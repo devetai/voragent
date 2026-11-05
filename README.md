@@ -54,8 +54,13 @@ pnpm install
 pnpm -r build
 
 # 3. Khởi động voragent daemon
-node packages/cli/dist/src/main.js
+pnpm start
+
+# Hoặc build rồi chạy luôn trong một lệnh
+pnpm dev
 ```
+
+Truyền thêm tham số bằng `--`, ví dụ `pnpm start -- --no-open --port 4800`. Tương đương chạy trực tiếp `node packages/cli/dist/src/main.js`.
 
 Để sử dụng lệnh `voragent` toàn cục trên máy, bạn có thể liên kết gói CLI:
 

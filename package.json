@@ -9,6 +9,8 @@
   "scripts": {
     "test": "vitest run",
     "build": "pnpm -r build",
+    "start": "node packages/cli/dist/src/main.js",
+    "dev": "pnpm -r build && node packages/cli/dist/src/main.js",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
