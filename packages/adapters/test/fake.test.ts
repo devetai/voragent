@@ -1,8 +1,9 @@
 import { test, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { rmTmp } from './tmp.js';
 import { createFakeAdapter } from '../src/fake.js';
 import type { Adapter } from '../src/types.js';
 
@@ -20,7 +21,7 @@ function run(adapter: Adapter, cwd: string, sessionId: string | null = null) {
 
 function withDir<T>(fn: (dir: string) => T): T {
   const dir = mkdtempSync(join(tmpdir(), 'vor dir-'));
-  try { return fn(dir); } finally { rmSync(dir, { recursive: true, force: true }); }
+  try { return fn(dir); } finally { rmTmp(dir); }
 }
 
 test('fixture ok', () => withDir((dir) => {

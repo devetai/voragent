@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { createServer as createNetServer } from 'node:net';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
 import { join, resolve } from 'node:path';
 import spawn from 'cross-spawn';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -9,12 +10,13 @@ import WebSocket from 'ws';
 import { createFakeAdapter } from '@voragent/adapters';
 import type { Adapter } from '@voragent/adapters';
 import type { ProviderId, Task, VEvent } from '@voragent/shared';
-import { freePort, until, withFreePort } from './helpers.js';
+import { freePort, until, withFreePort, rmTmp } from './helpers.js';
 import { EventBus } from '../src/bus.js';
 import { DEFAULT_CONFIG } from '../src/config.js';
 import { startDaemon } from '../src/daemon.js';
 import type { Daemon } from '../src/daemon.js';
 import { createOrchestrator } from '../src/orchestrator.js';
+import { createProjectCatalog } from '../src/projects.js';
 import { createServer } from '../src/server.js';
 import { openStore } from '../src/store.js';
 import type { Store } from '../src/store.js';
@@ -69,7 +71,7 @@ afterEach(async () => {
       }
     }
   }
-  rmSync(root, { recursive: true, force: true });
+  rmTmp(root);
 });
 
 const fakeAdapters = (fixture = 'fake-ok.jsonl'): Map<ProviderId, Adapter> =>
@@ -254,6 +256,77 @@ describe('createServer (không cần socket)', () => {
     expect((await a.request('/api/shutdown', { method: 'POST', headers: h })).status).toBe(204);
     await until(() => calls.length === 1, 'onShutdown');
     expect(calls[0]).toEqual({ force: false });
+  });
+});
+
+describe('GET /api/projects', () => {
+  function appWith(withCatalog: boolean) {
+    const store = openStore(':memory:');
+    stores.push(store);
+    const bus = new EventBus();
+    const orchestrator = createOrchestrator({
+      store, bus, adapters: fakeAdapters(), config: { ...DEFAULT_CONFIG, dataDir, priority: ['fake-a'] },
+    });
+    const pa = join(root, 'proj-a');
+    const pb = join(root, 'proj-b');
+    mkdirSync(pa);
+    mkdirSync(pb);
+    const calls = { n: 0 };
+    const projects = createProjectCatalog({
+      sources: [async () => {
+        calls.n += 1;
+        return [
+          { path: pa, lastUsedAt: 1_000, source: 'claude' as const },
+          { path: pb, lastUsedAt: 2_000, source: 'antigravity' as const },
+        ];
+      }],
+      store, dataDir, home: join(root, 'uhome'), tmpDirs: [],
+      runGit: async () => null,
+    });
+    const a = createServer({
+      orchestrator, store, bus, key: KEY, webDir: null, ...(withCatalog ? { projects } : {}),
+    });
+    return { a, calls, pa, pb };
+  }
+  const h = { 'x-voragent-key': KEY };
+
+  it('401 khi thiếu khóa', async () => {
+    const { a } = appWith(true);
+    expect((await a.request('/api/projects')).status).toBe(401);
+  });
+
+  it('200 với danh sách đúng và thứ tự dùng gần nhất trước', async () => {
+    const { a, pa, pb } = appWith(true);
+    const r = await a.request('/api/projects', { headers: h });
+    expect(r.status).toBe(200);
+    const list = (await r.json()) as Array<{ path: string; name: string; sources: Array<{ source: string }> }>;
+    expect(list.map((p) => p.name)).toEqual(['proj-b', 'proj-a']);
+    expect(list.map((p) => p.path)).toEqual([pb, pa]);
+    expect(list[0]?.sources.map((s) => s.source)).toEqual(['antigravity']);
+  });
+
+  it('?refresh=1 gọi lại các nguồn, không có thì dùng bộ nhớ đệm', async () => {
+    const { a, calls } = appWith(true);
+    await a.request('/api/projects', { headers: h });
+    await a.request('/api/projects', { headers: h });
+    expect(calls.n).toBe(1);
+    await a.request('/api/projects?refresh=1', { headers: h });
+    expect(calls.n).toBe(2);
+  });
+
+  it('không truyền projects thì trả []', async () => {
+    const { a } = appWith(false);
+    const r = await a.request('/api/projects', { headers: h });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual([]);
+  });
+
+  it('Host không hợp lệ bị 403; Host localhost và Origin lạ trên GET vẫn theo luật cũ', async () => {
+    const { a } = appWith(true);
+    expect((await a.request('/api/projects', { headers: { ...h, host: 'evil.example.com' } })).status).toBe(403);
+    expect((await a.request('/api/projects', { headers: { ...h, host: 'localhost:4717' } })).status).toBe(200);
+    expect((await a.request('/api/projects', { headers: { ...h, origin: 'http://evil.example.com' } })).status).toBe(200);
+    expect((await a.request('/api/projects', { method: 'POST', headers: { ...h, origin: 'http://evil.example.com' } })).status).toBe(403);
   });
 });
 
@@ -587,3 +660,56 @@ async function getTask(d: Daemon, id: string): Promise<{
   const r = await fetch(`${base(d)}/api/tasks/${id}`, authed(d));
   return (await r.json()) as never;
 }
+
+describe('startDaemon: cô lập thư mục người dùng', () => {
+  function writeAg(appRoot: string, name: string, folderPath: string): void {
+    const dir = join(appRoot, 'Antigravity', 'User', 'workspaceStorage', name);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'workspace.json'), JSON.stringify({ folder: pathToFileURL(folderPath).href }));
+  }
+
+  it('userHome được ghi đè thì không đọc APPDATA thật', async () => {
+    const mine = join(root, 'mine');
+    const decoy = join(root, 'decoy');
+    mkdirSync(mine);
+    mkdirSync(decoy);
+    const fakeHome = join(root, 'fakehome');
+    const otherApp = join(root, 'otherapp');
+    mkdirSync(fakeHome);
+    writeAg(join(fakeHome, 'AppData', 'Roaming'), 'a', mine);
+    writeAg(otherApp, 'b', decoy);
+    const oldApp = process.env.APPDATA;
+    process.env.APPDATA = otherApp;
+    try {
+      const d = await withFreePort((port) =>
+        startDaemon({ dataDir, port, adapters: fakeAdapters(), userHome: fakeHome, projectTmpDirs: [] }),
+      );
+      daemons.push(d);
+      const r = await fetch(`${base(d)}/api/projects?refresh=1`, authed(d));
+      const list = (await r.json()) as Array<{ path: string }>;
+      expect(list.map((p) => p.path)).toEqual([realpathSync.native(mine)]);
+    } finally {
+      if (oldApp === undefined) delete process.env.APPDATA;
+      else process.env.APPDATA = oldApp;
+    }
+  });
+
+  it('không truyền userHome/projectSources: môi trường test trỏ tới home tạm của globalSetup', async () => {
+    const home = process.env.VORAGENT_USER_HOME;
+    expect(home).toBeTruthy();
+    expect(realpathSync.native(home!).toLowerCase()).not.toBe(realpathSync.native(homedir()).toLowerCase());
+    const proj = join(root, 'viahome');
+    mkdirSync(proj);
+    writeFileSync(join(home!, '.claude.json'), JSON.stringify({ projects: { [proj]: {} } }));
+    try {
+      const d = await withFreePort((port) =>
+        startDaemon({ dataDir, port, adapters: fakeAdapters(), projectTmpDirs: [] }),
+      );
+      daemons.push(d);
+      const list = (await (await fetch(`${base(d)}/api/projects?refresh=1`, authed(d))).json()) as Array<{ path: string }>;
+      expect(list.map((p) => p.path)).toEqual([realpathSync.native(proj)]);
+    } finally {
+      rmSync(join(home!, '.claude.json'), { force: true });
+    }
+  });
+});

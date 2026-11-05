@@ -29,11 +29,32 @@ thì trang gốc chỉ báo "chưa được build", còn API và các lệnh dư
 | --- | --- |
 | `voragent [--port N] [--no-open]` | Chạy daemon trong terminal, in URL kèm khóa, mở trình duyệt (trừ khi có `--no-open`). Ctrl-C lần một dừng có trật tự và chờ các lượt đang chạy xong; Ctrl-C lần hai (hoặc SIGTERM) dừng cứng: giết các lượt đang chạy rồi thoát, chờ tối đa khoảng 5 giây. |
 | `voragent start --background` | Chạy daemon nền, ghi log vào `daemon.log`, in URL rồi thoát. |
-| `voragent add <repoPath> <tin nhắn...> [--mode m] [--agent id]` | Tạo task mới. `--mode` là một trong `head-dirty-commit`, `head-commit`, `dirty-nocommit`. `--agent id` chỉ cho task dùng đúng nền tảng đó. Nếu `<repoPath>` không phải repo git, lệnh in cảnh báo không cách ly ra stderr (xem mục "Chế độ workspace") nhưng vẫn tạo task và thoát mã 0. |
+| `voragent projects` | Bảng các dự án đã dùng với Claude Code / Antigravity (tên, đường dẫn, lần dùng cuối, nguồn, nhánh, số file sửa dở, số task). |
+| `voragent add <dự-án-hoặc-đường-dẫn> <tin nhắn...> [--mode m] [--agent id]` | Tạo task mới. `--mode` là một trong `head-dirty-commit`, `head-commit`, `dirty-nocommit`. `--agent id` chỉ cho task dùng đúng nền tảng đó. Tham số đầu là thư mục có thật thì dùng làm đường dẫn; nếu không, tra theo tên dự án (xem `voragent projects`): khớp chính xác không phân biệt hoa thường, hoặc khớp một phần duy nhất; không thấy hoặc trùng thì in các đường dẫn ứng viên và thoát mã 1. Nếu đường dẫn không phải repo git, lệnh in cảnh báo không cách ly ra stderr (xem mục "Chế độ workspace") nhưng vẫn tạo task và thoát mã 0. |
 | `voragent status` | Bảng các nền tảng (đã cài, tạm nghỉ đến lúc nào, đã dùng bao nhiêu phần trăm) và các task chưa đóng. |
 | `voragent stop [--force]` | Dừng daemon đang chạy. Mặc định chờ các lượt đang chạy xong (có thể rất lâu, tới `turnTimeoutMs`); `--force` dừng ngay các lượt đó (xem mục "Dừng daemon"). |
 
 Khi chưa có daemon, `add`, `status` và `stop` in `Daemon chưa chạy. Chạy: voragent` rồi thoát với mã 1.
+
+## Khám phá dự án
+
+Màn hình đầu của giao diện web là danh sách các dự án bạn đã mở bằng công cụ khác, để chọn thay vì gõ đường dẫn. voragent đọc các nguồn sau, chỉ đọc, không ghi và không gửi gì ra khỏi máy:
+
+- Claude Code: file `~/.claude.json` và thư mục `~/.claude/projects`. Với mỗi thư mục dự án trong `~/.claude/projects`, voragent chỉ đọc 64 KB đầu của file transcript MỚI NHẤT, để tìm đường dẫn `cwd`; chỉ đường dẫn, thời gian và `cwd` được giữ lại, nội dung hội thoại không được lưu, không ghi log, không gửi đi đâu;
+- Antigravity IDE: các thư mục workspace trong `workspaceStorage` của IDE.
+
+Kết quả được gộp theo đường dẫn thật (không phân biệt hoa thường trên Windows) rồi sắp theo lần dùng gần nhất. Mục sau bị loại: đường dẫn không tuyệt đối hoặc không còn tồn tại, không phải thư mục, thư mục home, các thư mục cấu hình dạng `~/.xxx`, thư mục dữ liệu của voragent, thư mục tạm, gốc ổ đĩa và các thư mục cha của chúng. Với mỗi dự án, voragent chạy thêm `git` chỉ đọc để lấy nhánh và số file đang sửa; thư mục không phải repo git vẫn hiện, kèm huy hiệu "không phải repo git". Kết quả được giữ 30 giây; nút "Làm mới" trên giao diện bỏ qua bộ nhớ đệm.
+
+Biến môi trường `VORAGENT_USER_HOME` đổi thư mục home dùng để dò (mặc định là home của hệ điều hành), hữu ích khi thử nghiệm.
+
+```bash
+voragent projects            # in bảng các dự án
+voragent add my-project "Sửa lỗi đăng nhập"   # chọn dự án theo tên
+```
+
+`voragent add` nhận tên dự án thay cho đường dẫn: khớp chính xác không phân biệt hoa thường, hoặc khớp một phần duy nhất; không thấy hoặc trùng thì in các đường dẫn ứng viên và thoát mã 1.
+
+Chưa hỗ trợ: Codex và `agy` (chưa dò được dự án từ hai nguồn này).
 
 ## Thư mục dữ liệu
 
@@ -156,3 +177,52 @@ Chưa kiểm:
 - Claude dùng công cụ Bash (`echo >>`, `sed -i`) thay vì Edit/Write nên không có sự kiện `FILE_CHANGED` trong lần chạy này.
 - Hai lượt dùng chung một bản ghi run (`runs` có một dòng, `endedAt` cập nhật theo lượt cuối); `RUN_STARTED` của lượt 0 có `sessionId: null` vì phiên chỉ biết sau khi CLI trả về.
 - Tin nhắn lượt 1 lưu thành "Gi? x�a d�ng..." vì lệnh `curl` trên Windows gửi byte không phải UTF-8 (lỗi của lệnh kiểm, chưa kết luận là lỗi của voragent); Claude vẫn hiểu. Tiếng Việt qua API với UTF-8 chuẩn chưa được kiểm lại.
+
+### Khám phá dự án
+
+- voragent: commit `7836136` (nhánh `feat/phase1b-projects`, commit mã nguồn cuối cùng; các commit sau chỉ sửa tài liệu), các phần kiểm trên dữ liệu thật và thư mục chính giả bên dưới làm ở commit `5a50d10`, kiểm ngày 2026-11-05.
+- Hệ điều hành: Windows 11 Pro (10.0.26100), Git Bash. Node v22.14.0.
+- `pnpm -r build`, `pnpm -r typecheck` và toàn bộ test (298, 20 file) đều qua ở commit `7836136`, chạy 3 lần liên tiếp.
+
+Cách kiểm: chỉ đọc. Phần 1 chạy trên thư mục chính thật của người dùng (daemon với `VORAGENT_HOME` tạm, không tạo task, không đọc nội dung
+transcript, không ghi gì vào thư mục chính). Phần 2 dùng thư mục chính giả (`VORAGENT_USER_HOME` và `APPDATA` trỏ vào thư mục tạm),
+hai repo thử dùng một lần cộng một thư mục không phải git, `VORAGENT_FAKE=1` nên không tốn quota. Báo cáo này chỉ ghi số lượng, không ghi đường
+dẫn hay tên dự án thật.
+
+Phần 1, dữ liệu thật (chỉ đọc):
+
+- ✔ Mục thô: 109 (Claude 52, Antigravity 57). 20 mục thô trùng nhau chỉ khác hoa thường, dấu gạch hoặc dấu gạch cuối (89 khóa riêng sau khi gấp).
+- ✔ Số mục bị loại theo từng lý do (tính riêng từng lý do, có thể chồng nhau): không tồn tại 32, không phải thư mục 0, chính thư mục chính 0,
+  trong thư mục dữ liệu công cụ (`~/.claude`, `~/.gemini`, ...) 14, trong thư mục dữ liệu voragent 0, trong thư mục tạm của hệ điều hành 1,
+  gốc ổ đĩa hoặc tổ tiên của home/dataDir/tmp 0. Còn 62 mục, gộp trùng 16, ra 46 dự án.
+- ✔ `GET /api/projects` trả 46 dự án, khớp đúng con số 46 của đoạn mã tính riêng. 40 là repo git, 40 có nhánh, 11 có file sửa dở, 6 không phải git.
+  41 dự án chỉ có một nguồn, 5 có cả hai nguồn (Claude 24 dự án, Antigravity 27).
+- ✔ Không còn dự án trùng (so khóa không phân biệt hoa thường, 46 khóa riêng); không có dự án nào nằm trong thư mục tạm, trong thư mục dữ liệu
+  voragent, là gốc ổ đĩa hoặc là chính thư mục chính.
+- ✔ Thời gian: lần gọi đầu 3,15 s (46 dự án, mỗi dự án chạy ba lệnh git chỉ đọc, đồng thời 4); lần hai (nhớ đệm) 0,003 s; `?refresh=1` 2,86 s.
+  Kết quả của ba lần giống hệt nhau. Lần đầu 3 s là chấp nhận được nhưng đáng ghi nhận nếu số dự án tăng nhiều.
+- ✔ `voragent projects`: thoát mã 0, 47 dòng (1 dòng tiêu đề và 46 dự án), có đủ các cột Tên, Đường dẫn, Dùng lần cuối, Nguồn, Nhánh, File sửa dở, Task.
+
+Phần 2, thư mục chính giả (không đọc thư mục chính thật):
+
+- ✔ `voragent projects`: đúng 3 dự án thử (4 khóa trong `.claude.json`, khóa thứ tư khác hoa thường của ổ đĩa và thư mục thật nên được gộp, một khóa có dấu gạch cuối); dự án không phải git hiện nhánh `-` và file sửa dở `-`.
+- ✔ `voragent add demo-app "ping"`: mã 0, task có `repoPath` là thư mục `demo-app`.
+- ✔ `voragent add demo "ping"`: mã 1, in cả hai ứng viên `demo-app` và `demo-app-extra` (không tạo task).
+- ✔ `voragent add extra "ping"`: mã 0, khớp duy nhất `demo-app-extra`.
+- ✔ `voragent add nonexistent-name "ping"`: mã 1, "Không tìm thấy dự án".
+- ✔ `voragent add ./does/not/exist "ping"`: mã 1, "thư mục không tồn tại".
+- ✔ `voragent add plain-folder "ping"`: mã 0, in cảnh báo không cách ly ra stderr, task tạo ở thư mục đó.
+- ✔ Hai repo thử: `git status` sạch, `main` giữ nguyên commit, chỉ thêm nhánh `voragent/task-N` và worktree dưới `VORAGENT_HOME`.
+
+Chưa kiểm:
+
+- Nguồn Codex và nguồn `agy` (Antigravity CLI, kể cả các cuộc trò chuyện của nó); chỉ kiểm nguồn Claude Code và Antigravity IDE.
+- macOS, Linux (chỉ kiểm đường dẫn Windows).
+- Giao diện web trong trình duyệt thật (chỉ kiểm `GET /api/projects` và CLI).
+- `voragent add <tên dự án thật>` trên thư mục chính thật (tránh tạo worktree trong repo của người dùng).
+- Đối chiếu thủ công vì sao từng dự án Claude đã mở lại vắng mặt trong danh sách: chỉ có số lượng theo lý do, không xem từng mục để giữ kín đường dẫn.
+
+Điểm lạ ghi nhận (không sửa trong lần kiểm này):
+
+- Daemon dò Antigravity qua biến `APPDATA` thật dù đã đặt `VORAGENT_USER_HOME`; muốn cô lập hoàn toàn phải đặt cả `APPDATA`.
+- Thời gian lần đầu khoảng 3 s với 46 dự án, chủ yếu do git chỉ đọc cho từng dự án.

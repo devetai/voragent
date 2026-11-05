@@ -23,3 +23,4 @@ export function createAdapters(ids: ProviderId[]): Map<ProviderId, Adapter> {
   }
   return map;
 }
+export * from './discovery/index.js';

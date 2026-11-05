@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
-import type { ProviderState, Task, VEvent } from '@voragent/shared';
+import type { Project, ProviderState, Task, VEvent } from '@voragent/shared';
 import { ApiError, api, errText } from './api';
 import { Board } from './Board';
 import { INITIAL_CONNECTION, nextConnectionState } from './connection';
 import type { ConnectionEvent, ConnectionState } from './connection';
 import { NewTaskForm } from './NewTaskForm';
+import { ProjectList } from './ProjectList';
 import { QuotaBar } from './QuotaBar';
 import { TaskView } from './TaskView';
-import { applyEvent, mergeEvents } from './state';
+import { applyEvent, mergeEvents, projectKeyOf, projectPathOf, resolveProjectRoute, taskIdOf, tasksOfProject } from './state';
 import type { UiState } from './state';
 
 type Action =
@@ -50,6 +51,10 @@ function useHash(): [string, (h: string) => void] {
   return [hash, (h) => { window.location.hash = h; }];
 }
 
+const PROJECT_PREFIX = '#/project/';
+
+const baseName = (p: string): string => p.replace(/[\/]+$/, '').split(/[\/]/).pop() ?? p;
+
 export function App() {
   const [state, dispatch] = useReducer(reduce, initial);
   const [conn, setConn] = useState<ConnectionState>(INITIAL_CONNECTION);
@@ -58,6 +63,41 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [hash, go] = useHash();
+  const nav = (h: string): void => {
+    setNotice(null);
+    go(h);
+  };
+  const [projects, setProjects] = useState<Project[] | null>(null);
+  const [projLoading, setProjLoading] = useState(true);
+  const [projError, setProjError] = useState<string | null>(null);
+  // Màn danh sách gần nhất (dự án / bảng tất cả / bảng một dự án): nơi quay về khi thoát task hoặc form.
+  const [listHash, setListHash] = useState('');
+  const [notice, setNotice] = useState<string | null>(null);
+  const projReq = useRef(0);
+  const mounted = useRef(true);
+
+  const loadProjects = useCallback(async (refresh: boolean): Promise<void> => {
+    const req = ++projReq.current;
+    setProjLoading(true);
+    try {
+      const list = await api.projects(refresh);
+      if (!mounted.current || req !== projReq.current) return;
+      setProjects(list);
+      setProjError(null);
+    } catch (e) {
+      if (!mounted.current || req !== projReq.current) return;
+      setProjError(errText(e)); // giữ danh sách cũ, không làm trắng trang
+    } finally {
+      if (mounted.current && req === projReq.current) setProjLoading(false);
+    }
+  }, []);
+
+  // Tải danh sách dự án đúng một lần khi mở; lọc chữ không đụng tới đây.
+  useEffect(() => {
+    mounted.current = true;
+    void loadProjects(false);
+    return () => { mounted.current = false; };
+  }, [loadProjects]);
 
   const reload = useCallback(async (): Promise<void> => {
     try {
@@ -161,16 +201,41 @@ export function App() {
 
   const tasks = [...state.tasks.values()];
   const providers = [...state.providers.values()];
-  const taskId = hash.startsWith('#/task/') ? decodeURIComponent(hash.slice(7)) : null;
+  const taskId = taskIdOf(hash);
   const open = taskId !== null ? state.tasks.get(taskId) : undefined;
+  const isListHash = hash === '' || hash === '#/board' || projectPathOf(hash) !== null;
+  useEffect(() => {
+    if (isListHash) setListHash(hash);
+  }, [hash, isListHash]);
+  const listView = isListHash ? hash : listHash;
+  const viewedPath = projectPathOf(listView);
+  const viewedProject = viewedPath === null ? undefined
+    : projects?.find((p) => projectKeyOf(p.path) === projectKeyOf(viewedPath));
+  const viewedName = viewedProject?.name ?? (viewedPath === null ? '' : baseName(viewedPath));
+  const boardTasks = viewedPath === null ? tasks : tasksOfProject(tasks, { path: viewedPath });
+  // Dự án đã chọn không còn trong danh sách (đã tải thành công): về danh sách kèm thông báo.
+  const loadState = projError !== null ? 'failed' : projects === null ? 'loading' : 'loaded';
+  const route = resolveProjectRoute(hash, projects, loadState);
+  const staleNotice = route.view === 'list' ? route.notice : undefined;
+  useEffect(() => {
+    if (staleNotice !== undefined) {
+      setNotice(staleNotice);
+      go('');
+    }
+  }, [staleNotice]);
+  const activeTab = listView === '#/board' ? 'board' : 'projects';
 
   return (
     <div className="app">
       <header>
         <h1>voragent</h1>
         {conn.status !== 'connected' && <span className="offline">mất kết nối</span>}
-        <button onClick={() => go('#/new')}>+ Task mới</button>
+        <button onClick={() => nav('#/new')}>+ Task mới</button>
       </header>
+      <nav className="tabs">
+        <button type="button" className={activeTab === 'projects' ? 'active' : ''} onClick={() => nav('')}>Dự án</button>
+        <button type="button" className={activeTab === 'board' ? 'active' : ''} onClick={() => nav('#/board')}>Bảng task</button>
+      </nav>
       {conn.status === 'auth-failed' && (
         <div className="error banner" role="alert">
           Khóa truy cập đã đổi (có thể voragent đã khởi động lại). Hãy mở lại URL do voragent in ra.
@@ -178,16 +243,31 @@ export function App() {
       )}
       <QuotaBar providers={providers} now={now} />
       {error !== null && <div className="error" role="alert">{error}</div>}
+      {notice !== null && <div className="notice" role="status">{notice}</div>}
+      {viewedPath !== null && hash !== '#/new' && open === undefined && (
+        <div className="crumb"><a href="#" onClick={(e) => { e.preventDefault(); nav(''); }}>Dự án</a> › {viewedName}</div>
+      )}
       {hash === '#/new' ? (
         <NewTaskForm
           providers={providers}
-          onCreated={(id) => { void reload(); go(`#/task/${encodeURIComponent(id)}`); }}
-          onCancel={() => go('')}
+          projects={projects ?? []}
+          initialPath={viewedPath}
+          onCreated={(id) => { void reload(); nav(`#/task/${encodeURIComponent(id)}`); }}
+          onCancel={() => nav(listView)}
         />
       ) : open ? (
-        <TaskView task={open} events={state.events.get(open.id) ?? []} onLoaded={onHistory} onBack={() => go('')} />
+        <TaskView task={open} events={state.events.get(open.id) ?? []} onLoaded={onHistory} onBack={() => nav(listView)} />
+      ) : activeTab === 'projects' && viewedPath === null ? (
+        <ProjectList
+          projects={projects}
+          loading={projLoading}
+          error={projError}
+          taskCount={(p) => tasksOfProject(tasks, p).length}
+          onOpen={(p) => nav(PROJECT_PREFIX + encodeURIComponent(p.path))}
+          onRefresh={() => { void loadProjects(true); }}
+        />
       ) : (
-        <Board tasks={tasks} events={state.events} onOpen={(id) => go(`#/task/${encodeURIComponent(id)}`)} />
+        <Board tasks={boardTasks} events={state.events} onOpen={(id) => nav(`#/task/${encodeURIComponent(id)}`)} />
       )}
     </div>
   );

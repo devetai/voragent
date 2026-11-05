@@ -88,3 +88,28 @@ export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   failed: 'Lỗi',
   closed: 'Xong',
 };
+
+export type DiscoverySource = 'claude' | 'antigravity' | 'codex';
+
+export interface DiscoveredProject {
+  path: string;
+  lastUsedAt: number | null;
+  source: DiscoverySource;
+}
+
+export interface ProjectSource {
+  source: DiscoverySource;
+  lastUsedAt: number | null;
+}
+
+export interface Project {
+  id: string;
+  path: string;
+  name: string;
+  lastUsedAt: number | null;
+  sources: ProjectSource[];
+  isGit: boolean;
+  branch: string | null;
+  dirtyCount: number | null;
+  taskCount: number;
+}

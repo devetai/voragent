@@ -12,6 +12,7 @@ import type { Config, ProviderId, WorkspaceMode } from '@voragent/shared';
 import type { EventBus } from './bus.js';
 import { DEFAULT_CONFIG } from './config.js';
 import type { Orchestrator } from './orchestrator.js';
+import type { ProjectCatalog } from './projects.js';
 import type { Store } from './store.js';
 import { workspaceSummary } from './workspace.js';
 
@@ -121,6 +122,8 @@ export function createServer(d: {
   config?: Config;
   /** Gọi sau khi trả 204 cho POST /api/shutdown. `force`: dừng cứng các lượt đang chạy. Không có thì route trả 501. */
   onShutdown?: (o: { force: boolean }) => void;
+  /** Danh mục dự án cho GET /api/projects. Thiếu thì route trả []. */
+  projects?: ProjectCatalog;
 }): Hono {
   const { orchestrator, store, key } = d;
   const app = new Hono();
@@ -287,6 +290,11 @@ export function createServer(d: {
   });
 
   app.get('/api/providers', (c) => c.json(store.listProviders()));
+
+  app.get('/api/projects', async (c) => {
+    if (!d.projects) return c.json([]);
+    return c.json(await d.projects.list({ refresh: c.req.query('refresh') === '1' }));
+  });
 
   app.get("/api/config", (c) => c.json(d.config ?? { ...DEFAULT_CONFIG, dataDir: "" }));
 

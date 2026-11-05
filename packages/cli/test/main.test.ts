@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer as createNetServer } from 'node:net';
 import { statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,8 +10,8 @@ import type { Adapter } from '@voragent/adapters';
 import { startDaemon } from '@voragent/core';
 import type { Daemon } from '@voragent/core';
 import type { ProviderId } from '@voragent/shared';
-import { freePort, until, withFreePort } from './helpers.js';
-import { formatStatus, NO_DAEMON, runCli } from '../src/cli.js';
+import { freePort, until, withFreePort, rmTmp } from './helpers.js';
+import { formatStatus, matchProject, NO_DAEMON, runCli } from '../src/cli.js';
 import type { CliContext } from '../src/cli.js';
 
 const fx = (name: string): string => resolve(import.meta.dirname, '../../adapters/test/fixtures', name);
@@ -94,11 +94,11 @@ afterEach(async () => {
       }
     }
   }
-  rmSync(root, { recursive: true, force: true });
+  rmTmp(root);
 });
 
 async function live(): Promise<Daemon> {
-  const d = await withFreePort((port) => startDaemon({ dataDir: home, port, adapters: adapters() }));
+  const d = await withFreePort((port) => startDaemon({ dataDir: home, port, adapters: adapters(), userHome: join(root, 'uhome'), projectTmpDirs: [] }));
   daemons.push(d);
   return d;
 }
@@ -178,7 +178,7 @@ describe('voragent với daemon đang chạy', () => {
     expect(errBuf).toMatch(/mode/);
     errBuf = '';
     expect(await runCli(['add', join(root, 'khong-co'), 'x'], ctx())).toBe(1);
-    expect(errBuf).toMatch(/repoPath/);
+    expect(errBuf).toMatch(/thư mục không tồn tại/);
   });
 
   it('stop gửi /api/shutdown và daemon dừng, daemon.json biến mất', async () => {
@@ -292,6 +292,150 @@ describe('voragent stop --force và cảnh báo không cách ly', () => {
     await live();
     expect(await runCli(['add', repo, 'làm gì đó', '--agent', 'fake-a'], ctx())).toBe(0);
     expect(errBuf).toBe('');
+  });
+});
+
+describe('voragent projects và add theo tên dự án', () => {
+  let projs: string;
+  const dirs = (...names: string[]): string[] => names.map((n) => {
+    const p = join(projs, n);
+    mkdirSync(p, { recursive: true });
+    return p;
+  });
+
+  async function liveProjects(found: Array<{ path: string; lastUsedAt: number | null; source: 'claude' | 'antigravity' }>): Promise<Daemon> {
+    const d = await withFreePort((port) => startDaemon({
+      dataDir: home, port, adapters: adapters(),
+      projectSources: [async () => found], userHome: join(root, 'uhome'), projectTmpDirs: [],
+    }));
+    daemons.push(d);
+    return d;
+  }
+  const tasksOf = async (d: Daemon) =>
+    (await (await fetch(`http://127.0.0.1:${d.port}/api/tasks`, { headers: { 'x-voragent-key': d.key } })).json()) as Array<{ repoPath: string }>;
+
+  beforeEach(() => {
+    projs = join(root, 'projs');
+    mkdirSync(projs);
+  });
+
+  it('projects in bảng có tên, đường dẫn và nguồn', async () => {
+    const [alpha, beta] = dirs('alpha-app', 'beta-app');
+    await liveProjects([
+      { path: alpha!, lastUsedAt: new Date(2026, 10, 5, 9, 7).getTime(), source: 'claude' },
+      { path: beta!, lastUsedAt: null, source: 'antigravity' },
+    ]);
+    expect(await runCli(['projects'], ctx())).toBe(0);
+    expect(outBuf).toMatch(/Tên\s+Đường dẫn\s+Dùng lần cuối\s+Nguồn\s+Nhánh\s+File sửa dở\s+Task/);
+    expect(outBuf).toMatch(/alpha-app\s+.*alpha-app\s+2026-11-05 09:07\s+Claude/);
+    expect(outBuf).toMatch(/beta-app\s+.*beta-app\s+-\s+Antigravity/);
+    expect(errBuf).toBe('');
+  });
+
+  it('projects với danh sách rỗng in dòng hướng dẫn', async () => {
+    await liveProjects([]);
+    expect(await runCli(['projects'], ctx())).toBe(0);
+    expect(outBuf).toMatch(/Không tìm thấy dự án nào/);
+    expect(outBuf).toMatch(/voragent add/);
+  });
+
+  it('projects khi chưa có daemon: thông báo cũ, mã 1', async () => {
+    expect(await runCli(['projects'], ctx())).toBe(1);
+    expect(errBuf).toBe(`${NO_DAEMON}\n`);
+    expect(outBuf).toBe('');
+  });
+
+  it('add theo tên chính xác tạo task đúng repoPath', async () => {
+    const [alpha, beta] = dirs('tenduan', 'tenduan-phu');
+    const d = await liveProjects([
+      { path: alpha!, lastUsedAt: 2, source: 'claude' },
+      { path: beta!, lastUsedAt: 1, source: 'claude' },
+    ]);
+    expect(await runCli(['add', 'TenDuan', 'làm gì đó', '--agent', 'fake-a'], ctx())).toBe(0);
+    expect(outBuf).toMatch(/Đã tạo task #1/);
+    expect((await tasksOf(d))[0]?.repoPath).toBe(alpha);
+  });
+
+  it('add theo tên khớp một phần duy nhất thì nhận', async () => {
+    const [one, two] = dirs('quan-ly-kho', 'web-ban-hang');
+    const d = await liveProjects([
+      { path: one!, lastUsedAt: 2, source: 'claude' },
+      { path: two!, lastUsedAt: 1, source: 'claude' },
+    ]);
+    expect(await runCli(['add', 'ban-hang', 'làm gì đó', '--agent', 'fake-a'], ctx())).toBe(0);
+    expect((await tasksOf(d))[0]?.repoPath).toBe(two);
+  });
+
+  it('add với tên trùng ở hai thư mục: mã 1 và liệt kê cả hai đường dẫn', async () => {
+    const [x, y] = [join(projs, 'a', 'shop'), join(projs, 'b', 'shop')];
+    mkdirSync(x, { recursive: true });
+    mkdirSync(y, { recursive: true });
+    const d = await liveProjects([
+      { path: x, lastUsedAt: 2, source: 'claude' },
+      { path: y, lastUsedAt: 1, source: 'antigravity' },
+    ]);
+    expect(await runCli(['add', 'shop', 'làm gì đó'], ctx())).toBe(1);
+    expect(errBuf).toContain(x);
+    expect(errBuf).toContain(y);
+    expect(await tasksOf(d)).toEqual([]);
+  });
+
+  it('add với khớp một phần nhiều kết quả: mã 1 và liệt kê ứng viên', async () => {
+    const [x, y] = dirs('shop-web', 'shop-api');
+    await liveProjects([
+      { path: x!, lastUsedAt: 2, source: 'claude' },
+      { path: y!, lastUsedAt: 1, source: 'claude' },
+    ]);
+    expect(await runCli(['add', 'shop', 'x'], ctx())).toBe(1);
+    expect(errBuf).toContain(x);
+    expect(errBuf).toContain(y);
+  });
+
+  it('add với tên không có: mã 1 và thông báo', async () => {
+    const [x] = dirs('alpha');
+    const d = await liveProjects([{ path: x!, lastUsedAt: 1, source: 'claude' }]);
+    expect(await runCli(['add', 'khongco', 'x'], ctx())).toBe(1);
+    expect(errBuf).toMatch(/Không tìm thấy dự án "khongco"/);
+    expect(await tasksOf(d)).toEqual([]);
+  });
+
+  it('add với đường dẫn không tồn tại: "thư mục không tồn tại", mã 1, không tra theo tên', async () => {
+    const d = await liveProjects([]);
+    expect(await runCli(['add', join('.', 'khong', 'co'), 'x'], ctx())).toBe(1);
+    expect(errBuf).toMatch(/thư mục không tồn tại/);
+    expect(await runCli(['add', 'C:nope', 'x'], ctx())).toBe(1);
+    expect(errBuf).toMatch(/thư mục không tồn tại/);
+    expect(await tasksOf(d)).toEqual([]);
+  });
+
+  it('add với một FILE làm đối số đầu: "không phải thư mục", mã 1', async () => {
+    const d = await liveProjects([]);
+    const file = join(root, 'tep.txt');
+    writeFileSync(file, 'x');
+    expect(await runCli(['add', file, 'x'], ctx())).toBe(1);
+    expect(errBuf).toMatch(/không phải thư mục: /);
+    expect(errBuf).not.toMatch(/không tồn tại/);
+    expect(await tasksOf(d)).toEqual([]);
+  });
+
+  it('matchProject chuẩn hóa NFC và không phân biệt hoa thường (NFD vs NFC)', () => {
+    const nfc = 'Dự Án Đẹp'.normalize('NFC');
+    const nfd = 'dự án đẹp'.normalize('NFD');
+    expect(nfd).not.toBe(nfc.toLowerCase());
+    const p = { name: nfc, path: '/x/a' } as never;
+    expect(matchProject([p], nfd)).toEqual({ project: p });
+    expect(matchProject([p], 'ÁN'.normalize('NFD'))).toEqual({ project: p });
+    const q = { name: nfd, path: '/x/b' } as never;
+    expect(matchProject([q], nfc)).toEqual({ project: q });
+  });
+
+  it('add với thư mục có thật hoạt động như cũ, kể cả cảnh báo không phải repo git', async () => {
+    const d = await liveProjects([]);
+    const plain = join(root, 'plain');
+    mkdirSync(plain);
+    expect(await runCli(['add', plain, 'làm gì đó', '--agent', 'fake-a'], ctx())).toBe(0);
+    expect(errBuf).toMatch(/không cách ly/);
+    expect((await tasksOf(d))[0]?.repoPath).toBe(plain);
   });
 });
 

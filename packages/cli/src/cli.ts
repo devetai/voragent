@@ -7,7 +7,7 @@ import { isPidAlive, readDaemonInfo, startDaemon } from '@voragent/core';
 import type { Daemon, DaemonInfo } from '@voragent/core';
 import type { Adapter } from '@voragent/adapters';
 import { TASK_STATUS_LABEL } from '@voragent/shared';
-import type { ProviderId, ProviderState, Task } from '@voragent/shared';
+import type { ProviderId, ProviderState, Project, Task } from '@voragent/shared';
 
 export interface CliContext {
   /** Thư mục dữ liệu (mặc định `$VORAGENT_HOME` hoặc `~/.voragent`). */
@@ -37,7 +37,9 @@ export const NO_DAEMON = 'Daemon chưa chạy. Chạy: voragent';
 const USAGE = `Cách dùng:
   voragent [--port N] [--no-open]        chạy daemon trong terminal, mở trình duyệt
   voragent start --background [--port N] chạy daemon nền, in URL rồi thoát
-  voragent add <repoPath> <tin nhắn…> [--mode m] [--agent id]
+  voragent projects                       liệt kê các dự án đã dùng với Claude Code / Antigravity
+  voragent add <dự-án|đường-dẫn> <tin nhắn…> [--mode m] [--agent id]
+                                          dự án chọn theo tên (xem: voragent projects)
   voragent status
   voragent stop [--force]                 --force: dừng ngay các lượt đang chạy (xếp lại để chạy tiếp lần sau)`;
 
@@ -235,6 +237,53 @@ function table(rows: string[][]): string {
     .join('\n');
 }
 
+const SOURCE_LABEL: Record<string, string> = { claude: 'Claude', antigravity: 'Antigravity' };
+
+function stamp(ts: number): string {
+  const d = new Date(ts);
+  const p = (n: number): string => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+export function formatProjects(projects: Project[]): string {
+  if (projects.length === 0) {
+    return 'Không tìm thấy dự án nào. Thêm bằng: voragent add <thư-mục> <tin nhắn…>\n';
+  }
+  const rows: string[][] = [['Tên', 'Đường dẫn', 'Dùng lần cuối', 'Nguồn', 'Nhánh', 'File sửa dở', 'Task']];
+  for (const p of projects) {
+    rows.push([
+      p.name,
+      p.path,
+      p.lastUsedAt !== null ? stamp(p.lastUsedAt) : '-',
+      p.sources.map((s) => SOURCE_LABEL[s.source] ?? s.source).join(', '),
+      p.branch ?? '-',
+      p.dirtyCount !== null ? String(p.dirtyCount) : '-',
+      String(p.taskCount),
+    ]);
+  }
+  return `${table(rows)}\n`;
+}
+
+/** Chuỗi trông như đường dẫn (có dấu phân cách hoặc ký tự ổ đĩa) thì không tra theo tên. */
+const looksLikePath = (s: string): boolean => /[\\/:]/.test(s);
+
+/** Tra dự án theo tên: khớp chính xác (không phân biệt hoa thường), nếu không thì khớp một phần duy nhất. */
+export function matchProject(
+  projects: Project[], name: string,
+): { project: Project } | { error: string } {
+  // NFC + chữ thường cả hai phía: tên tiếng Việt gõ dạng NFD (dấu tách rời) vẫn khớp dạng NFC.
+  const fold = (s: string): string => s.normalize('NFC').toLowerCase();
+  const q = fold(name);
+  const exact = projects.filter((p) => fold(p.name) === q);
+  const hits = exact.length > 0 ? exact : projects.filter((p) => fold(p.name).includes(q));
+  if (hits.length === 1) return { project: hits[0]! };
+  if (hits.length === 0) {
+    return { error: `Không tìm thấy dự án "${name}". Xem danh sách: voragent projects` };
+  }
+  const list = hits.map((p) => `  ${p.name}  ${p.path}`).join('\n');
+  return { error: `Có ${hits.length} dự án khớp "${name}", hãy nhập đường dẫn đầy đủ:\n${list}` };
+}
+
 export function formatStatus(providers: ProviderState[], tasks: Task[], now = Date.now()): string {
   const prov: string[][] = [['Nền tảng', 'Đã cài', 'Tạm nghỉ đến', 'Đã dùng']];
   for (const p of providers) {
@@ -311,14 +360,46 @@ export async function runCli(argv: string[], ctx: CliContext): Promise<number> {
       }
       return runBackground(ctx, portOpt);
     case 'add': {
-      const [repoPath, ...words] = positionals;
-      if (!repoPath || words.length === 0) {
+      const [target, ...words] = positionals;
+      if (!target || words.length === 0) {
         ctx.err(`Thiếu đối số.\n${USAGE}\n`);
         return 1;
       }
+      const asPath = resolve(ctx.cwd, target);
+      let isDir = false;
+      let isFile = false;
+      try {
+        const st = statSync(asPath);
+        isDir = st.isDirectory();
+        isFile = !isDir;
+      } catch {
+        isDir = false;
+      }
+      if (isFile) {
+        ctx.err(`Lỗi: không phải thư mục: ${asPath}\n`);
+        return 1;
+      }
+      if (!isDir && looksLikePath(target)) {
+        ctx.err(`Lỗi: thư mục không tồn tại: ${asPath}\n`);
+        return 1;
+      }
       return withDaemon(ctx, async (info) => {
+        let repoPath = asPath;
+        if (!isDir) {
+          const r = await call(info, 'GET', '/api/projects');
+          if (r.status !== 200) {
+            ctx.err(`Không đọc được danh sách dự án: ${errorOf(r.json, `HTTP ${r.status}`)}\n`);
+            return 1;
+          }
+          const m = matchProject(r.json as Project[], target);
+          if ('error' in m) {
+            ctx.err(`${m.error}\n`);
+            return 1;
+          }
+          repoPath = m.project.path;
+        }
         const body: Record<string, unknown> = {
-          repoPath: resolve(ctx.cwd, repoPath),
+          repoPath,
           message: words.join(' '),
         };
         if (values.mode !== undefined) body.mode = values.mode;
@@ -339,6 +420,16 @@ export async function runCli(argv: string[], ctx: CliContext): Promise<number> {
         return 0;
       });
     }
+    case 'projects':
+      return withDaemon(ctx, async (info) => {
+        const r = await call(info, 'GET', '/api/projects');
+        if (r.status !== 200) {
+          ctx.err(`Không đọc được danh sách dự án: ${errorOf(r.json, `HTTP ${r.status}`)}\n`);
+          return 1;
+        }
+        ctx.out(formatProjects(r.json as Project[]));
+        return 0;
+      });
     case 'status':
       return withDaemon(ctx, async (info) => {
         const [p, t] = await Promise.all([

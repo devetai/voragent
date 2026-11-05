@@ -1,4 +1,4 @@
-import type { Config, ProviderState, Run, Task, Turn, VEvent, WorkspaceMode } from '@voragent/shared';
+import type { Config, Project, ProviderState, Run, Task, Turn, VEvent, WorkspaceMode } from '@voragent/shared';
 
 /** Lỗi API: `message` là chuỗi tiếng Việt trong trường `error` của JSON trả về. */
 export class ApiError extends Error {
@@ -45,6 +45,7 @@ export const api = {
   task: (id: string) => call<TaskDetail>('GET', `/api/tasks/${encodeURIComponent(id)}`),
   diff: (id: string) => call<Diff>('GET', `/api/tasks/${encodeURIComponent(id)}/diff`),
   providers: () => call<ProviderState[]>('GET', '/api/providers'),
+  projects: (refresh = false) => call<Project[]>('GET', refresh ? '/api/projects?refresh=1' : '/api/projects'),
   config: () => call<Config>('GET', '/api/config'),
   createTask: (b: { repoPath: string; message: string; mode: WorkspaceMode; priority?: string[] }) =>
     call<Task>('POST', '/api/tasks', b),

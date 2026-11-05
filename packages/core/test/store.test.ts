@@ -1,5 +1,6 @@
+import { rmTmp } from './helpers.js';
 import { test, expect } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openStore } from '../src/store.js';
@@ -85,7 +86,7 @@ test('mở lại file DB vẫn đọc được task', () => {
     expect(s2.createTask(base).task.seq).toBe(2);
     s2.close();
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmTmp(dir);
   }
 });
 

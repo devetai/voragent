@@ -2,15 +2,18 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAdaptorServer } from '@hono/node-server';
-import { createAdapters, createFakeAdapter, fakeFixturePath } from '@voragent/adapters';
+import { createAdapters, createFakeAdapter, discoverAll, fakeFixturePath } from '@voragent/adapters';
 import type { Adapter } from '@voragent/adapters';
 import type { ProviderId } from '@voragent/shared';
 import { EventBus } from './bus.js';
 import { DEFAULT_CONFIG, loadConfig } from './config.js';
 import { createOrchestrator } from './orchestrator.js';
+import { createProjectCatalog } from './projects.js';
+import type { ProjectCatalogDeps } from './projects.js';
 import { attachWebSocket, createServer } from './server.js';
 import { openStore } from './store.js';
 
@@ -82,6 +85,12 @@ export async function startDaemon(o: {
   adapters?: Map<ProviderId, Adapter> | ((ids: ProviderId[]) => Map<ProviderId, Adapter>);
   /** Mặc định: tự tìm `packages/web/dist`. */
   webDir?: string | null;
+  /** Chỉ để test: nguồn dự án thay cho `discoverAll`. */
+  projectSources?: ProjectCatalogDeps['sources'];
+  /** Thư mục home dùng để dò dự án (mặc định `$VORAGENT_USER_HOME` hoặc `os.homedir()`). */
+  userHome?: string;
+  /** Thư mục tạm bị loại khỏi danh sách dự án (mặc định: `os.tmpdir()`). */
+  projectTmpDirs?: string[];
 }): Promise<Daemon> {
   const { dataDir } = o;
   mkdirSync(dataDir, { recursive: true });
@@ -162,8 +171,21 @@ export async function startDaemon(o: {
     const orch = createOrchestrator({ store, bus, adapters, config });
     orchestrator = orch;
 
+    const envHome = process.env.VORAGENT_USER_HOME;
+    const home = o.userHome ?? (envHome !== undefined && envHome !== '' ? envHome : homedir());
+    // Home bị ghi đè thì KHÔNG đọc APPDATA thật: dẫn xuất từ home đó (chỉ win32 cần; nền tảng khác dùng mặc định dưới home).
+    const homeOverridden = o.userHome !== undefined || (envHome !== undefined && envHome !== '');
+    const appData = homeOverridden
+      ? (process.platform === 'win32' ? join(home, 'AppData', 'Roaming') : undefined)
+      : process.env.APPDATA;
+    const projects = createProjectCatalog({
+      sources: o.projectSources ?? [() => discoverAll({ home, ...(appData ? { appData } : {}) })],
+      store, dataDir, home,
+      ...(o.projectTmpDirs !== undefined ? { tmpDirs: o.projectTmpDirs } : {}),
+    });
+
     const app = createServer({
-      orchestrator: orch, store, bus, key, config,
+      orchestrator: orch, store, bus, key, config, projects,
       webDir: o.webDir === undefined ? findWebDir() : o.webDir,
       onShutdown: (o) => {
         void stop(o);

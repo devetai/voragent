@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { isPidAlive } from '../src/daemon.js';
-import { until } from './helpers.js';
+import { until, rmTmp } from './helpers.js';
 import spawn from 'cross-spawn';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createFakeAdapter } from '@voragent/adapters';
@@ -58,7 +58,7 @@ afterEach(() => {
     }
   }
   store.close();
-  rmSync(root, { recursive: true, force: true });
+  rmTmp(root);
 });
 
 function fake(

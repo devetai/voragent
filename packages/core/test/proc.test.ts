@@ -1,4 +1,5 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { rmTmp } from './helpers.js';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -15,7 +16,7 @@ beforeEach(() => {
   cwd = mkdtempSync(join(tmpdir(), 'voragent-proc-'));
 });
 afterEach(() => {
-  rmSync(cwd, { recursive: true, force: true });
+  rmTmp(cwd);
 });
 
 const input = (prompt: string): TurnInput => ({
@@ -46,6 +47,9 @@ function alive(pid: number): boolean {
 }
 
 const readPid = (name: string): number => Number(readFileSync(join(cwd, name), 'utf8'));
+const readPidOrNaN = (name: string): number => {
+  try { return readPid(name); } catch { return NaN; }
+};
 
 function killQuietly(pid: number | undefined): void {
   if (pid === undefined || Number.isNaN(pid)) return;
@@ -239,7 +243,7 @@ describe('runTurn', () => {
       });
       let done = false;
       await waitFor(() => existsSync(join(cwd, '.fake-orphan.pid')));
-      await sleepMs(50);
+      await waitFor(() => readPidOrNaN('.fake-orphan.pid') > 0, 15_000);
       orphan = readPid('.fake-orphan.pid');
       ac.abort();
       await p;
@@ -249,6 +253,7 @@ describe('runTurn', () => {
       await sleepMs(800);
       expect(after).toBe(false);
       expect(count).toBe(atDone);
+      expect(alive(orphan)).toBe(true); // cháu vẫn ghi vào pipe đã hủy suốt khoảng chờ: khoảng yên lặng là thật
     } finally {
       killQuietly(orphan);
     }

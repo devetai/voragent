@@ -8,3 +8,4 @@ export * from './handoff.js';
 export * from './orchestrator.js';
 export * from './server.js';
 export * from './daemon.js';
+export * from './projects.js';

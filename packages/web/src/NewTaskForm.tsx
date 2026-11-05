@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import type { ProviderState, WorkspaceMode } from '@voragent/shared';
+import type { Project, ProviderState, WorkspaceMode } from '@voragent/shared';
 import { api, errText } from './api';
+import { OTHER, effectiveChoice } from './state';
 
 // Nhãn theo mục 6.2 của tài liệu thiết kế.
 const MODE_LABEL: Record<WorkspaceMode, string> = {
@@ -11,9 +12,20 @@ const MODE_LABEL: Record<WorkspaceMode, string> = {
 };
 
 export function NewTaskForm({
-  providers, onCreated, onCancel,
-}: { providers: ProviderState[]; onCreated: (id: string) => void; onCancel: () => void }) {
-  const [repoPath, setRepoPath] = useState('');
+  providers, projects, initialPath, onCreated, onCancel,
+}: {
+  providers: ProviderState[];
+  projects: Project[];
+  /** Dự án đang xem (nếu có): được chọn sẵn. */
+  initialPath: string | null;
+  onCreated: (id: string) => void;
+  onCancel: () => void;
+}) {
+  const [picked, setPicked] = useState<string | null>(null);
+  const [customPath, setCustomPath] = useState(initialPath ?? '');
+  const choice = effectiveChoice(picked, projects, initialPath);
+  const setChoice = (v: string): void => setPicked(v);
+  const repoPath = choice === OTHER ? customPath : choice;
   const [message, setMessage] = useState('');
   const [mode, setMode] = useState<WorkspaceMode>('head-dirty-commit');
   const [agent, setAgent] = useState('');
@@ -39,9 +51,18 @@ export function NewTaskForm({
   return (
     <form className="panel form" onSubmit={submit}>
       <h2>Task mới</h2>
-      <label>Đường dẫn repo
-        <input value={repoPath} onChange={(e) => setRepoPath(e.target.value)} placeholder="D:\Projects\ten-repo" required />
+      <label>Dự án
+        <select value={choice} onChange={(e) => setChoice(e.target.value)} required>
+          {choice === '' && <option value="">Chọn dự án…</option>}
+          {projects.map((p) => <option key={p.id} value={p.path}>{p.name} — {p.path}</option>)}
+          <option value={OTHER}>Thư mục khác…</option>
+        </select>
       </label>
+      {choice === OTHER && (
+        <label>Đường dẫn repo
+          <input value={customPath} onChange={(e) => setCustomPath(e.target.value)} placeholder="D:\Projects\ten-repo" required />
+        </label>
+      )}
       <div className="muted">
         Nếu thư mục không phải repo git, agent sẽ làm việc trực tiếp trong đó, không cách ly (không có worktree, không commit).
       </div>

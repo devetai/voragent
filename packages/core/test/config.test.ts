@@ -1,5 +1,6 @@
+import { rmTmp } from './helpers.js';
 import { test, expect } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DEFAULT_CONFIG, loadConfig } from '../src/config.js';
@@ -9,7 +10,7 @@ function withDir<T>(fn: (dir: string) => T): T {
   try {
     return fn(dir);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmTmp(dir);
   }
 }
 

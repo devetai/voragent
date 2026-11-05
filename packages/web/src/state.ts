@@ -1,4 +1,4 @@
-import type { ProviderId, ProviderState, Task, TaskStatus, VEvent } from '@voragent/shared';
+import type { DiscoverySource, Project, ProviderId, ProviderState, Task, TaskStatus, VEvent } from '@voragent/shared';
 
 export type Column = 'Chờ' | 'Đang chạy' | 'Chờ bạn' | 'Xong' | 'Lỗi';
 
@@ -152,4 +152,115 @@ export function mergeEvents(s: UiState, taskId: string, incoming: VEvent[]): UiS
   const events = new Map(s.events);
   events.set(taskId, [...byId.values()].sort((a, b) => a.id - b.id));
   return { ...s, events };
+}
+
+/** Khóa so khớp đường dẫn: đổi `\` thành `/`, bỏ dấu gạch cuối, viết thường. */
+export function projectKeyOf(path: string): string {
+  return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+}
+
+/** Task của một dự án: khớp nguyên đường dẫn đã chuẩn hóa (không khớp theo tiền tố). */
+export function tasksOfProject(tasks: Task[], project: Pick<Project, 'path'>): Task[] {
+  const key = projectKeyOf(project.path);
+  return tasks.filter((t) => projectKeyOf(t.repoPath) === key);
+}
+
+const SOURCE_LABELS: Array<[DiscoverySource, string]> = [
+  ['claude', 'Claude'], ['antigravity', 'Antigravity'], ['codex', 'Codex'],
+];
+
+/** Nhãn nguồn của dự án, thứ tự cố định (Claude, Antigravity, Codex), không trùng. */
+export function describeProjectSources(p: Project): string[] {
+  const have = new Set(p.sources.map((s) => s.source));
+  return SOURCE_LABELS.filter(([id]) => have.has(id)).map(([, label]) => label);
+}
+
+/** Dùng gần nhất trước, `null` cuối, hòa thì theo tên (không phân biệt hoa thường). Không sửa mảng đầu vào. */
+export function sortProjects(ps: Project[]): Project[] {
+  return [...ps].sort((a, b) => {
+    if (a.lastUsedAt !== b.lastUsedAt) {
+      if (a.lastUsedAt === null) return 1;
+      if (b.lastUsedAt === null) return -1;
+      return b.lastUsedAt - a.lastUsedAt;
+    }
+    const byName = a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' });
+    if (byName !== 0) return byName;
+    return a.path < b.path ? -1 : a.path > b.path ? 1 : 0;
+  });
+}
+
+/** Lọc phía trình duyệt: khớp tên hoặc đường dẫn, không phân biệt hoa thường. Chuỗi lọc rỗng giữ nguyên. */
+export function filterProjects(ps: Project[], query: string): Project[] {
+  const q = query.trim().toLowerCase();
+  if (q === '') return ps;
+  return ps.filter((p) => p.name.toLowerCase().includes(q) || p.path.toLowerCase().includes(q));
+}
+
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+
+/** `YYYY-MM-DD HH:mm` theo giờ máy, hoặc "chưa rõ" khi không có thời điểm. */
+export function formatLastUsed(ms: number | null): string {
+  if (ms === null) return 'chưa rõ';
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+/** Giá trị ô chọn dự án cho lựa chọn "Thư mục khác…". */
+export const OTHER = '__other__';
+
+/**
+ * Giá trị đang chọn của ô chọn dự án: lựa chọn của người dùng nếu có; không thì dự án đang xem
+ * (khớp theo khóa đường dẫn; không có trong danh sách thì "Thư mục khác…"); danh sách rỗng thì "Thư mục khác…";
+ * còn lại là rỗng (chưa chọn). Thuần, nên đổi dự án đang xem hay danh sách tải về muộn đều tự cập nhật.
+ */
+export function effectiveChoice(picked: string | null, projects: Project[], initialPath: string | null): string {
+  if (picked !== null) return picked;
+  if (initialPath !== null) {
+    const key = projectKeyOf(initialPath);
+    return projects.find((p) => projectKeyOf(p.path) === key)?.path ?? OTHER;
+  }
+  return projects.length === 0 ? OTHER : '';
+}
+
+const PROJECT_PREFIX = '#/project/';
+const TASK_PREFIX = '#/task/';
+
+/** Đường dẫn dự án trong hash dạng #/project/<đường dẫn mã hóa>; không phải hoặc mã hóa hỏng thì null. */
+export function projectPathOf(hash: string): string | null {
+  if (!hash.startsWith(PROJECT_PREFIX)) return null;
+  try {
+    return decodeURIComponent(hash.slice(PROJECT_PREFIX.length));
+  } catch {
+    return null;
+  }
+}
+
+/** Id task trong hash dạng #/task/<id mã hóa>; không phải hoặc mã hóa hỏng thì null (không bao giờ ném lỗi). */
+export function taskIdOf(hash: string): string | null {
+  if (!hash.startsWith(TASK_PREFIX)) return null;
+  try {
+    return decodeURIComponent(hash.slice(TASK_PREFIX.length));
+  } catch {
+    return null;
+  }
+}
+
+export type ProjectsLoad = 'loading' | 'failed' | 'loaded';
+
+export const PROJECT_NOT_FOUND_NOTICE = 'Không tìm thấy dự án đã chọn (có thể thư mục đã bị xóa hoặc đổi tên).';
+
+/**
+ * Quyết định màn hình theo hash. Chỉ khi danh sách đã tải THÀNH CÔNG mà không dự án nào khớp mới đưa về danh sách
+ * kèm thông báo; đang tải hoặc tải lỗi thì giữ nguyên để không mất chỗ đang xem.
+ */
+export function resolveProjectRoute(
+  hash: string, projects: Project[] | null, load: ProjectsLoad,
+): { view: 'list'; notice?: string } | { view: 'project'; path: string } {
+  if (!hash.startsWith(PROJECT_PREFIX)) return { view: 'list' };
+  const path = projectPathOf(hash);
+  if (path === null) return { view: 'list' };
+  if (load !== 'loaded' || projects === null) return { view: 'project', path };
+  const key = projectKeyOf(path);
+  if (projects.some((p) => projectKeyOf(p.path) === key)) return { view: 'project', path };
+  return { view: 'list', notice: PROJECT_NOT_FOUND_NOTICE };
 }

@@ -225,6 +225,7 @@ Luôn hiển thị: mỗi nền tảng có trạng thái sẵn sàng / sắp h�
 ## 10. Lộ trình
 
 1. **Lõi chạy được:** daemon, CLI, SQLite, hàng đợi, adapter Claude Code và Codex, worktree, nhận diện hết quota và bàn giao, kèm web tối thiểu gồm bảng, dòng thời gian và thanh quota. *Xong giai đoạn này phải chứng minh được G1:* một task bị hết quota trên Claude vẫn được Codex làm xong trong cùng worktree.
+1b. **Khám phá dự án** (mục 14): tự nhận ra các dự án đã mở bằng Claude Code và Antigravity, chọn dự án để giao task. Bổ sung sau giai đoạn 1, trước giai đoạn 2.
 2. **Văn phòng 3D** nối với sự kiện thật, theo mục 8.1.
 3. **Theo dõi phiên tay** qua hook Claude Code, đọc nhật ký phiên Codex, chuyển yêu cầu duyệt quyền lên web.
 4. **Mở rộng:** đồ thị và GitNexus, thêm adapter, hiện quota chủ động, chọn agent theo loại việc.
@@ -260,3 +261,42 @@ Những điểm dưới đây do mình (người viết tài liệu) quyết. Ng
 - Bố cục và thiết kế chi tiết của bảng, dòng thời gian, đồ thị.
 - Cách tối ưu hiệu năng của cảnh 3D.
 - Bộ test và công cụ build.
+
+## 14. Khám phá dự án (bổ sung 2026-11-05)
+
+Giai đoạn 1 chỉ có ô gõ đường dẫn repo khi tạo task. Thiết kế đúng là voragent **tự nhận ra các dự án người dùng đã từng mở bằng Claude Code, Antigravity (và Codex)**, hiện thành danh sách để người dùng chọn rồi làm việc tiếp, không phải gõ đường dẫn. Người dùng đã chọn phạm vi **A**: chọn dự án để giao task. Xem lịch sử các phiên cũ (phạm vi B) và nối tiếp phiên cũ trong voragent (phạm vi C) không làm ở đây; B thuộc phần theo dõi phiên tay của giai đoạn 3.
+
+### 14.1 Nguồn dữ liệu (đã kiểm trên máy Windows 11 của người dùng, chỉ đọc)
+
+| Nguồn | Nơi đọc | Ghi chú |
+| --- | --- | --- |
+| Claude Code | Khóa của mục `projects` trong `~/.claude.json` là đường dẫn thật. Thêm `~/.claude/projects/<thư-mục-mã-hóa>/*.jsonl`: mỗi dòng có `cwd`, `sessionId`, `timestamp`; thời gian sửa file mới nhất cho biết lần dùng cuối | Tên thư mục mã hóa mất thông tin (`D---ai-agents-...`), không giải mã ngược: chỉ dùng `cwd` bên trong file. `~/.claude.json` có mục trùng chỉ khác hoa thường hay dấu gạch (`d:/...` và `D:/...`) |
+| Antigravity IDE | `%APPDATA%\Antigravity\User\workspaceStorage\*\workspace.json`, trường `folder` dạng `file:///d%3A/Projects/x`; lần dùng cuối là thời gian sửa thư mục con | macOS: `~/Library/Application Support/Antigravity/...`, Linux: `~/.config/Antigravity/...` (theo quy ước VS Code, chưa kiểm) |
+| Antigravity CLI `agy` | `~/.gemini/antigravity-cli/conversations` | Chưa biết có ghi đường dẫn dự án không: **chưa làm** |
+| Codex | `~/.codex/sessions/**/rollout-*.jsonl` | Máy người dùng chưa cài, không kiểm được: **chưa làm**, để lại chỗ cắm |
+
+Quy tắc chung: chỉ đọc đường dẫn và thời gian. Không đọc nội dung hội thoại, không ghi vào thư mục của công cụ khác, không gửi dữ liệu ra ngoài máy.
+
+### 14.2 Mô hình
+
+- `DiscoveredProject { path: string; lastUsedAt: number | null; source: 'claude' | 'antigravity' | 'codex' }`: kết quả thô của một nguồn.
+- `Project { id: string; path: string; name: string; lastUsedAt: number | null; sources: ProjectSource[]; isGit: boolean; branch: string | null; dirtyCount: number | null; taskCount: number }`, với `ProjectSource { source; lastUsedAt }`. `id` là mã băm ngắn của đường dẫn đã chuẩn hóa; `name` là tên thư mục cuối.
+- Mỗi nguồn là một hàm `discoverXxxProjects(opts)` trả `DiscoveredProject[]`, không bao giờ ném lỗi vì thiếu file (trả mảng rỗng); thêm nguồn mới không phải sửa lõi.
+
+### 14.3 Gộp và lọc (trong daemon)
+
+1. Chuẩn hóa: `realpath` (lấy hoa thường đúng của hệ thống tệp), khóa so sánh viết thường trên Windows. Hai đường dẫn khác chữ hoa hoặc dấu gạch nhưng cùng thư mục là một dự án; `lastUsedAt` lấy giá trị lớn nhất, `sources` gom đủ các nguồn.
+2. Bỏ: đường dẫn không còn tồn tại hoặc không phải thư mục; thư mục chính của người dùng; thư mục dữ liệu của công cụ (`~/.claude`, `~/.gemini`, `~/.codex`, `~/.antigravity`, `~/.voragent` và mọi thứ bên trong); mọi thứ nằm trong thư mục dữ liệu của voragent (worktree của task) hoặc trong thư mục tạm của hệ điều hành; gốc ổ đĩa (`C:\`, `/`) và mọi thư mục cha của thư mục chính, thư mục dữ liệu voragent hay thư mục tạm cũng bị bỏ; đường dẫn tương đối bị bỏ.
+3. Làm giàu: `isGit`, nhánh hiện tại, số file đang sửa dở (`git status --porcelain`), số task của voragent trên dự án đó. Chạy song song tối đa 4, mỗi lệnh git có giới hạn 3 giây; lỗi hoặc quá giờ thì để `null`, không làm hỏng cả danh sách.
+4. Sắp xếp theo `lastUsedAt` giảm dần (không có thì xuống cuối). Kết quả được nhớ 30 giây; `?refresh=1` bỏ qua bộ nhớ đệm.
+
+### 14.4 API, CLI, giao diện
+
+- `GET /api/projects` (cần khóa như mọi route; `?refresh=1`) trả `Project[]`. `POST /api/tasks` vẫn nhận `repoPath`; giao diện điền đường dẫn của dự án đã chọn. Đường dẫn gõ tay vẫn dùng được cho thư mục chưa từng mở bằng công cụ nào.
+- CLI: `voragent projects` in bảng (tên, đường dẫn, lần dùng cuối, nguồn, nhánh, số file sửa dở, số task). `voragent add <dự-án-hoặc-đường-dẫn> <tin nhắn…>`: tham số đầu nếu là thư mục tồn tại thì dùng làm đường dẫn; nếu không thì tìm theo tên dự án (khớp chính xác không phân biệt hoa thường, rồi khớp một phần nếu chỉ có một kết quả); trùng thì báo lỗi kèm các đường dẫn ứng viên. Không dùng số thứ tự vì danh sách đổi theo thời gian.
+- Giao diện: màn hình đầu là **danh sách dự án** (tên, đường dẫn, lần dùng cuối, huy hiệu công cụ, nhánh, số file sửa dở, số task, huy hiệu "không phải repo git" nếu cần). Bấm một dự án thì vào bảng task của riêng dự án đó, nút "Tạo task" đã chọn sẵn dự án. Form tạo task dùng ô chọn dự án, kèm lựa chọn "Thư mục khác…" để gõ đường dẫn.
+- Ô lọc trên danh sách dự án chỉ lọc phía trình duyệt (theo tên và đường dẫn, trên danh sách đã tải), không gọi máy chủ và không lưu lại chữ đã gõ.
+
+### 14.5 Không phải mục tiêu của phần này
+
+Xem hay nối tiếp phiên cũ, ẩn hoặc ghim dự án, nguồn Codex và `agy`, lưu chữ đã gõ vào ô lọc. Có thể thêm sau.

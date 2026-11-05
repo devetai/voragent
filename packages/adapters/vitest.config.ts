@@ -7,5 +7,6 @@ export default defineConfig({
     hookTimeout: 30_000,
     env: { NODE_NO_WARNINGS: '1' },
     exclude: ['dist/**', 'node_modules/**'],
+    globalSetup: ['./test/global-env.ts'],
   },
 });
