@@ -39,3 +39,8 @@ Mọi AI Agent (Antigravity, Claude Code, Codex, opencode...) khi làm việc tr
 
 7. **ĐỒNG BỘ TÀI LIỆU VÀ `README.MD` KHI CÓ THAY ĐỔI:**
    - Khi có bất kỳ thay đổi nào về tính năng mới, lệnh CLI, cấu trúc gói, UI/UX hoặc quy trình vận hành, AI agent **BẮT BUỘC** phải rà soát và cập nhật lại [`README.md`](README.md) (cùng các tài liệu liên quan) cho thích hợp, đồng bộ và chính xác.
+
+
+8. **CHỈ DỌN DẸP RÁC VÀ WORKTREE THUỘC SESSION CỦA CHÍNH MÌNH:**
+   - Khi thực hiện dọn rác (xóa file tạm, log, worktree hoặc branch), AI agent **CHỈ ĐƯỢC PHÉP** dọn dẹp các tài nguyên/worktree do chính phiên làm việc (session/task) hiện tại của mình tạo ra.
+   - **TUYỆT ĐỐI KHÔNG** đụng chạm, xóa bỏ hay can thiệp vào các worktree, branch, stash hoặc tệp tin của các session/agent khác đang cùng làm việc song song (ví dụ: các worktree khác trong `.worktrees/`).

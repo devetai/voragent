@@ -52,3 +52,4 @@ voragent là chương trình chạy trên máy người dùng. Nó điều phố
 - **Merge worktree vào `main`: squash thành đúng 1 commit cho mỗi task.** Một worktree (một nhánh làm việc) tương ứng một task, nên khi merge dùng `git merge --squash` (hoặc tương đương) để `main` nhận một commit duy nhất, không mang theo các commit trung gian của nhánh. Thông điệp commit squash mô tả cả task, không liệt kê từng commit nhỏ, và cũng không có dòng ghi công AI. Chỉ merge khi người dùng yêu cầu.
 - Markdown phải qua markdownlint theo `.markdownlint.json`.
 - `.superpowers/` (bản thử, phiên brainstorm) không commit.
+- **Chỉ dọn dẹp rác thuộc session của mình:** Khi dọn rác, xóa file tạm hay xóa worktree sau khi merge, AI agent chỉ được dọn tài nguyên do chính session hiện tại của mình tạo ra; tuyệt đối không đụng chạm tới các worktree, branch hoặc file của các session/agent khác đang cùng làm việc song song.
