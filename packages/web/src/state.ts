@@ -225,24 +225,57 @@ export function effectiveChoice(picked: string | null, projects: Project[], init
 const PROJECT_PREFIX = '#/project/';
 const TASK_PREFIX = '#/task/';
 
-/** Đường dẫn dự án trong hash dạng #/project/<đường dẫn mã hóa>; không phải hoặc mã hóa hỏng thì null. */
-export function projectPathOf(hash: string): string | null {
-  if (!hash.startsWith(PROJECT_PREFIX)) return null;
-  try {
-    return decodeURIComponent(hash.slice(PROJECT_PREFIX.length));
-  } catch {
-    return null;
+/**
+ * Đường dẫn dự án từ URL: hỗ trợ dạng query param ?project=<mã hóa> (hoặc hash cũ #/project/<mã hóa>).
+ * Không phải hoặc mã hóa hỏng thì null.
+ */
+export function projectPathOf(urlOrHash: string): string | null {
+  if (urlOrHash.startsWith(PROJECT_PREFIX)) {
+    try {
+      return decodeURIComponent(urlOrHash.slice(PROJECT_PREFIX.length));
+    } catch {
+      return null;
+    }
   }
+  // Hỗ trợ ?project=... hoặc /board?project=...
+  const queryIndex = urlOrHash.indexOf('?');
+  if (queryIndex >= 0) {
+    const search = urlOrHash.slice(queryIndex);
+    const params = new URLSearchParams(search);
+    const p = params.get('project');
+    if (p !== null) {
+      try {
+        return decodeURIComponent(p);
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
 }
 
-/** Id task trong hash dạng #/task/<id mã hóa>; không phải hoặc mã hóa hỏng thì null (không bao giờ ném lỗi). */
-export function taskIdOf(hash: string): string | null {
-  if (!hash.startsWith(TASK_PREFIX)) return null;
-  try {
-    return decodeURIComponent(hash.slice(TASK_PREFIX.length));
-  } catch {
-    return null;
+/**
+ * Id task từ URL: hỗ trợ dạng path /task/<id mã hóa> hoặc /tasks/<id mã hóa> (kèm hash cũ #/task/<id mã hóa>).
+ * Không phải hoặc mã hóa hỏng thì null (không bao giờ ném lỗi).
+ */
+export function taskIdOf(urlOrHash: string): string | null {
+  if (urlOrHash.startsWith(TASK_PREFIX)) {
+    try {
+      return decodeURIComponent(urlOrHash.slice(TASK_PREFIX.length));
+    } catch {
+      return null;
+    }
   }
+  const path = urlOrHash.split('?')[0]?.split('#')[0] ?? '';
+  const match = path.match(/^\/(?:task|tasks)\/(.+)$/);
+  if (match?.[1]) {
+    try {
+      return decodeURIComponent(match[1]);
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 export type ProjectsLoad = 'loading' | 'failed' | 'loaded';
@@ -250,14 +283,13 @@ export type ProjectsLoad = 'loading' | 'failed' | 'loaded';
 export const PROJECT_NOT_FOUND_NOTICE = 'Không tìm thấy dự án đã chọn (có thể thư mục đã bị xóa hoặc đổi tên).';
 
 /**
- * Quyết định màn hình theo hash. Chỉ khi danh sách đã tải THÀNH CÔNG mà không dự án nào khớp mới đưa về danh sách
+ * Quyết định màn hình theo URL hoặc hash. Chỉ khi danh sách đã tải THÀNH CÔNG mà không dự án nào khớp mới đưa về danh sách
  * kèm thông báo; đang tải hoặc tải lỗi thì giữ nguyên để không mất chỗ đang xem.
  */
 export function resolveProjectRoute(
-  hash: string, projects: Project[] | null, load: ProjectsLoad,
+  urlOrHash: string, projects: Project[] | null, load: ProjectsLoad,
 ): { view: 'list'; notice?: string } | { view: 'project'; path: string } {
-  if (!hash.startsWith(PROJECT_PREFIX)) return { view: 'list' };
-  const path = projectPathOf(hash);
+  const path = projectPathOf(urlOrHash);
   if (path === null) return { view: 'list' };
   if (load !== 'loaded' || projects === null) return { view: 'project', path };
   const key = projectKeyOf(path);

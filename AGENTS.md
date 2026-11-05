@@ -17,6 +17,7 @@ Mọi AI Agent (Antigravity, Claude Code, Codex, opencode...) khi làm việc tr
 
 3. **QUY ƯỚC COMMIT VÀ BẢN QUYỀN:**
    - Chỉ commit hoặc push khi người dùng yêu cầu.
+   - **BẮT BUỘC DÙNG TIẾNG ANH CHO COMMIT MESSAGE:** Toàn bộ commit message phải viết hoàn toàn bằng tiếng Anh theo chuẩn Conventional Commits (ví dụ: `feat(...)`, `fix(...)`, `docs(...)`, `refactor(...)`). Tuyệt đối không dùng tiếng Việt trong commit message.
    - **CẤM** ghi bất kỳ dòng ghi công AI nào (ví dụ `Co-Authored-By: Claude...`, `Generated with...`) trong commit message hoặc PR description.
    - Merge worktree vào `main`: luôn squash thành đúng 1 commit duy nhất cho mỗi task (`git merge --squash`).
 
@@ -43,3 +44,14 @@ Mọi AI Agent (Antigravity, Claude Code, Codex, opencode...) khi làm việc tr
 8. **CHỈ DỌN DẸP RÁC VÀ WORKTREE THUỘC SESSION CỦA CHÍNH MÌNH:**
    - Khi thực hiện dọn rác (xóa file tạm, log, worktree hoặc branch), AI agent **CHỈ ĐƯỢC PHÉP** dọn dẹp các tài nguyên/worktree do chính phiên làm việc (session/task) hiện tại của mình tạo ra.
    - **TUYỆT ĐỐI KHÔNG** đụng chạm, xóa bỏ hay can thiệp vào các worktree, branch, stash hoặc tệp tin của các session/agent khác đang cùng làm việc song song (ví dụ: các worktree khác trong `.worktrees/`).
+
+9. **ĐỊNH TUYẾN URL QUA PATH + QUERY & BẢO TOÀN TRẠNG THÁI (URL ROUTING & RELOAD PERSISTENCE):**
+   - Mọi điều hướng trong ứng dụng web **BẮT BUỘC** phải sử dụng cấu trúc Semantic Path + Query (`/`, `/board`, `/board?project=...`, `/task/<id>`, `/office`, `/graph`, `/new`), **TUYỆT ĐỐI KHÔNG** dùng URL hash (`#/...`).
+   - Đảm bảo khi người dùng tải lại trang (reload / F5 / Ctrl+F5) ở bất kỳ URL nào, ứng dụng **BẮT BUỘC** phải giữ nguyên ở trang hiện tại, không được văng về trang chủ hay mất tham số ngữ cảnh.
+   - Luôn tự động bảo lưu tham số xác thực `key=...` trong URL query khi điều hướng để reload trang hoặc copy URL không bao giờ bị mất phiên truy cập (401). Phía máy chủ HTTP daemon phải đảm bảo SPA fallback (`index.html`) hoạt động thông suốt cho mọi sub-path.
+
+10. **TRIỆT TIÊU ANTI-PATTERN THANH CUỘN LỒNG NHAU (ZERO DOUBLE SCROLLBARS):**
+   - Tại bất kỳ màn hình nào, trên một chiều không gian (dọc hoặc ngang), **TUYỆT ĐỐI CHỈ TỒN TẠI TỐI ĐA 1 THANH CUỘN HOẠT ĐỘNG**.
+   - Nghiêm cấm để thanh cuộn của cửa sổ trình duyệt (`window` / `body`) và thanh cuộn của container con (`overflow-y: auto`) cùng xuất hiện song song (Double Scrollbar).
+   - Với màn hình danh sách (ProjectList, bảng dữ liệu dài): Bắt buộc dùng cơ chế cuộn tự nhiên của trang (Unified Page Scroll) kết hợp với các thanh công cụ bám dính (`position: sticky`), tuyệt đối không bọc container danh sách vào `max-height: calc(...)` và `overflow-y: auto` gây sinh thanh cuộn kép.
+   - Với màn hình dạng App Shell (Kanban Board 2D, Văn phòng 3D, Đồ thị quan hệ, TaskView split-screen): Kiểm soát chặt chẽ chiều cao tổng thể không vượt quá 100vh để không sinh thanh cuộn thừa ngoài cửa sổ.

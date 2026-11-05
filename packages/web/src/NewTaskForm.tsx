@@ -1,14 +1,21 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import type { Project, ProviderState, WorkspaceMode } from '@voragent/shared';
+import {
+  AlertCircle,
+  AlertTriangle,
+  Folder,
+  FolderGit2,
+  FolderPlus,
+  GitBranch,
+  GitCommit,
+  GitFork,
+  Play,
+  X,
+} from 'lucide-react';
+import type { Project, ProviderId, ProviderState, WorkspaceMode } from '@voragent/shared';
 import { api, errText } from './api';
-
-// Nhãn theo mục 6.2 của tài liệu thiết kế.
-const MODE_LABEL: Record<WorkspaceMode, string> = {
-  'head-dirty-commit': 'Từ HEAD, mang theo việc dở, agent tự commit (Khuyến nghị)',
-  'head-commit': 'Chỉ từ HEAD, agent tự commit',
-  'dirty-nocommit': 'Mang theo việc dở, không commit',
-};
+import { CustomSelect, type SelectOption } from './components/CustomSelect';
+import { AgentPriorityMultiSelect } from './components/AgentPriorityMultiSelect';
 
 const OTHER = '__other__';
 
@@ -39,20 +46,67 @@ export function NewTaskForm({
 
   const [message, setMessage] = useState('');
   const [mode, setMode] = useState<WorkspaceMode>('head-dirty-commit');
-  const [agent, setAgent] = useState('');
+  const [priorities, setPriorities] = useState<ProviderId[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Tạo options cho CustomSelect Dự án
+  const projectOptions: SelectOption[] = [
+    ...projects.map((p) => ({
+      value: p.path,
+      label: p.name,
+      sublabel: p.path,
+      icon: <FolderGit2 size={16} color="var(--primary)" />,
+      badge: p.sources.length > 0 ? p.sources.map((s) => s.source).join(', ') : undefined,
+    })),
+    {
+      value: OTHER,
+      label: 'Thư mục khác…',
+      sublabel: 'Nhập đường dẫn kho mã nguồn thủ công',
+      icon: <FolderPlus size={16} color="var(--amber-text)" />,
+    },
+  ];
+
+  // Tạo options cho CustomSelect Chế độ Git Worktree
+  const modeOptions: SelectOption<WorkspaceMode>[] = [
+    {
+      value: 'head-dirty-commit',
+      label: 'Từ HEAD, mang việc dở (Khuyến nghị)',
+      sublabel: 'Tạo commit ban đầu từ HEAD và mang toàn bộ file sửa dở sang worktree cách ly',
+      badge: 'Khuyến nghị',
+      badgeType: 'success',
+      icon: <GitBranch size={16} color="var(--green-base)" />,
+    },
+    {
+      value: 'head-commit',
+      label: 'Chỉ từ HEAD (Sạch sẽ)',
+      sublabel: 'Khởi tạo từ commit HEAD mới nhất, bỏ qua thay đổi dở dang ở repo chính',
+      icon: <GitCommit size={16} color="var(--blue-base)" />,
+    },
+    {
+      value: 'dirty-nocommit',
+      label: 'Mang việc dở, không commit',
+      sublabel: 'Chép việc sửa dở sang worktree nhưng không tạo commit ban đầu',
+      icon: <GitFork size={16} color="var(--amber-base)" />,
+    },
+  ];
+
   const submit = (ev: FormEvent): void => {
     ev.preventDefault();
+    if (!repoPath.trim()) {
+      setError('Vui lòng chọn hoặc nhập đường dẫn dự án hợp lệ.');
+      return;
+    }
     setBusy(true);
     setError(null);
+
     const body = {
       repoPath: repoPath.trim(),
       message: message.trim(),
       mode,
-      ...(agent !== '' ? { priority: [agent] } : {}),
+      ...(priorities !== null && priorities.length > 0 ? { priority: priorities } : {}),
     };
+
     api.createTask(body).then(
       (t) => {
         setBusy(false);
@@ -66,34 +120,35 @@ export function NewTaskForm({
   };
 
   return (
-    <form className="panel form" onSubmit={submit} style={{ maxWidth: '680px', margin: '0 auto' }}>
+    <form className="panel form" onSubmit={submit} style={{ maxWidth: '720px', margin: '0 auto' }}>
       <div className="task-nav">
         <h2>Tạo Task Mới</h2>
         <button type="button" onClick={onCancel} title="Hủy bỏ (Phím tắt: Esc)">
-          ✕ Đóng <kbd>Esc</kbd>
+          <X size={15} /> Đóng <kbd>Esc</kbd>
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
-        <div>
-          <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>
-            Dự án (Project)
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.25rem' }}>
+        {/* 1. Chọn Dự án bằng CustomSelect */}
+        <div className="form-group">
+          <label className="form-label">
+            Dự án (Project Workspace) <span className="text-danger">*</span>
           </label>
-          <select value={choice} onChange={(e) => setChoice(e.target.value)} required>
-            {choice === '' && <option value="">Chọn dự án…</option>}
-            {projects.map((p) => (
-              <option key={p.id} value={p.path}>
-                {p.name} — {p.path}
-              </option>
-            ))}
-            <option value={OTHER}>Thư mục khác…</option>
-          </select>
+          <CustomSelect
+            options={projectOptions}
+            value={choice}
+            onChange={(val) => setChoice(val)}
+            placeholder="Tìm hoặc chọn một dự án..."
+            searchPlaceholder="Gõ tên hoặc đường dẫn dự án..."
+            searchable={projects.length >= 4}
+          />
         </div>
 
+        {/* Nhập đường dẫn thủ công nếu chọn Thư mục khác */}
         {choice === OTHER && (
-          <div>
-            <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>
-              Đường dẫn thư mục / Repo Git
+          <div className="form-group">
+            <label className="form-label">
+              Đường dẫn thư mục / Repo Git <span className="text-danger">*</span>
             </label>
             <input
               value={customPath}
@@ -103,65 +158,67 @@ export function NewTaskForm({
               className="mono"
               autoFocus
             />
-            <div className="muted" style={{ marginTop: '0.35rem' }}>
-              Lưu ý: Nếu thư mục không phải repo Git, agent sẽ làm việc trực tiếp tại chỗ mà không có cách ly worktree.
+            <div className="form-hint warn">
+              <AlertTriangle size={13} style={{ flexShrink: 0 }} />
+              <span>Lưu ý: Nếu thư mục không phải repo Git, agent sẽ làm việc trực tiếp tại chỗ mà không có phân nhánh worktree cách ly.</span>
             </div>
           </div>
         )}
 
-        <div>
-          <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>
-            Yêu cầu công việc (Prompt ban đầu)
+        {/* 2. Yêu cầu công việc (Prompt) */}
+        <div className="form-group">
+          <label className="form-label">
+            Yêu cầu công việc (Initial Prompt) <span className="text-danger">*</span>
           </label>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={4}
-            placeholder="Mô tả chi tiết tính năng cần thêm, bug cần fix, hoặc tài liệu cần viết…"
+            placeholder="Mô tả cụ thể nhiệm vụ bạn muốn giao cho Agent: sửa lỗi, thêm tính năng, viết bài test, review mã nguồn..."
             required
           />
         </div>
 
-        <div>
-          <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>
-            Chế độ không gian làm việc (Git Worktree Mode)
+        {/* 3. Chế độ Git Worktree bằng CustomSelect */}
+        <div className="form-group">
+          <label className="form-label">
+            Chế độ cách ly Git Worktree
           </label>
-          <select value={mode} onChange={(e) => setMode(e.target.value as WorkspaceMode)}>
-            {(Object.keys(MODE_LABEL) as WorkspaceMode[]).map((m) => (
-              <option key={m} value={m}>
-                {MODE_LABEL[m]}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            options={modeOptions}
+            value={mode}
+            onChange={(val) => setMode(val as WorkspaceMode)}
+            searchable={false}
+          />
         </div>
 
-        <div>
-          <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>
-            Nền tảng thực thi ưu tiên
+        {/* 4. Điều phối Agent & Quota Handoff bằng AgentPriorityMultiSelect */}
+        <div className="form-group">
+          <label className="form-label">
+            Điều phối Agent & Thứ tự ưu tiên Quota Handoff
           </label>
-          <select value={agent} onChange={(e) => setAgent(e.target.value)}>
-            <option value="">Tự động điều phối theo thứ tự ưu tiên (Mặc định)</option>
-            {providers.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.id} {p.version ? `(${p.version})` : ''}
-              </option>
-            ))}
-          </select>
+          <AgentPriorityMultiSelect
+            providers={providers}
+            value={priorities}
+            onChange={setPriorities}
+            disabled={busy}
+          />
         </div>
       </div>
 
       {error !== null && (
-        <div className="error" role="alert" style={{ marginTop: '1rem' }}>
-          {error}
+        <div className="error banner" role="alert" style={{ marginTop: '1.25rem' }}>
+          <AlertCircle size={15} style={{ flexShrink: 0 }} />
+          <span>{error}</span>
         </div>
       )}
 
-      <div className="row" style={{ marginTop: '1.5rem', justifyContent: 'flex-end' }}>
+      <div className="row" style={{ marginTop: '1.75rem', justifyContent: 'flex-end', gap: '0.75rem' }}>
         <button type="button" onClick={onCancel} disabled={busy}>
           Hủy bỏ <kbd>Esc</kbd>
         </button>
         <button type="submit" className="primary" disabled={busy}>
-          {busy ? 'Đang khởi tạo…' : 'Bắt đầu thực thi'}
+          <Play size={14} /> {busy ? 'Đang khởi tạo…' : 'Bắt đầu thực thi'}
         </button>
       </div>
     </form>

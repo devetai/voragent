@@ -1,4 +1,13 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import {
+  Building2,
+  ChevronRight,
+  Folder,
+  FolderGit2,
+  KanbanSquare,
+  Network,
+  Plus,
+} from 'lucide-react';
 import type { Project, ProviderState, Task, VEvent } from '@voragent/shared';
 import { ApiError, api, errText } from './api';
 import { Board } from './Board';
@@ -11,8 +20,10 @@ import { OfficeCanvas } from './office/OfficeCanvas';
 import { ProjectList } from './ProjectList';
 import { QuotaBar } from './QuotaBar';
 import { TaskView } from './TaskView';
-import { applyEvent, mergeEvents, projectKeyOf, projectPathOf, resolveProjectRoute, taskIdOf, tasksOfProject } from './state';
+import { applyEvent, mergeEvents, projectKeyOf, resolveProjectRoute, tasksOfProject } from './state';
 import type { UiState } from './state';
+import { useAppRoute } from './route';
+import type { AppView } from './route';
 
 type Action =
   | { t: 'load'; tasks: Task[]; providers: ProviderState[]; events: Map<string, VEvent[]> }
@@ -44,18 +55,6 @@ function reduce(s: UiState, a: Action): UiState {
 
 const REFRESH_PROVIDER_EVENTS = new Set(['QUOTA_UPDATED', 'QUOTA_EXHAUSTED', 'RUN_FINISHED']);
 
-function useHash(): [string, (h: string) => void] {
-  const [hash, setHash] = useState(window.location.hash);
-  useEffect(() => {
-    const on = (): void => setHash(window.location.hash);
-    window.addEventListener('hashchange', on);
-    return () => window.removeEventListener('hashchange', on);
-  }, []);
-  return [hash, (h) => { window.location.hash = h; }];
-}
-
-const PROJECT_PREFIX = '#/project/';
-
 const baseName = (p: string): string => p.replace(/[\/]+$/, '').split(/[\/]/).pop() ?? p;
 
 export function App() {
@@ -66,19 +65,42 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [loading, setLoading] = useState(true);
-  const [hash, go] = useHash();
-  const nav = (h: string): void => {
+
+  // Bộ định tuyến URL Path + Query
+  const [route, navTo] = useAppRoute();
+  const nav = useCallback((target: string | { view: AppView; taskId?: string | null; projectPath?: string | null }): void => {
     setNotice(null);
-    go(h);
-  };
+    navTo(target);
+  }, [navTo]);
+
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [projLoading, setProjLoading] = useState(true);
   const [projError, setProjError] = useState<string | null>(null);
   // Màn danh sách gần nhất (dự án / bảng tất cả / bảng một dự án): nơi quay về khi thoát task hoặc form.
-  const [listHash, setListHash] = useState('');
+  const [listUrl, setListUrl] = useState('/');
   const [notice, setNotice] = useState<string | null>(null);
   const projReq = useRef(0);
   const mounted = useRef(true);
+
+  const isListView = route.view === 'projects' || route.view === 'board';
+  useEffect(() => {
+    if (isListView) {
+      setListUrl(route.pathname + (route.search ? route.search : ''));
+    }
+  }, [route.view, route.pathname, route.search, isListView]);
+
+  const listView = isListView ? (route.pathname + (route.search ? route.search : '')) : (listUrl || '/');
+
+  const tasks = [...state.tasks.values()];
+  const providers = [...state.providers.values()];
+  const taskId = route.taskId;
+  const open = taskId !== null ? state.tasks.get(taskId) : undefined;
+
+  const viewedPath = route.projectPath;
+  const viewedProject = viewedPath === null ? undefined
+    : projects?.find((p) => projectKeyOf(p.path) === projectKeyOf(viewedPath));
+  const viewedName = viewedProject?.name ?? (viewedPath === null ? '' : baseName(viewedPath));
+  const boardTasks = viewedPath === null ? tasks : tasksOfProject(tasks, { path: viewedPath });
 
   const loadProjects = useCallback(async (refresh: boolean): Promise<void> => {
     const req = ++projReq.current;
@@ -138,18 +160,18 @@ export function App() {
 
       if ((e.key === 'n' || e.key === 'N') && !isInput && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
-        nav('#/new');
+        nav(viewedPath !== null ? `/new?project=${encodeURIComponent(viewedPath)}` : '/new');
       } else if (e.key === 'Escape') {
-        if (window.location.hash !== '' && window.location.hash !== '#') {
+        if (route.view === 'task' || route.view === 'new') {
           e.preventDefault();
-          nav(listHash || '');
+          nav(listView);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nav, listHash]);
+  }, [nav, listView, route.view, viewedPath]);
 
   // Kết nối WebSocket thời gian thực
   useEffect(() => {
@@ -223,140 +245,141 @@ export function App() {
     dispatch({ t: 'history', taskId, events });
   }, []);
 
-  const tasks = [...state.tasks.values()];
-  const providers = [...state.providers.values()];
-  const taskId = taskIdOf(hash);
-  const open = taskId !== null ? state.tasks.get(taskId) : undefined;
-
-  const isListHash = hash === '' || hash === '#' || hash === '#/board' || projectPathOf(hash) !== null;
-  useEffect(() => {
-    if (isListHash) setListHash(hash);
-  }, [hash, isListHash]);
-
-  const listView = isListHash ? hash : (listHash || '');
-  const viewedPath = projectPathOf(listView);
-  const viewedProject = viewedPath === null ? undefined
-    : projects?.find((p) => projectKeyOf(p.path) === projectKeyOf(viewedPath));
-  const viewedName = viewedProject?.name ?? (viewedPath === null ? '' : baseName(viewedPath));
-  const boardTasks = viewedPath === null ? tasks : tasksOfProject(tasks, { path: viewedPath });
-
   // Dự án đã chọn không còn trong danh sách (đã tải thành công): về danh sách kèm thông báo.
   const loadState = projError !== null ? 'failed' : projects === null ? 'loading' : 'loaded';
-  const route = resolveProjectRoute(hash, projects, loadState);
-  const staleNotice = route.view === 'list' ? route.notice : undefined;
+  const resolved = resolveProjectRoute(route.pathname + route.search, projects, loadState);
+  const staleNotice = resolved.view === 'list' && viewedPath !== null ? resolved.notice : undefined;
   useEffect(() => {
     if (staleNotice !== undefined) {
       setNotice(staleNotice);
-      go('');
+      nav('/');
     }
-  }, [staleNotice, go]);
+  }, [staleNotice, nav]);
 
-  const activeTab = hash === '#/office'
-    ? 'office'
-    : hash === '#/graph'
-    ? 'graph'
-    : (hash === '#/board' || viewedPath !== null)
-    ? 'board'
-    : 'projects';
+  const activeTab = route.activeTab;
 
   return (
     <div className="app">
-      <header className="app-header">
-        <div className="brand-section">
-          <div className="logo-badge" onClick={() => nav('')} title="Về trang chủ danh sách dự án">
-            <Logo size={24} />
-            <span className="brand-title">voragent</span>
+      <div className="sticky-top-header">
+        <header className="header-bar">
+          <div className="header-left">
+            <div className="logo-badge" onClick={() => nav('/')} title="Về trang chủ danh sách dự án">
+              <Logo size={22} />
+              <span className="brand-title">voragent</span>
+            </div>
+            <div className="status-pill">
+              <span className={`status-dot ${conn.status === 'connected' ? 'online' : 'offline'}`} />
+              <span>{conn.status === 'connected' ? 'Cục bộ' : 'Mất kết nối'}</span>
+            </div>
+
+            <div className="header-divider" />
+
+            {/* 4-View Switcher Tabs - Tích hợp trực tiếp lên Top Header */}
+            <nav className="view-tabs" aria-label="Chế độ xem">
+              <button
+                type="button"
+                className={`view-tab ${activeTab === 'projects' ? 'active' : ''}`}
+                onClick={() => nav('/')}
+              >
+                <FolderGit2 size={15} /> Dự án
+              </button>
+              <button
+                type="button"
+                className={`view-tab ${activeTab === 'board' ? 'active' : ''}`}
+                onClick={() => nav(viewedPath !== null ? `/board?project=${encodeURIComponent(viewedPath)}` : '/board')}
+              >
+                <KanbanSquare size={15} /> Bảng task {viewedPath !== null && `(${viewedName})`}
+              </button>
+              <button
+                type="button"
+                className={`view-tab ${activeTab === 'office' ? 'active' : ''}`}
+                onClick={() => nav('/office')}
+              >
+                <Building2 size={15} /> Văn phòng 3D
+              </button>
+              <button
+                type="button"
+                className={`view-tab ${activeTab === 'graph' ? 'active' : ''}`}
+                onClick={() => nav('/graph')}
+              >
+                <Network size={15} /> Đồ thị quan hệ
+              </button>
+            </nav>
           </div>
-          <div className="status-pill">
-            <span className={`status-dot ${conn.status === 'connected' ? 'online' : 'offline'}`} />
-            <span>{conn.status === 'connected' ? 'Cục bộ' : 'Mất kết nối'}</span>
+
+          <div className="header-right">
+            {/* Quota Bar gọn gàng nằm ngay trên header bên cạnh nút Tạo task */}
+            <QuotaBar providers={providers} now={now} />
+
+            <div className="header-actions">
+              <button
+                className="primary"
+                onClick={() => nav(viewedPath !== null ? `/new?project=${encodeURIComponent(viewedPath)}` : '/new')}
+                title="Tạo task mới (Phím tắt: N)"
+              >
+                <Plus size={15} /> Task mới <kbd>N</kbd>
+              </button>
+            </div>
           </div>
-        </div>
+        </header>
 
-        <div className="header-actions">
-          <button className="primary" onClick={() => nav('#/new')} title="Tạo task mới (Phím tắt: N)">
-            + Task mới <kbd>N</kbd>
-          </button>
-        </div>
-      </header>
-
-      {conn.status === 'auth-failed' && (
-        <div className="error banner" role="alert">
-          Khóa truy cập đã đổi (có thể voragent đã khởi động lại). Hãy mở lại URL do voragent in ra.
-        </div>
-      )}
-
-      {/* Quota Bar */}
-      <QuotaBar providers={providers} now={now} />
-
-      {/* 4-View Switcher Tabs */}
-      <nav className="view-tabs" aria-label="Chế độ xem">
-        <button
-          type="button"
-          className={`view-tab ${activeTab === 'projects' ? 'active' : ''}`}
-          onClick={() => nav('')}
-        >
-          📁 Dự án
-        </button>
-        <button
-          type="button"
-          className={`view-tab ${activeTab === 'board' ? 'active' : ''}`}
-          onClick={() => nav('#/board')}
-        >
-          📋 Bảng task {viewedPath !== null && `(${viewedName})`}
-        </button>
-        <button
-          type="button"
-          className={`view-tab ${activeTab === 'office' ? 'active' : ''}`}
-          onClick={() => nav('#/office')}
-        >
-          🏢 Văn phòng 3D <span className="tab-badge">Giai đoạn 2</span>
-        </button>
-        <button
-          type="button"
-          className={`view-tab ${activeTab === 'graph' ? 'active' : ''}`}
-          onClick={() => nav('#/graph')}
-        >
-          🕸 Đồ thị quan hệ <span className="tab-badge">Giai đoạn 3</span>
-        </button>
-      </nav>
+        {conn.status === 'auth-failed' && (
+          <div className="error banner" role="alert" style={{ marginTop: '0.5rem', marginBottom: 0 }}>
+            Khóa truy cập đã đổi (có thể voragent đã khởi động lại). Hãy mở lại URL do voragent in ra.
+          </div>
+        )}
+      </div>
 
       {error !== null && <div className="error" role="alert">{error}</div>}
       {notice !== null && <div className="notice" role="status">{notice}</div>}
-      {viewedPath !== null && hash !== '#/new' && open === undefined && hash !== '#/office' && hash !== '#/graph' && (
+      {viewedPath !== null && route.view !== 'new' && open === undefined && route.view !== 'office' && route.view !== 'graph' && (
         <div className="crumb">
-          <a href="#" onClick={(e) => { e.preventDefault(); nav(''); }}>Dự án</a> › {viewedName}
+          <Folder size={14} />
+          <a href="/" onClick={(e) => { e.preventDefault(); nav('/'); }}>Dự án</a>
+          <ChevronRight size={14} />
+          <span>{viewedName}</span>
         </div>
       )}
 
       {/* Content router */}
-      {hash === '#/new' ? (
+      {route.view === 'new' ? (
         <NewTaskForm
           providers={providers}
           projects={projects ?? []}
           initialPath={viewedPath}
-          onCreated={(id) => { void reload(); nav(`#/task/${encodeURIComponent(id)}`); }}
+          onCreated={(id) => { void reload(); nav(`/task/${encodeURIComponent(id)}`); }}
           onCancel={() => nav(listView)}
         />
-      ) : open ? (
-        <TaskView
-          task={open}
-          events={state.events.get(open.id) ?? []}
-          onLoaded={onHistory}
-          onBack={() => nav(listView)}
-        />
+      ) : route.view === 'task' || open ? (
+        open ? (
+          <TaskView
+            task={open}
+            events={state.events.get(open.id) ?? []}
+            onLoaded={onHistory}
+            onBack={() => nav(listView)}
+          />
+        ) : (
+          <div className="card" style={{ padding: '2rem', textAlign: 'center', marginTop: '1rem' }}>
+            <p style={{ color: 'var(--text-secondary)' }}>
+              {loading ? 'Đang tải thông tin task...' : 'Không tìm thấy task yêu cầu (có thể task đã bị xóa hoặc URL không đúng).'}
+            </p>
+            <button style={{ marginTop: '1rem' }} onClick={() => nav(listView)}>
+              Quay lại danh sách
+            </button>
+          </div>
+        )
       ) : activeTab === 'office' ? (
         <OfficeCanvas
           tasks={tasks}
           providers={providers}
-          onSelectTask={(id) => nav(`#/task/${encodeURIComponent(id)}`)}
+          onSelectTask={(id) => nav(`/task/${encodeURIComponent(id)}`)}
         />
       ) : activeTab === 'graph' ? (
         <GraphCanvas
           tasks={tasks}
           providers={providers}
           events={state.events}
-          onSelectTask={(id) => nav(`#/task/${encodeURIComponent(id)}`)}
+          onSelectTask={(id) => nav(`/task/${encodeURIComponent(id)}`)}
         />
       ) : activeTab === 'projects' && viewedPath === null ? (
         <ProjectList
@@ -364,7 +387,7 @@ export function App() {
           loading={projLoading}
           error={projError}
           taskCount={(p) => tasksOfProject(tasks, p).length}
-          onOpen={(p) => nav(PROJECT_PREFIX + encodeURIComponent(p.path))}
+          onOpen={(p) => nav(`/board?project=${encodeURIComponent(p.path)}`)}
           onRefresh={() => { void loadProjects(true); }}
         />
       ) : (
@@ -372,8 +395,8 @@ export function App() {
           tasks={boardTasks}
           events={state.events}
           loading={loading}
-          onOpen={(id) => nav(`#/task/${encodeURIComponent(id)}`)}
-          onCreateNew={() => nav('#/new')}
+          onOpen={(id) => nav(`/task/${encodeURIComponent(id)}`)}
+          onCreateNew={() => nav(viewedPath !== null ? `/new?project=${encodeURIComponent(viewedPath)}` : '/new')}
         />
       )}
     </div>

@@ -153,8 +153,14 @@ Giao diện người dùng voragent được thiết kế theo triết lý **War
   - **Logo & Favicon:** Hình tượng **Chú Rắn Ouroboros** uốn vòng cung tròn khép kín, nét vẽ phẳng, đơn sắc (`#1F1B18`), tự động chuyển sang màu sáng ngà `#FAF8F5` khi trình duyệt bật Dark mode.
   - **Hiệu ứng Loading dùng chung (Snake Motion):** Chú rắn Ouroboros trườn co duỗi tự nhiên theo nhịp quán tính (pure CSS keyframes, 60fps mượt mà, không tốn tài nguyên).
 - **Quy chuẩn tối ưu công thái học:**
-  - **Zero Excessive Scrolling (Tránh cuộn trang dài):** Phân trang hợp lý khi danh sách dài; cố định các thanh hành động chính (sticky/float buttons) để người dùng không phải cuộn lên xuống tìm nút bấm.
-  - **Tối ưu không gian hiển thị (Screen Real-Estate):** Gọn gàng, độ đặc thông tin cao, thích ứng hoàn hảo với màn hình laptop nhỏ (13–14 inch) và chế độ chia đôi màn hình (split-screen).
+  - **Full-width Fluid Canvas (Bao phủ tối đa màn hình):** Không bó hẹp giao diện trong khung nhỏ; tự động mở rộng bao phủ 100% diện tích màn hình lớn và ultrawide, dàn trải 5 cột Kanban thoáng đãng.
+  - **Bố cục Split-Screen Two-Pane:** Màn hình TaskView chia 2 cột thông minh (Cột trái: Hội thoại & Sticky Chat Action Dock; Cột phải: Git Diff & Commits Viewer độc lập).
+  - **Zero Excessive Scrolling:** Thanh gửi tin nhắn và hành động chính luôn neo cố định (sticky bottom dock) kèm hiệu ứng kính mờ (backdrop-filter blur), tương tác tức thì không cần cuộn trang.
+  - **Biểu tượng vector hiện đại (`lucide-react`):** Toàn bộ biểu tượng được chuẩn hóa bằng nét vẽ siêu mảnh 1.5px, sắc nét, đồng bộ trên toàn bộ thẻ task, thanh công cụ và dự án.
+  - **Tiện ích Developer Ergonomics:** Nút sao chép 1-click cho đường dẫn Repo/Worktree và Git Branch, hệ thống Semantic Badges đầy đủ (Xanh, Hổ phách, Đỏ, Lam) và Skeleton loading bóng bẩy.
+  - **Hệ thống điều khiển & thời gian tùy chỉnh (Custom Form Controls & Smart Datetime):** Loại bỏ triệt để các control mặc định thô sơ của trình duyệt. Tích hợp Dropdown tìm kiếm thông minh (`CustomSelect`), bộ chọn đa nền tảng và ưu tiên agent (`AgentPriorityMultiSelect`), huy hiệu thời gian tương đối tự nhiên (`TimeBadge`), thanh cuộn siêu mỏng 6px bo tròn mềm và vòng sáng focus màu ấm công nghệ.
+  - **Triệt tiêu thanh cuộn lồng nhau (Zero Double Scrollbars):** Quy chuẩn nghiêm ngặt chỉ duy nhất 1 thanh cuộn hoạt động trên toàn trang; thanh tìm kiếm và công cụ bám dính thông minh (`sticky top`) khi cuộn danh sách dài, không bao giờ xuất hiện 2 thanh cuộn dọc song song.
+  - **Định tuyến URL trực quan (Semantic Path + Query):** Loại bỏ hoàn toàn hash URL (`#/...`), sử dụng chuẩn HTML5 History API (`/`, `/board`, `/board?project=...`, `/task/<id>`, `/office`, `/graph`, `/new`), tự động bảo lưu trạng thái và tham số xác thực khi tải lại trang (reload / F5).
 
 ---
 

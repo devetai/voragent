@@ -1,18 +1,73 @@
 import { useEffect, useState } from 'react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowLeft,
+  Bot,
+  Check,
+  CheckCircle2,
+  Clock,
+  Copy,
+  FileCode2,
+  Folder,
+  GitBranch,
+  GitCommit,
+  MessagesSquare,
+  RotateCcw,
+  Send,
+  Settings2,
+  UserCheck,
+  Zap,
+} from 'lucide-react';
 import type { Task, VEvent } from '@voragent/shared';
 import { api, errText } from './api';
 import type { Diff } from './api';
 import { SnakeLoader } from './components/SnakeLoader';
 import { isUnisolated, transcript } from './state';
+import { TimeBadge } from './components/TimeBadge';
 
-const STATUS_LABEL: Record<Task['status'], { label: string; badgeClass: string }> = {
-  queued: { label: 'Hàng đợi', badgeClass: 'badge neutral' },
-  waiting_quota: { label: 'Chờ hạn mức', badgeClass: 'badge warn' },
-  running: { label: 'Đang chạy', badgeClass: 'badge info' },
-  awaiting_user: { label: 'Chờ phản hồi', badgeClass: 'badge warn' },
-  closed: { label: 'Đã hoàn tất', badgeClass: 'badge success' },
-  failed: { label: 'Thất bại', badgeClass: 'badge warn' },
-};
+function TaskStatusBadge({ status }: { status: Task['status'] }) {
+  switch (status) {
+    case 'waiting_quota':
+      return <span className="badge warn"><Clock size={12} /> Chờ hạn mức</span>;
+    case 'running':
+      return <span className="badge info"><Zap size={12} /> Đang chạy</span>;
+    case 'awaiting_user':
+      return <span className="badge warn"><UserCheck size={12} /> Chờ phản hồi</span>;
+    case 'closed':
+      return <span className="badge success"><CheckCircle2 size={12} /> Đã hoàn tất</span>;
+    case 'failed':
+      return <span className="badge danger"><AlertCircle size={12} /> Thất bại</span>;
+    default:
+      return <span className="badge neutral"><Clock size={12} /> Hàng đợi</span>;
+  }
+}
+
+function CopyableTag({ text, label, icon }: { text: string; label: string; icon: React.ReactNode }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    void navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
+
+  return (
+    <div className="task-meta-item" title={label}>
+      {icon}
+      <span>{text}</span>
+      <button
+        type="button"
+        className="copy-btn"
+        onClick={copy}
+        title={copied ? 'Đã sao chép!' : 'Sao chép'}
+      >
+        {copied ? <Check size={11} color="var(--green-base)" /> : <Copy size={11} />}
+      </button>
+    </div>
+  );
+}
 
 export function TaskView({
   task,
@@ -79,7 +134,6 @@ export function TaskView({
 
   const canSend = task.status === 'awaiting_user' || task.status === 'failed';
   const items = transcript(events);
-  const statusInfo = STATUS_LABEL[task.status] ?? { label: task.status, badgeClass: 'badge neutral' };
 
   const handleSend = (): void => {
     if (canSend && text.trim() !== '' && !busy) {
@@ -87,13 +141,15 @@ export function TaskView({
     }
   };
 
+  const displayPath = task.workspacePath ?? task.repoPath;
+
   return (
     <div className="panel">
       <div className="task-nav">
         <button type="button" onClick={onBack} title="Quay lại bảng Kanban (Phím tắt: Esc)">
-          ← Quay lại bảng <kbd>Esc</kbd>
+          <ArrowLeft size={15} /> Quay lại bảng <kbd>Esc</kbd>
         </button>
-        <span className={statusInfo.badgeClass}>{statusInfo.label}</span>
+        <TaskStatusBadge status={task.status} />
       </div>
 
       <div className="task-header">
@@ -104,133 +160,179 @@ export function TaskView({
         </div>
 
         <div className="task-meta-grid">
-          <div className="task-meta-item" title="Đường dẫn làm việc">
-            📁 {task.workspacePath ?? task.repoPath}
-          </div>
+          <CopyableTag
+            text={displayPath}
+            label="Đường dẫn thư mục làm việc"
+            icon={<Folder size={13} style={{ flexShrink: 0 }} />}
+          />
           {task.branch && (
-            <div className="task-meta-item" title="Nhánh git cách ly">
-              🌿 {task.branch}
-            </div>
+            <CopyableTag
+              text={task.branch}
+              label="Nhánh git cách ly"
+              icon={<GitBranch size={13} style={{ flexShrink: 0 }} />}
+            />
           )}
           {task.currentProvider && (
             <div className="task-meta-item" title="Nền tảng thực thi hiện hành">
-              🤖 {task.currentProvider}
+              <Bot size={13} /> {task.currentProvider}
             </div>
           )}
           <div className="task-meta-item" title="Chế độ không gian làm việc">
-            ⚙ {task.mode}
+            <Settings2 size={13} /> {task.mode}
+          </div>
+          <div className="task-meta-item" title="Thời gian cập nhật gần nhất">
+            <TimeBadge timestamp={task.updatedAt || task.createdAt} />
           </div>
           {isUnisolated(task) && (
             <div className="badge warn">
-              ⚠️ Không cách ly: làm việc trực tiếp trên repo gốc
+              <AlertTriangle size={12} /> Không cách ly: làm việc trực tiếp trên repo gốc
             </div>
           )}
         </div>
       </div>
 
-      <div className="transcript-container">
-        <h3>Nhật ký hội thoại và hành động</h3>
-        <div className="transcript">
-          {items.map((it, i) =>
-            it.kind === 'handoff' ? (
-              <div key={i} className="handoff-divider-wrap">
-                <div className="handoff-divider-line" />
-                <div className="handoff-divider-badge">
-                  <span>⚡ Handoff:</span> {it.text}
-                </div>
-              </div>
-            ) : (
-              <div key={i} className={`msg ${it.kind}`}>
-                {it.text}
-              </div>
-            ),
-          )}
-          {items.length === 0 && <div className="muted">Chưa có nội dung trao đổi.</div>}
-        </div>
-      </div>
-
-      <div className="diff-section">
-        <h3>Thay đổi mã nguồn (Git Diff)</h3>
-        {diff === null ? (
-          <SnakeLoader size="sm" inline label="Đang tải thay đổi…" />
-        ) : (
-          <div className="diff-container">
-            {diff.commits.length > 0 && (
-              <div className="diff-header">
-                Các commit đã tạo:
-                <pre className="diff">{diff.commits.join('\n')}</pre>
-              </div>
-            )}
-            {diff.status !== '' && (
-              <div className="diff-header">
-                Trạng thái file:
-                <pre className="diff">{diff.status}</pre>
-              </div>
-            )}
-            <div className="diff-header">Nội dung diff:</div>
-            <pre className="diff">
-              {diff.diff === '' ? '(Không có thay đổi mã nguồn chưa commit)' : diff.diff}
-            </pre>
-          </div>
-        )}
-      </div>
-
       {error !== null && (
-        <div className="error" role="alert">
-          {error}
+        <div className="error" role="alert" style={{ marginBottom: '1rem' }}>
+          <AlertCircle size={16} /> {error}
         </div>
       )}
 
-      <div className="chat-action-bar">
-        <textarea
-          value={text}
-          rows={3}
-          placeholder={
-            canSend
-              ? 'Nhập hướng dẫn hoặc phản hồi tiếp theo cho agent (Ctrl + Enter để gửi nhanh)…'
-              : 'Task đang thực thi hoặc đã kết thúc, không thể gửi thêm tin nhắn.'
-          }
-          disabled={!canSend}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-              e.preventDefault();
-              handleSend();
-            }
-          }}
-        />
-        <div className="row">
-          <button
-            type="button"
-            className="primary"
-            disabled={busy || !canSend || text.trim() === ''}
-            onClick={handleSend}
-            title="Gửi phản hồi (Ctrl + Enter)"
-          >
-            Gửi phản hồi <kbd>Ctrl+Enter</kbd>
-          </button>
-          <button
-            type="button"
-            disabled={busy || task.status === 'closed'}
-            onClick={() => act(() => api.close(task.id))}
-          >
-            Đánh dấu hoàn thành
-          </button>
-          <button
-            type="button"
-            disabled={busy || task.status !== 'failed'}
-            onClick={() => act(() => api.retry(task.id, false))}
-          >
-            Thử lại trên nền tảng hiện tại
-          </button>
-          <button
-            type="button"
-            className="danger"
-            disabled={busy || task.status !== 'failed'}
-            onClick={() => act(() => api.retry(task.id, true))}
-          >
-            Chuyển sang nền tảng kế tiếp
-          </button>
+      {/* 2-Column Split-Screen Layout (Bao phủ tối đa màn hình) */}
+      <div className="task-split-layout">
+        {/* Left Column: Transcript & Sticky Chat Action Dock */}
+        <div className="task-pane-left">
+          <div className="transcript-container">
+            <div className="transcript-header">
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '1rem' }}>
+                <MessagesSquare size={16} /> Nhật ký trao đổi & hành động
+              </h3>
+            </div>
+            <div className="transcript">
+              {items.map((it, i) =>
+                it.kind === 'handoff' ? (
+                  <div key={i} className="handoff-divider-wrap">
+                    <div className="handoff-divider-line" />
+                    <div className="handoff-divider-badge">
+                      <Zap size={13} /> <span>Handoff:</span> {it.text}
+                    </div>
+                  </div>
+                ) : (
+                  <div key={i} className={`msg ${it.kind}`}>
+                    {it.text}
+                  </div>
+                ),
+              )}
+              {items.length === 0 && (
+                <div className="muted" style={{ padding: '2rem 1rem', textAlign: 'center' }}>
+                  Chưa có nội dung trao đổi.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Sticky Bottom Action Dock (Zero Excessive Scrolling) */}
+          <div className="chat-action-bar">
+            <div className="chat-input-row">
+              <textarea
+                value={text}
+                rows={2}
+                placeholder={
+                  canSend
+                    ? 'Nhập hướng dẫn hoặc phản hồi cho agent (Ctrl + Enter để gửi nhanh)…'
+                    : 'Task đang thực thi hoặc đã kết thúc, không thể gửi thêm tin nhắn.'
+                }
+                disabled={!canSend}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="primary chat-btn-send"
+                disabled={busy || !canSend || text.trim() === ''}
+                onClick={handleSend}
+                title="Gửi phản hồi (Ctrl + Enter)"
+              >
+                <Send size={15} /> Gửi <kbd>Ctrl+↵</kbd>
+              </button>
+            </div>
+
+            <div className="chat-lifecycle-actions">
+              <button
+                type="button"
+                disabled={busy || task.status === 'closed'}
+                onClick={() => act(() => api.close(task.id))}
+                title="Đánh dấu công việc đã hoàn thành trọn vẹn"
+              >
+                <CheckCircle2 size={14} /> Hoàn tất
+              </button>
+              <button
+                type="button"
+                disabled={busy || task.status !== 'failed'}
+                onClick={() => act(() => api.retry(task.id, false))}
+                title="Thử lại trên nền tảng hiện tại"
+              >
+                <RotateCcw size={14} className={busy ? 'spin' : ''} /> Thử lại
+              </button>
+              <button
+                type="button"
+                className="danger"
+                disabled={busy || task.status !== 'failed'}
+                onClick={() => act(() => api.retry(task.id, true))}
+                title="Chuyển sang nền tảng kế tiếp trong danh sách ưu tiên"
+              >
+                <Zap size={14} /> Chuyển agent kế tiếp
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Source Code Diff & Commits */}
+        <div className="task-pane-right">
+          <div style={{ marginBottom: '0.75rem' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '1rem' }}>
+              <FileCode2 size={16} /> Thay đổi mã nguồn (Git Diff)
+            </h3>
+          </div>
+
+          {diff === null ? (
+            <div style={{ padding: '2rem 1rem', background: 'var(--bg-canvas)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', textAlign: 'center' }}>
+              <SnakeLoader size="sm" inline label="Đang tải thay đổi git…" />
+            </div>
+          ) : (
+            <div className="diff-container">
+              {diff.commits.length > 0 && (
+                <div className="diff-header">
+                  <GitCommit size={13} /> Các commit đã tạo ({diff.commits.length}):
+                </div>
+              )}
+              {diff.commits.length > 0 && (
+                <pre className="diff" style={{ maxHeight: '140px', borderBottom: '1px solid #27272A' }}>
+                  {diff.commits.join('\n')}
+                </pre>
+              )}
+              {diff.status !== '' && (
+                <div className="diff-header">
+                  <FileCode2 size={13} /> Trạng thái file:
+                </div>
+              )}
+              {diff.status !== '' && (
+                <pre className="diff" style={{ maxHeight: '140px', borderBottom: '1px solid #27272A' }}>
+                  {diff.status}
+                </pre>
+              )}
+              <div className="diff-header">
+                Nội dung diff:
+              </div>
+              <pre className="diff">
+                {diff.diff === '' ? '(Không có thay đổi mã nguồn chưa commit)' : diff.diff}
+              </pre>
+            </div>
+          )}
         </div>
       </div>
     </div>

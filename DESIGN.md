@@ -91,16 +91,78 @@ Mọi hành vi đều phải có phản hồi tức thì:
 ### 2.9. Tối Ưu Tầm Mắt & Tránh Bắt Người Dùng Cuộn Trang Nhiều (Zero Excessive Scrolling)
 
 - **Nguyên tắc:** Tránh bắt người dùng phải cuộn chuột dài đằng đẵng để tìm kiếm thông tin hoặc bấm nút hành động.
-- **Phân trang / Tải lũy tiến (Pagination / Virtualized List):** Khi danh sách dài (lịch sử task, danh sách dự án, transcripts, diffs lớn), bắt buộc phải phân trang hoặc cuộn nội bộ trong container giới hạn chiều cao (`max-height` cố định), tuyệt đối không để trang web dài ngoằng làm trôi mất thanh điều hướng.
-- **Sticky / Floating Actions (Cố định thanh hành động):** Các nút hành động chính (như nút gửi tin nhắn `Gửi`, `Tạo task`, `+ Task mới`, các nút điều hướng) phải được neo cố định (sticky/float) ở đầu trang hoặc chân màn hình/panel. Người dùng phải luôn nhìn thấy và bấm được ngay lập tức mà không phải cuộn lên cuộn xuống nhiều lần.
+- **Sticky Top Global Navigation (Cố định thanh điều hướng toàn cục):** Toàn bộ cụm Header (Logo, Trạng thái kết nối, Nút `+ Task mới`), Thanh Quota Bar và Bộ chuyển Tab 4 chế độ xem (`.sticky-top-header`) **BẮT BUỘC** phải được ghim cố định ở đầu trang (`position: sticky; top: 0; z-index: 40;`) với hiệu ứng kính mờ ấm (`backdrop-filter: blur(14px)`). Khi danh sách dự án hoặc bảng Kanban kéo dài, người dùng luôn quan sát được Quota nền tảng, có thể chuyển chế độ xem hoặc tạo task mới ngay lập tức mà không phải cuộn ngược lên đỉnh trang.
+- **Sticky Bottom Action Dock (Cố định dock hành động chi tiết task):** Tại màn hình `TaskView`, ô nhập tin nhắn và nút `Gửi phản hồi <kbd>Ctrl+↵</kbd>` luôn được ghim cố định ở đáy màn hình (`position: sticky; bottom: 0;`). Dù nhật ký hội thoại có hàng trăm tin nhắn hay Git diff dài hàng nghìn dòng, người dùng luôn có thể phản hồi cho agent ngay tức khắc.
+- **Sticky Contextual Toolbars (Cố định thanh công cụ ngữ cảnh):** Các thanh công cụ như ô lọc tìm kiếm và nút làm mới danh sách dự án (`.projects-toolbar`) được giữ cố định ngay dưới thanh tab điều hướng khi cuộn danh sách.
+- **Phân trang / Tải lũy tiến (Pagination / Virtualized List):** Khi danh sách dài, kết hợp cuộn nội bộ trong container giới hạn chiều cao hợp lý (`max-height` cố định), tuyệt đối không để trang web dài ngoằng làm trôi mất các công cụ điều khiển.
 
 ### 2.10. Tận Dụng Tối Đa Không Gian Màn Hình (Screen Real-Estate Optimization)
 
 - **Nguyên tắc:** Tối ưu hóa từng pixel, triệt tiêu các khoảng trống dư thừa (excessive whitespace) gây lãng phí diện tích hiển thị.
+- **Single-Row Compact Command Bar (Hợp nhất thanh điều khiển một hàng duy nhất):**
+  - Tuyệt đối không xếp chồng 3–4 tầng menu và banner gây chiếm dụng chiều dọc màn hình (Vertical Screen Tax).
+  - Tích hợp toàn bộ: Logo nhận diện, Trạng thái kết nối, Bộ chuyển 4 Tab chế độ xem, Giám sát hạn mức Quota Bar và Nút tạo task `+ Task mới` lên **cùng một hàng ngang duy nhất (Single-Row Bar)** với chiều cao chuẩn ≤ 56px.
+  - Tiết kiệm hơn 100px chiều dọc, ưu tiên tối đa tầm nhìn cho nội dung cốt lõi: Bảng Kanban, Danh sách dự án, Transcript và Git Diff.
 - **Thích ứng màn hình nhỏ:** Rất nhiều developer làm việc trên laptop màn hình nhỏ (13–14 inch) hoặc chia đôi màn hình (split-screen half width). Do đó:
   - Bố cục phải gọn gàng, độ đặc thông tin hợp lý (compact & dense nhưng thoáng mắt).
   - Không chừa padding/margin quá rộng (> 24px ở các panel phụ) làm hẹp vùng hiển thị nội dung chính.
   - Tận dụng chiều ngang và chiều dọc linh hoạt, ưu tiên tối đa diện tích cho dữ liệu hữu ích: Bảng Kanban, cây thư mục dự án, Git Diff và Terminal Logs.
+
+### 2.11. Thiết Kế Điều Hướng Liền Mạch (Seamless Navigation - Chống Anti-pattern "Box-in-a-Box")
+
+- **Nguyên tắc:** Tránh tuyệt đối bọc khối lồng khối liên tiếp (ví dụ: thanh header bọc container tab bo viền sẫm, bên trong tab active lại bọc một block nổi màu trắng có đổ bóng). Điều này gây cảm giác vụn vặt, chia cắt và làm giao diện nặng nề, thiếu tính chuyên nghiệp.
+- **Thanh tab điều hướng phẳng (Flat Seamless Tabs):**
+  - Khung bao `.view-tabs` hoàn toàn trong suốt (`background: transparent; border: none; box-shadow: none;`), các tab đứng tự nhiên trên bề mặt Header bar.
+  - Tab inactive: Chữ màu dịu (`var(--text-secondary)`), rê chuột vào hiện nền hover mờ siêu nhẹ `rgba(31, 27, 24, 0.05)` với bo góc `6px`.
+  - Tab active: Sử dụng nền xám ấm phẳng nhẹ nhàng (`background: rgba(31, 27, 24, 0.08)`), chữ đậm `var(--text-primary)`, không đổ bóng cộm, không viền dày, tạo cảm giác thanh thoát và liền lạc (phong cách Linear / GitHub / Vercel).
+- **Đồng bộ hóa các thành phần phụ cận:** Badge trạng thái kết nối (`.status-pill`) và vạch phân cách (`.header-divider`) được tinh giản phẳng mỏng, đảm bảo thanh Header là một dải điều hướng thống nhất, mượt mà từ trái sang phải.
+
+### 2.12. Định Tuyến URL Trực Quan & Bảo Toàn Trạng Thái (Semantic Path + Query & Reload Persistence)
+
+- **Nguyên tắc:** Trải nghiệm điều hướng web hiện đại cần URL trong sáng, tường minh và bền vững. Tuyệt đối không dùng URL hash (`#/...`) gây kỳ dị và thô kệch.
+- **Cấu trúc URL chuẩn hóa:**
+  - Trang danh sách dự án: `/` hoặc `/projects`
+  - Bảng task Kanban toàn thể: `/board`
+  - Bảng task theo dự án: `/board?project=<encoded_path>` (ví dụ: `/board?project=D%3A%2FProjects%2Fvoragent`)
+  - Không gian Văn phòng 3D: `/office`
+  - Đồ thị quan hệ: `/graph`
+  - Tạo task mới: `/new` (hoặc `/new?project=<encoded_path>` nếu tạo từ ngữ cảnh dự án)
+  - Xem chi tiết task: `/task/<id>` (ví dụ: `/task/task-2026-11-05-001`)
+- **Bảo toàn trạng thái khi Reload (Reload Persistence):**
+  - Khi người dùng bấm F5 / Reload ở bất kỳ URL nào, ứng dụng khởi tạo state trực tiếp từ `pathname` và `search params`, đảm bảo người dùng ở nguyên màn hình hiện tại mà không bị văng về trang chủ hay mất dữ liệu đang lọc.
+  - Tham số xác thực phiên `key=...` tự động được bảo lưu qua các lượt chuyển trang trong `buildUrl`, giúp việc chia sẻ link nội bộ hoặc mở tab mới không bị lỗi 401.
+  - Phía server HTTP daemon tự động fallback mọi sub-path không phải static asset về `index.html`.
+  - Tương thích ngược: Tự động chuyển hướng mượt mà các URL hash cũ sang Path + Query mới qua `history.replaceState`.
+
+### 2.13. Hệ Thống Điều Khiển Biểu Mẫu & Thời Gian Trực Quan (Custom Form Controls & Datetime UX)
+
+- **Nguyên tắc:** Tuyệt đối loại bỏ các điều khiển mặc định thô sơ của trình duyệt (Windows classic form controls) làm phá vỡ ngôn ngữ thiết kế **Warm Cozy Tech**.
+- **Custom Select Dropdown (`CustomSelect`):**
+  - Thay thế toàn bộ `<select>` nguyên bản bằng Dropdown tùy chỉnh cao cấp: trigger bo góc mềm, icon ngữ cảnh, mũi tên xoay mượt mà.
+  - Tích hợp tìm kiếm nhanh nội bộ (`searchable`), phân cấp thông tin rõ ràng với tiêu đề, đường dẫn phụ (`sublabel`) và badge trạng thái.
+  - Dropdown menu nổi với kính mờ ấm, đổ bóng mịn, đánh dấu lựa chọn đang chọn bằng biểu tượng tích xanh `Check`.
+- **Custom Multi-Select & Priority Selector (`AgentPriorityMultiSelect`):**
+  - Cho phép chọn nhiều agent và sắp xếp thứ tự ưu tiên điều phối (`priority order`) trực quan bằng các card tương tác có màu nhận diện riêng (Claude cam đào, Codex ngọc bích, Antigravity xanh dương).
+  - Tích hợp thanh đo Quota mini theo thời gian thực và chế độ chuyển đổi linh hoạt giữa "Tự động hoàn toàn (Auto Quota Handoff)" và "Tùy chỉnh mức ưu tiên".
+- **Smart Datetime UX (`TimeBadge`):**
+  - Hiển thị thời gian cập nhật dưới dạng thời gian tương đối tự nhiên ("Vừa xong", "5 phút trước", "2 giờ trước", "Hôm qua lúc 14:30"), hover vào hiển thị ngày giờ chuẩn xác đầy đủ.
+  - Tự động gắn chấm xanh nhấp nháy (`pulse dot`) cho các tác vụ hoạt động trong 15 phút gần nhất.
+- **Custom Native Controls & Scrollbar:**
+  - Thanh cuộn (`::-webkit-scrollbar`): Siêu mỏng 6px, bo tròn `radius-full`, màu ấm mờ `rgba(31, 27, 24, 0.18)` không xâm lấn nội dung.
+  - Native `<select>` fallback: Tự động thay mũi tên đen mặc định của hệ điều hành bằng inline SVG chevron sắc nét.
+  - Custom checkbox: Bo góc 4px với SVG checkmark, không dùng ô vuông xám Windows.
+  - Warm focus ring: Thay viền xanh công nghiệp bằng viền ấm công nghệ `rgba(217, 119, 87, 0.18)`.
+
+### 2.14. Quy Chuẩn Triệt Tiêu Thanh Cuộn Lồng Nhau (Zero Double Scrollbars Architecture)
+
+- **Nguyên tắc "Đơn Thanh Cuộn" (Single Active Scrollbar):** Trong mọi màn hình, trên cùng một chiều không gian (dọc hoặc ngang), **TUYỆT ĐỐI CHỈ TỒN TẠI TỐI ĐA 1 THANH CUỘN HOẠT ĐỘNG**. Nghiêm cấm đặt thanh cuộn của cửa sổ trình duyệt (`window` / `body`) và thanh cuộn của container con (`overflow-y: auto`) nằm song song, gây giật cục chuột và rối mắt người dùng.
+- **Màn hình danh sách mở rộng (Unified Page Scroll):**
+  - Màn hình dạng danh sách dài (như `ProjectList`): Tuyệt đối không áp đặt `max-height: calc(100vh - Xpx)` và `overflow-y: auto` lên container con.
+  - Cho phép danh sách chảy tự nhiên trên toàn trang với đúng 1 thanh cuộn duy nhất ở mép ngoài cùng của trình duyệt.
+  - **Sticky Contextual Toolbars:** Khi cuộn danh sách dài, thanh tìm kiếm và nút thao tác (`.projects-toolbar`) bám dính thông minh ngay bên dưới Top Header bar (`position: sticky; top: 52px; z-index: 30;` với nền mờ `backdrop-filter: blur(10px)`), đảm bảo các nút điều khiển luôn sẵn sàng mà không cần cuộn ngược lên đỉnh.
+- **Màn hình chuyên biệt dạng App Shell (Kanban, 3D Canvas, Split-Screen):**
+  - Giữ cố định chiều cao vừa khít 100% viewport, triệt tiêu hoàn toàn thanh cuộn thừa ngoài cửa sổ.
+  - Chỉ cho phép cuộn nội bộ độc lập trong từng phân vùng riêng biệt (từng cột Kanban `.column-body`, cột hội thoại Transcript `.transcript`, hoặc Diff viewer).
 
 ---
 

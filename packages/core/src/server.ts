@@ -343,7 +343,7 @@ export function createServer(d: {
       ok = false;
     }
     if (!ok) {
-      if (extname(path) !== '') return err(c, 404, 'Không tìm thấy.');
+      if (extname(path) !== '' && extname(path).toLowerCase() in MIME) return err(c, 404, 'Không tìm thấy.');
       file = join(root, 'index.html'); // SPA fallback
     }
     try {
