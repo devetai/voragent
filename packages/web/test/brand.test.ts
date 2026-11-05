@@ -1,10 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import { Logo } from '../src/components/Logo';
 import { SnakeLoader } from '../src/components/SnakeLoader';
+import { ProviderIcon, resolveProviderKey, PROVIDER_BRAND_META } from '../src/components/ProviderIcon';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 
 describe('Brand & UI Components', () => {
+  describe('ProviderIcon component', () => {
+    it('resolves opencode provider key and metadata', () => {
+      expect(resolveProviderKey('opencode')).toBe('opencode');
+      expect(resolveProviderKey('OpenCode CLI')).toBe('opencode');
+      expect(PROVIDER_BRAND_META.opencode.color).toBe('#059669');
+      expect(PROVIDER_BRAND_META.opencode.label).toBe('OpenCode');
+    });
+
+    it('renders opencode vector icon with emerald terminal badge', () => {
+      const html = renderToString(React.createElement(ProviderIcon, { provider: 'opencode', size: 16 }));
+      expect(html).toContain('viewBox="0 0 24 24"');
+      expect(html).toContain('#059669');
+      expect(html).toContain('#ECFDF5');
+    });
+  });
+
   describe('Logo component', () => {
     it('renders default ouroboros logo with SVG icon and eye mask', () => {
       const html = renderToString(React.createElement(Logo, { size: 32 }));

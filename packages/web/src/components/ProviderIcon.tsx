@@ -1,6 +1,6 @@
 import React, { useId } from 'react';
 
-export type BrandProviderKey = 'claude' | 'codex' | 'antigravity' | 'manager' | 'user' | 'unknown';
+export type BrandProviderKey = 'claude' | 'codex' | 'antigravity' | 'opencode' | 'manager' | 'user' | 'unknown';
 
 export function resolveProviderKey(raw?: string | null): BrandProviderKey {
   if (!raw) return 'unknown';
@@ -10,6 +10,7 @@ export function resolveProviderKey(raw?: string | null): BrandProviderKey {
   if (s.includes('antigravity') || s.includes('agy') || s.includes('gemini') || s.includes('google')) {
     return 'antigravity';
   }
+  if (s.includes('opencode')) return 'opencode';
   if (s.includes('manager') || s.includes('trưởng phòng') || s.includes('lead')) return 'manager';
   if (s.includes('user') || s.includes('bạn')) return 'user';
   return 'unknown';
@@ -36,6 +37,12 @@ export const PROVIDER_BRAND_META: Record<
     color: '#2563EB',
     bg: '#EFF6FF',
     border: '#BFDBFE',
+  },
+  opencode: {
+    label: 'OpenCode',
+    color: '#059669',
+    bg: '#ECFDF5',
+    border: '#A7F3D0',
   },
   manager: {
     label: 'Trưởng phòng',
@@ -176,6 +183,24 @@ export function ProviderIcon({
     );
   }
 
+  if (key === 'opencode') {
+    // OpenCode Terminal & Code Badge (Emerald Green #059669)
+    return (
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+        style={{ flexShrink: 0, display: 'inline-block', verticalAlign: 'middle', ...style }}
+      >
+        <rect x="2.5" y="3" width="19" height="18" rx="4.5" fill="#ECFDF5" stroke="#059669" strokeWidth="1.8" />
+        <path d="M7 8.5L10.5 12L7 15.5" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <line x1="12.5" y1="15.5" x2="16.5" y2="15.5" stroke="#059669" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
   if (key === 'manager') {
     // Trưởng phòng Crown Mark
     return (
@@ -297,6 +322,42 @@ export function drawProviderBrandOnCanvas(
     ctx.beginPath();
     ctx.arc(cx + r * 0.36, cy - r * 0.36, r * 0.1, 0, Math.PI * 2);
     ctx.fill();
+  } else if (key === 'opencode') {
+    // OpenCode Terminal Badge (Emerald #059669)
+    const color = '#059669';
+    const scale = (r * 1.25) / 24;
+
+    // Background rounded rect
+    ctx.fillStyle = '#ECFDF5';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(1.6, 2 * scale);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const rw = 18 * scale;
+    const rh = 18 * scale;
+    const rx = cx - rw / 2;
+    const ry = cy - rh / 2;
+    const rad = 4.5 * scale;
+
+    ctx.beginPath();
+    ctx.roundRect(rx, ry, rw, rh, rad);
+    ctx.fill();
+    ctx.stroke();
+
+    // Terminal prompt `>_`
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(1.8, 2.2 * scale);
+    ctx.beginPath();
+    ctx.moveTo(cx + (7 - 12) * scale, cy + (8.5 - 12) * scale);
+    ctx.lineTo(cx + (10.5 - 12) * scale, cy + (12 - 12) * scale);
+    ctx.lineTo(cx + (7 - 12) * scale, cy + (15.5 - 12) * scale);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(cx + (12.5 - 12) * scale, cy + (15.5 - 12) * scale);
+    ctx.lineTo(cx + (16.5 - 12) * scale, cy + (15.5 - 12) * scale);
+    ctx.stroke();
   } else {
     // Fallback Crown / Node icon
     ctx.fillStyle = '#7C3AED';

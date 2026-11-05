@@ -83,6 +83,22 @@ function getProviderGuide(providerId: string): ProviderInstallGuide {
       ],
     };
   }
+  if (key.includes('opencode')) {
+    return {
+      id: 'opencode',
+      title: 'OpenCode CLI',
+      vendor: 'Anomaly Innovations',
+      npmPackage: '@opencode/cli',
+      installCmd: 'npm install -g @opencode/cli',
+      authCmd: 'opencode auth login',
+      verifyCmd: 'opencode --version',
+      docsUrl: 'https://github.com/anomalyco/opencode',
+      notes: [
+        'OpenCode là CLI mã nguồn mở hỗ trợ đa nền tảng (OpenRouter, Google Gemini, Groq, GitHub Copilot...).',
+        'Sau khi cài đặt, mở Terminal chạy lệnh "opencode auth login" hoặc "opencode auth" để kết nối các nhà cung cấp mô hình.',
+      ],
+    };
+  }
   return {
     id: 'antigravity',
     title: 'Google Antigravity CLI (agy)',

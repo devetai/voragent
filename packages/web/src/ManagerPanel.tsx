@@ -19,6 +19,7 @@ const AGENT_OPTIONS = [
   { id: 'claude', label: 'Claude Code (Kiến trúc & Logic)', defaultRole: 'Kiến trúc & Logic lõi' },
   { id: 'antigravity', label: 'Antigravity (Giao diện & Tương tác)', defaultRole: 'Giao diện & Tương tác' },
   { id: 'codex', label: 'Codex (Kiểm thử & Review)', defaultRole: 'Kiểm thử & Review' },
+  { id: 'opencode', label: 'OpenCode (Đa mô hình & Thực thi)', defaultRole: 'Đa mô hình & Thực thi' },
 ];
 
 /** Trích xuất tin nhắn/báo cáo cuối cùng của Agent hoặc lỗi từ danh sách sự kiện của một Task. */

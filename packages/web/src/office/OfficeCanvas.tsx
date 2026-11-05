@@ -55,7 +55,7 @@ export function OfficeCanvas({
   }, [tasks]);
 
   const workerAgents = useMemo<OfficeAgentData[]>(() => {
-    const knownProviders = ['claude', 'codex', 'antigravity'];
+    const knownProviders = ['claude', 'codex', 'antigravity', 'opencode'];
 
     return knownProviders.map((key, deskIdx) => {
       const theme = PROVIDER_THEMES[key] ?? DEFAULT_THEME;

@@ -4,6 +4,7 @@ export const LOUNGE_COORDINATES = [
   { x: 6.6, z: 4.8 },   // Vị trí nệm nghỉ Claude (Cam đất)
   { x: 10.2, z: 5.0 },  // Vị trí nệm nghỉ Codex (Xanh ngọc)
   { x: 8.4, z: 7.2 },   // Vị trí nệm nghỉ Antigravity (Xanh dương)
+  { x: 10.4, z: 7.2 },  // Vị trí nệm nghỉ OpenCode (Xanh ngọc đậm)
 ];
 
 export interface SlitherState {

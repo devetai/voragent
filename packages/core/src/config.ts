@@ -4,7 +4,7 @@ import type { Config, WorkspaceMode } from '@voragent/shared';
 
 export const DEFAULT_CONFIG: Omit<Config, 'dataDir'> = {
   port: 4717,
-  priority: ['claude', 'antigravity', 'codex'],
+  priority: ['claude', 'antigravity', 'codex', 'opencode'],
   concurrency: { perProvider: 2, total: 4 },
   quotaThreshold: 0.9,
   defaultCooldownMs: 3_600_000,
@@ -16,6 +16,7 @@ export const DEFAULT_CONFIG: Omit<Config, 'dataDir'> = {
     claude: 'claude-sonnet-5-5',
     codex: 'gpt-5.6-luna',
     antigravity: 'gemini-3.8-flash',
+    opencode: 'auto',
   },
   modelFallbackPolicy: 'auto',
 };

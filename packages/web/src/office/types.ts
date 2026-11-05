@@ -73,4 +73,11 @@ export const PROVIDER_THEMES: Record<string, ProviderThemeConfig> = {
     name: 'Antigravity',
     defaultRole: 'Giao diện & Tương tác',
   },
+  opencode: {
+    base: '#059669',       // Xanh ngọc đậm OpenCode
+    band: '#6EE7B7',       // Vằn xanh ngọc nhạt
+    accessory: 'bow',      // Nơ cổ công nghệ
+    name: 'OpenCode',
+    defaultRole: 'Đa mô hình & Thực thi',
+  },
 };

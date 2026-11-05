@@ -1,4 +1,5 @@
 import type {
+  BrowseFolderResult,
   Config,
   ManagerMode,
   ManagerPlan,
@@ -8,6 +9,7 @@ import type {
   MigrateOptions,
   MigrateResult,
   ModelQuotaInfo,
+  PickDirectoryResult,
   Project,
   ProviderState,
   PruneOptions,

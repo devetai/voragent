@@ -173,10 +173,10 @@ export function tasksOfProject(tasks: Task[], project: Pick<Project, 'path'>): T
 }
 
 const SOURCE_LABELS: Array<[DiscoverySource, string]> = [
-  ['claude', 'Claude'], ['antigravity', 'Antigravity'], ['codex', 'Codex'],
+  ['claude', 'Claude'], ['antigravity', 'Antigravity'], ['codex', 'Codex'], ['opencode', 'OpenCode'],
 ];
 
-/** Nhãn nguồn của dự án, thứ tự cố định (Claude, Antigravity, Codex), không trùng. */
+/** Nhãn nguồn của dự án, thứ tự cố định (Claude, Antigravity, Codex, OpenCode), không trùng. */
 export function describeProjectSources(p: Project): string[] {
   const have = new Set(p.sources.map((s) => s.source));
   return SOURCE_LABELS.filter(([id]) => have.has(id)).map(([, label]) => label);

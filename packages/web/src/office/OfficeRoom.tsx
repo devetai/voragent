@@ -37,9 +37,10 @@ interface OfficeRoomProps {
 }
 
 export const DESK_COORDINATES = [
-  { x: -5, z: -1 },  // Bàn 1: Claude
-  { x: 0, z: -1 },   // Bàn 2: Codex
-  { x: 5, z: -1 },   // Bàn 3: Antigravity
+  { x: -6.0, z: -1 },  // Bàn 1: Claude
+  { x: -2.0, z: -1 },  // Bàn 2: Codex
+  { x: 2.0, z: -1 },   // Bàn 3: Antigravity
+  { x: 6.0, z: -1 },   // Bàn 4: OpenCode
 ];
 
 export const MANAGER_DESK_COORDINATE = { x: 0, z: -5.2 };
@@ -497,12 +498,13 @@ export function OfficeRoom({
           <meshStandardMaterial color="#F3EDE2" roughness={0.95} />
         </mesh>
 
-        {/* 3 Nệm lười (Floor Poufs) êm ái cho 3 Agent nghỉ ngơi */}
+        {/* 4 Nệm lười (Floor Poufs) êm ái cho 4 Agent nghỉ ngơi */}
         {LOUNGE_COORDINATES.map((pos, idx) => {
           const colors = [
             { rim: '#D97757', top: '#FDE68A' }, // Claude (Cam đất)
             { rim: '#10A37F', top: '#D1FAE5' }, // Codex (Xanh ngọc)
             { rim: '#3B82F6', top: '#DBEAFE' }, // Antigravity (Xanh dương)
+            { rim: '#059669', top: '#A7F3D0' }, // OpenCode (Xanh ngọc đậm)
           ][idx] ?? { rim: '#E2E8F0', top: '#FFFFFF' };
 
           return (

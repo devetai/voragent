@@ -29,6 +29,12 @@ const PROVIDER_METAS: Record<string, { name: string; color: string; bg: string; 
     bg: '#EFF6FF',
     border: '#BFDBFE',
   },
+  opencode: {
+    name: 'OpenCode CLI',
+    color: '#059669',
+    bg: '#ECFDF5',
+    border: '#A7F3D0',
+  },
 };
 
 export function AgentPriorityMultiSelect({

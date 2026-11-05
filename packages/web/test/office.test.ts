@@ -24,7 +24,7 @@ describe('Văn phòng 3D - Quy chuẩn thiết kế & Tính toán hình học', 
     expect(tailTipRadius).toBeCloseTo(0.06, 2);
   });
 
-  it('bộ theme màu và phụ kiện đặc trưng của 3 coding agent tuân thủ Warm Cozy Tech', () => {
+  it('bộ theme màu và phụ kiện đặc trưng của các coding agent tuân thủ Warm Cozy Tech', () => {
     // Claude: cam đất ấm áp, kính tri thức
     expect(PROVIDER_THEMES.claude?.base).toBe('#D97757');
     expect(PROVIDER_THEMES.claude?.accessory).toBe('glasses');
@@ -36,6 +36,10 @@ describe('Văn phòng 3D - Quy chuẩn thiết kế & Tính toán hình học', 
     // Antigravity: xanh dương tươi sáng, mũ lưỡi trai
     expect(PROVIDER_THEMES.antigravity?.base).toBe('#3B82F6');
     expect(PROVIDER_THEMES.antigravity?.accessory).toBe('cap');
+
+    // OpenCode: xanh ngọc đậm công nghệ, nơ cổ
+    expect(PROVIDER_THEMES.opencode?.base).toBe('#059669');
+    expect(PROVIDER_THEMES.opencode?.accessory).toBe('bow');
 
     // Default theme dự phòng
     expect(DEFAULT_THEME.accessory).toBe('none');
@@ -65,7 +69,7 @@ describe('Văn phòng 3D - Quy chuẩn thiết kế & Tính toán hình học', 
   });
 
   it('tọa độ khu nghỉ ngơi tách biệt với bàn làm việc', () => {
-    expect(LOUNGE_COORDINATES.length).toBe(3);
+    expect(LOUNGE_COORDINATES.length).toBe(4);
     LOUNGE_COORDINATES.forEach((coord) => {
       expect(coord.z).toBeGreaterThan(4.0); // Nằm ở góc phòng nghỉ
       expect(coord.x).toBeGreaterThan(6.0);

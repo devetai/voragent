@@ -21,6 +21,7 @@ const BASE_PROVIDER_AUTHORS = [
   { value: 'claude', label: 'Claude Code' },
   { value: 'antigravity', label: 'Antigravity' },
   { value: 'codex', label: 'Codex' },
+  { value: 'opencode', label: 'OpenCode' },
 ];
 
 export function SharedMemoryPanel({

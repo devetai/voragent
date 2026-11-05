@@ -6,7 +6,7 @@ Trung tâm điều phối AI agent cục bộ, hỗ trợ làm việc song song 
 
 ## Tính Năng Nổi Bật
 
-- **Đa nền tảng thông minh:** Hỗ trợ Claude Code và Google Antigravity (AGY). Tự động hoán chuyển khi một nền tảng cạn hạn mức (quota exhausted) hoặc hết lượt dùng mà không làm gián đoạn công việc của lập trình viên.
+- **Đa nền tảng thông minh:** Hỗ trợ Claude Code, OpenAI Codex, Google Antigravity (AGY) và OpenCode CLI. Tự động hoán chuyển khi một nền tảng cạn hạn mức (quota exhausted) hoặc hết lượt dùng mà không làm gián đoạn công việc của lập trình viên.
 - **Cách ly tuyệt đối bằng Git Worktree:** Với mỗi task, voragent tự động tạo một git worktree riêng biệt đặt tại `~/.voragent/worktrees/task-N` (hoặc vị trí tùy chọn trên ổ D/E...). Mọi thay đổi chưa commit (`dirty files`) đều được mang theo an toàn mà không ảnh hưởng tới nhánh chính hay tiến trình làm việc của người dùng.
 - **Tùy chọn vị trí lưu trữ & Di chuyển dữ liệu (Migration):** Tránh tình trạng đầy ổ đĩa C hệ thống; cho phép chuyển toàn bộ thư mục dữ liệu `.voragent` sang ổ đĩa khác an toàn, tự động đồng bộ lại tham chiếu Git worktree và con trỏ khởi động `~/.voragentrc`.
 - **Cơ chế Dọn dẹp rác & Quản lý dung lượng (Cleanup Engine):** Giải phóng an toàn các worktree của task đã hoàn tất, dọn worktree mồ côi, thu gọn log và tối ưu SQLite database chỉ với 1 cú click (Quick Cleanup), bảo toàn 100% lịch sử chat, diff và checkpoints.
@@ -22,7 +22,7 @@ Trung tâm điều phối AI agent cục bộ, hỗ trợ làm việc song song 
 voragent/
 ├── packages/
 │   ├── shared/       # Kiểu dữ liệu TypeScript và định nghĩa dùng chung
-│   ├── adapters/     # Bộ điều hợp cho Claude Code, Antigravity và Fake adapter
+│   ├── adapters/     # Bộ điều hợp cho Claude Code, Codex, Antigravity, OpenCode và Fake adapter
 │   ├── core/         # SQLite Store, Orchestrator, Workspace, Storage & Cleanup, HTTP/WS Server
 │   ├── daemon/       # Quản lý tiến trình nền, ghi file daemon.json
 │   ├── cli/          # Giao diện dòng lệnh voragent

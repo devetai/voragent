@@ -97,7 +97,7 @@ export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   closed: 'Xong',
 };
 
-export type DiscoverySource = 'claude' | 'antigravity' | 'codex';
+export type DiscoverySource = 'claude' | 'antigravity' | 'codex' | 'opencode';
 
 export interface DiscoveredProject {
   path: string;
@@ -191,6 +191,12 @@ export const PROVIDER_MODELS: Record<string, ModelOption[]> = {
     { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', description: 'Phản hồi cực nhanh, tối ưu hạn mức (Mặc định)', default: true },
     { id: 'gemini-4-argon', name: 'Gemini 4 Argon', description: 'Mô hình thế hệ mới tư duy kỹ thuật' },
   ],
+  opencode: [
+    { id: 'auto', name: 'Mặc định CLI (Auto)', description: 'Sử dụng mô hình mặc định đã thiết lập trong OpenCode', default: true },
+    { id: 'groq/llama-3.3-70b-versatile', name: 'Groq Llama 3.3 70B', description: 'Mô hình mã nguồn mở tốc độ cực cao trên Groq' },
+    { id: 'google/gemini-2.5-flash', name: 'Google Gemini 2.5 Flash', description: 'Mô hình Gemini thế hệ mới đa nhiệm' },
+    { id: 'openrouter/anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet (OpenRouter)', description: 'Sonnet 3.5 thông qua cổng OpenRouter' },
+  ],
 };
 
 
@@ -200,6 +206,7 @@ export const PROVIDER_QUOTA_TYPE: Record<string, QuotaSharingType> = {
   claude: 'shared',
   codex: 'shared',
   antigravity: 'per_model',
+  opencode: 'shared',
 };
 
 export interface ModelQuotaState {
