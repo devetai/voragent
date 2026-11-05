@@ -1,0 +1,21 @@
+{
+  "name": "@voragent/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": { "voragent": "dist/src/main.js" },
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@voragent/adapters": "workspace:*",
+    "@voragent/core": "workspace:*",
+    "@voragent/shared": "workspace:*",
+    "cross-spawn": "^7.0.6"
+  },
+  "devDependencies": {
+    "@types/cross-spawn": "^6.0.6",
+    "@types/node": "^26.6.6"
+  }
+}

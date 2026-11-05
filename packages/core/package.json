@@ -1,0 +1,25 @@
+{
+  "name": "@voragent/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "@types/cross-spawn": "^6.0.6",
+    "@types/node": "^26.6.6",
+    "@types/ws": "8.18.2"
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.6",
+    "@voragent/adapters": "workspace:*",
+    "@voragent/shared": "workspace:*",
+    "cross-spawn": "^7.0.6",
+    "hono": "4.13.16",
+    "ws": "8.22.1"
+  }
+}

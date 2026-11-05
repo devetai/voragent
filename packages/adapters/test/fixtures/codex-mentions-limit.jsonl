@@ -1,0 +1,4 @@
+{"type":"thread.started","thread_id":"s-demo-1"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Tôi đã thêm thông báo \"usage limit\" khi người dùng vượt hạn mức."}}
+{"type":"turn.completed","usage":{"input_tokens":50,"cached_input_tokens":0,"output_tokens":12}}

@@ -1,0 +1,14 @@
+# Bản thử giao diện và dữ liệu phiên brainstorm (chỉ để tham khảo, không commit)
+.superpowers/
+
+# Node / build
+node_modules/
+dist/
+.turbo/
+*.log
+
+# Dữ liệu chạy của voragent trong repo (worktree của task, cấu hình cục bộ)
+.voragent/
+
+# Worktree cô lập cho từng nhánh làm việc
+.worktrees/
