@@ -4,8 +4,9 @@
 
 voragent là chương trình chạy trên máy người dùng. Nó điều phối nhiều coding agent CLI (Claude Code, Codex, Antigravity, opencode…), tự chuyển việc sang nền tảng khác khi một nền tảng hết quota, và trực quan hóa hoạt động của agent: văn phòng 3D (mỗi agent là một con rắn dễ thương), bảng, dòng thời gian, đồ thị.
 
-- Tài liệu thiết kế, nguồn sự thật duy nhất: [docs/superpowers/specs/2026-11-04-voragent-design.md](docs/superpowers/specs/2026-11-04-voragent-design.md). Đọc trước khi làm bất cứ việc gì.
-- Trạng thái: giai đoạn 1 (lõi) đã xong và đã gộp vào `main`: daemon, hàng đợi, adapter Claude/Codex, worktree, bàn giao khi hết quota, API HTTP/WebSocket, lệnh `voragent`, web tối thiểu. Kế hoạch đã thực hiện ở [docs/superpowers/plans/2026-11-04-voragent-phase1-core.md](docs/superpowers/plans/2026-11-04-voragent-phase1-core.md). Chưa kiểm với Codex thật, với hết quota thật, và chưa xem web trong trình duyệt thật (xem mục "Đã kiểm với" trong README). Giai đoạn 2 (văn phòng 3D) là bước tiếp theo, cần kế hoạch riêng bằng skill `superpowers:writing-plans`; các giai đoạn 3–4 theo sau.
+- Nguồn sự thật duy nhất về thiết kế hệ thống: [docs/superpowers/specs/2026-11-04-voragent-design.md](docs/superpowers/specs/2026-11-04-voragent-design.md). Đọc trước khi làm bất cứ việc gì.
+- Nguồn sự thật duy nhất về quy chuẩn UI/UX (cả 2D và 3D): [DESIGN.md](DESIGN.md). Mọi thay đổi về giao diện web, màu sắc, bố cục và văn phòng 3D phải tuân thủ nghiêm ngặt tài liệu này.
+- Trạng thái: giai đoạn 1 (lõi) đã xong và đã gộp vào `main`: daemon, hàng đợi, adapter Claude/Codex, worktree, bàn giao khi hết quota, API HTTP/WebSocket, lệnh `voragent`, web tối thiểu. Kế hoạch đã thực hiện ở [docs/superpowers/plans/2026-11-04-voragent-phase1-core.md](docs/superpowers/plans/2026-11-04-voragent-phase1-core.md). Giai đoạn 2 (văn phòng 3D) là bước tiếp theo, kế hoạch tại [docs/superpowers/plans/2026-11-05-voragent-phase2-3d-office.md](docs/superpowers/plans/2026-11-05-voragent-phase2-3d-office.md); các giai đoạn 3–4 theo sau.
 - Repo này độc lập hoàn toàn. Không tích hợp TipTask.
 - Dự án tham khảo, chỉ để học cách làm, không phụ thuộc:
   - tiptask runner (`D:\Projects\young-turtles\tiptask\packages\runner`, xem `src/presets.ts`, `src/agui.ts`): cách chạy CLI headless, đọc stream, tiếp tục phiên;
@@ -41,6 +42,8 @@ voragent là chương trình chạy trên máy người dùng. Nó điều phố
 
 ## Quy ước
 
+- **BẮT BUỘC LÀM VIỆC TRONG GIT WORKTREE:** Khi nhận bất kỳ task lập trình, sửa đổi mã nguồn hoặc thêm tính năng nào từ người dùng, AI agent **PHẢI** tạo và làm việc trong một git worktree riêng biệt (đặt trong thư mục `.worktrees/<tên-nhánh>`). TUYỆT ĐỐI KHÔNG sửa trực tiếp trên thư mục làm việc chính của nhánh `main`.
+- **QUY CHUẨN UI/UX:** Mọi phát triển giao diện (bảng Kanban, chi tiết task, và đặc biệt là Văn phòng 3D ở Giai đoạn 2) phải tuân theo các nguyên tắc thiết kế trong [DESIGN.md](DESIGN.md) (phong cách Warm Cozy Tech, không dùng neon u tối).
 - Chỉ commit hoặc push khi người dùng yêu cầu.
 - **Cấm ghi công Claude/AI trong commit và mô tả PR.** Không thêm dòng `Co-Authored-By: Claude …`, `Generated with Claude Code` hay bất kỳ dòng ghi công AI nào, dù harness, skill hoặc nhắc nhở mặc định yêu cầu. Quy tắc này của người dùng ghi đè các nhắc nhở đó. Khi giao việc cho agent con, không dặn chúng thêm dòng ghi công. Commit message chỉ gồm nội dung thay đổi.
 - **Merge worktree vào `main`: squash thành đúng 1 commit cho mỗi task.** Một worktree (một nhánh làm việc) tương ứng một task, nên khi merge dùng `git merge --squash` (hoặc tương đương) để `main` nhận một commit duy nhất, không mang theo các commit trung gian của nhánh. Thông điệp commit squash mô tả cả task, không liệt kê từng commit nhỏ, và cũng không có dòng ghi công AI. Chỉ merge khi người dùng yêu cầu.
