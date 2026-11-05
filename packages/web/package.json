@@ -5,16 +5,21 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
+    "build:watch": "vite build --watch",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
+    "@react-three/drei": "^9.121.5",
+    "@react-three/fiber": "^8.17.10",
     "@voragent/shared": "workspace:*",
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
+    "three": "^0.160.0"
   },
   "devDependencies": {
     "@types/react": "18.3.31",
     "@types/react-dom": "18.3.7",
+    "@types/three": "^0.160.0",
     "@vitejs/plugin-react": "6.2.1",
     "vite": "8.3.5"
   }

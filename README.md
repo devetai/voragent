@@ -19,9 +19,14 @@ node packages/cli/dist/src/main.js
 
 Lệnh cuối khởi động daemon ngay trong terminal, in URL đầy đủ (có khóa truy cập) và mở trình duyệt.
 Muốn dùng lệnh `voragent` ở mọi nơi, chạy `pnpm link --global` trong thư mục `packages/cli`.
-Giao diện web (`packages/web`, React + Vite) được build ra `packages/web/dist` và daemon tự phục vụ ở trang gốc:
-bảng task theo cột, thanh quota các nền tảng, trò chuyện/dòng thời gian của từng task và form tạo task. Chưa build web
-thì trang gốc chỉ báo "chưa được build", còn API và các lệnh dưới đây vẫn dùng được.
+Giao diện web (`packages/web`, React + Vite) được build ra `packages/web/dist` và daemon tự phục vụ ở trang gốc với 4 chế độ xem:
+
+- **📁 Dự án:** Khám phá tự động các dự án bạn từng làm việc qua Claude Code và Antigravity;
+- **📋 Bảng task:** Bảng Kanban quản lý trạng thái, dòng thời gian sự kiện, thanh quota và form tạo task nhanh;
+- **🏢 Văn phòng 3D (Giai đoạn 2):** Không gian văn phòng tương tác 3D ấm cúng (Three.js/Fiber), nơi mỗi coding agent là một chú rắn thông minh biểu cảm sinh động (chớp mắt, vẫy đuôi, tập trung, chờ duyệt, ngủ, lỗi), tự trườn bàn giao quota khi cạn, cùng các NPC & đồ vật tương tác vui nhộn (mèo lười sưởi nắng, robot hút bụi dọn phòng, máy pha cà phê, đèn bàn);
+- **🕸 Đồ thị quan hệ (Giai đoạn 3):** Trực quan hóa mạng lưới tri thức và workspace (Canvas 2D + Force Layout), liên kết đa chiều giữa Agent, Task, File bị sửa/đọc và các mốc chuyển giao.
+
+Chưa build web thì trang gốc chỉ báo "chưa được build", còn API và các lệnh dưới đây vẫn dùng được.
 
 ## Các lệnh
 
@@ -178,7 +183,7 @@ Chưa kiểm:
 - Hai lượt dùng chung một bản ghi run (`runs` có một dòng, `endedAt` cập nhật theo lượt cuối); `RUN_STARTED` của lượt 0 có `sessionId: null` vì phiên chỉ biết sau khi CLI trả về.
 - Tin nhắn lượt 1 lưu thành "Gi? x�a d�ng..." vì lệnh `curl` trên Windows gửi byte không phải UTF-8 (lỗi của lệnh kiểm, chưa kết luận là lỗi của voragent); Claude vẫn hiểu. Tiếng Việt qua API với UTF-8 chuẩn chưa được kiểm lại.
 
-### Khám phá dự án
+### Kiểm tra khám phá dự án
 
 - voragent: commit `7836136` (nhánh `feat/phase1b-projects`, commit mã nguồn cuối cùng; các commit sau chỉ sửa tài liệu), các phần kiểm trên dữ liệu thật và thư mục chính giả bên dưới làm ở commit `5a50d10`, kiểm ngày 2026-11-05.
 - Hệ điều hành: Windows 11 Pro (10.0.26100), Git Bash. Node v22.14.0.

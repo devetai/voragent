@@ -88,6 +88,20 @@ Mọi hành vi đều phải có phản hồi tức thì:
 - **Laptop / Tablet (768px – 1199px):** Kanban chuyển sang lưới 3 cột hoặc cuộn ngang mượt mà, Drawer chi tiết chiếm 50% màn hình.
 - **Mobile (< 768px):** Kanban chuyển thành dạng accordion hoặc danh sách xếp dọc, Drawer chiếm toàn màn hình, menu chuyển sang compact.
 
+### 2.9. Tối Ưu Tầm Mắt & Tránh Bắt Người Dùng Cuộn Trang Nhiều (Zero Excessive Scrolling)
+
+- **Nguyên tắc:** Tránh bắt người dùng phải cuộn chuột dài đằng đẵng để tìm kiếm thông tin hoặc bấm nút hành động.
+- **Phân trang / Tải lũy tiến (Pagination / Virtualized List):** Khi danh sách dài (lịch sử task, danh sách dự án, transcripts, diffs lớn), bắt buộc phải phân trang hoặc cuộn nội bộ trong container giới hạn chiều cao (`max-height` cố định), tuyệt đối không để trang web dài ngoằng làm trôi mất thanh điều hướng.
+- **Sticky / Floating Actions (Cố định thanh hành động):** Các nút hành động chính (như nút gửi tin nhắn `Gửi`, `Tạo task`, `+ Task mới`, các nút điều hướng) phải được neo cố định (sticky/float) ở đầu trang hoặc chân màn hình/panel. Người dùng phải luôn nhìn thấy và bấm được ngay lập tức mà không phải cuộn lên cuộn xuống nhiều lần.
+
+### 2.10. Tận Dụng Tối Đa Không Gian Màn Hình (Screen Real-Estate Optimization)
+
+- **Nguyên tắc:** Tối ưu hóa từng pixel, triệt tiêu các khoảng trống dư thừa (excessive whitespace) gây lãng phí diện tích hiển thị.
+- **Thích ứng màn hình nhỏ:** Rất nhiều developer làm việc trên laptop màn hình nhỏ (13–14 inch) hoặc chia đôi màn hình (split-screen half width). Do đó:
+  - Bố cục phải gọn gàng, độ đặc thông tin hợp lý (compact & dense nhưng thoáng mắt).
+  - Không chừa padding/margin quá rộng (> 24px ở các panel phụ) làm hẹp vùng hiển thị nội dung chính.
+  - Tận dụng chiều ngang và chiều dọc linh hoạt, ưu tiên tối đa diện tích cho dữ liệu hữu ích: Bảng Kanban, cây thư mục dự án, Git Diff và Terminal Logs.
+
 ---
 
 ## 3. Hệ Thống Bố Cục (Layout & Spacing System)
@@ -237,6 +251,7 @@ Sử dụng bảng kiểm tra này trước khi merge bất kỳ thay đổi UI 
 - [ ] Không có hiện tượng dồn cục hay nhồi nhét nội dung.
 - [ ] Căn chỉnh thẳng hàng theo trục thị giác.
 - [ ] Tiêu đề và hành động chính nổi bật nhất trong 3 giây đầu tiên quan sát.
+- [ ] Tận dụng tối đa diện tích màn hình, không có khoảng trống lãng phí, hiển thị tối ưu trên màn hình nhỏ hoặc cửa sổ chia đôi.
 
 ### Kiểu chữ & Màu sắc (Typography & Color)
 
@@ -250,6 +265,7 @@ Sử dụng bảng kiểm tra này trước khi merge bất kỳ thay đổi UI 
 - [ ] Mọi hành động bất đồng bộ đều có phản hồi thị giác rõ ràng.
 - [ ] Có Empty State khi chưa có task nào trong hàng đợi hoặc cột.
 - [ ] Lỗi được giải thích bằng tiếng Việt kèm nút bấm khôi phục (Retry).
+- [ ] Không bắt người dùng cuộn trang quá dài; phân trang/cuộn nội bộ hợp lý; các nút hành động chính (gửi, tạo, duyệt) được sticky/float thuận tiện thao tác.
 
 ### Khả năng tiếp cận & Thiết bị (Accessibility & Responsive)
 

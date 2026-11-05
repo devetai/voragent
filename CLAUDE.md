@@ -6,6 +6,7 @@ voragent là chương trình chạy trên máy người dùng. Nó điều phố
 
 - Nguồn sự thật duy nhất về thiết kế hệ thống: [docs/superpowers/specs/2026-11-04-voragent-design.md](docs/superpowers/specs/2026-11-04-voragent-design.md). Đọc trước khi làm bất cứ việc gì.
 - Nguồn sự thật duy nhất về quy chuẩn UI/UX (cả 2D và 3D): [DESIGN.md](DESIGN.md). Mọi thay đổi về giao diện web, màu sắc, bố cục và văn phòng 3D phải tuân thủ nghiêm ngặt tài liệu này.
+- Hướng dẫn tổng quan & sử dụng: [README.md](README.md).
 - Trạng thái: giai đoạn 1 (lõi) đã xong và đã gộp vào `main`: daemon, hàng đợi, adapter Claude/Codex, worktree, bàn giao khi hết quota, API HTTP/WebSocket, lệnh `voragent`, web tối thiểu. Kế hoạch đã thực hiện ở [docs/superpowers/plans/2026-11-04-voragent-phase1-core.md](docs/superpowers/plans/2026-11-04-voragent-phase1-core.md). Giai đoạn 2 (văn phòng 3D) là bước tiếp theo, kế hoạch tại [docs/superpowers/plans/2026-11-05-voragent-phase2-3d-office.md](docs/superpowers/plans/2026-11-05-voragent-phase2-3d-office.md); các giai đoạn 3–4 theo sau.
 - Repo này độc lập hoàn toàn. Không tích hợp TipTask.
 - Dự án tham khảo, chỉ để học cách làm, không phụ thuộc:
@@ -44,6 +45,8 @@ voragent là chương trình chạy trên máy người dùng. Nó điều phố
 
 - **BẮT BUỘC LÀM VIỆC TRONG GIT WORKTREE:** Khi nhận bất kỳ task lập trình, sửa đổi mã nguồn hoặc thêm tính năng nào từ người dùng, AI agent **PHẢI** tạo và làm việc trong một git worktree riêng biệt (đặt trong thư mục `.worktrees/<tên-nhánh>`). TUYỆT ĐỐI KHÔNG sửa trực tiếp trên thư mục làm việc chính của nhánh `main`.
 - **QUY CHUẨN UI/UX:** Mọi phát triển giao diện (bảng Kanban, chi tiết task, và đặc biệt là Văn phòng 3D ở Giai đoạn 2) phải tuân theo các nguyên tắc thiết kế trong [DESIGN.md](DESIGN.md) (phong cách Warm Cozy Tech, không dùng neon u tối).
+- **Chiến lược chạy test linh hoạt theo phạm vi:** Không phải lúc nào cũng cần chạy toàn bộ test suite. Tùy thuộc vào yêu cầu, độ phức tạp và phạm vi tác động để quyết định chạy test all hay test từng phần (ví dụ thay đổi UI/web thì chỉ test web; thay đổi core/orchestrator/daemon thì test toàn diện).
+- **Đồng bộ `README.md` khi có thay đổi:** Rà soát và cập nhật `README.md` khi có tính năng mới, thay đổi lệnh CLI, quy chuẩn thiết kế hoặc quy trình làm việc.
 - Chỉ commit hoặc push khi người dùng yêu cầu.
 - **Cấm ghi công Claude/AI trong commit và mô tả PR.** Không thêm dòng `Co-Authored-By: Claude …`, `Generated with Claude Code` hay bất kỳ dòng ghi công AI nào, dù harness, skill hoặc nhắc nhở mặc định yêu cầu. Quy tắc này của người dùng ghi đè các nhắc nhở đó. Khi giao việc cho agent con, không dặn chúng thêm dòng ghi công. Commit message chỉ gồm nội dung thay đổi.
 - **Merge worktree vào `main`: squash thành đúng 1 commit cho mỗi task.** Một worktree (một nhánh làm việc) tương ứng một task, nên khi merge dùng `git merge --squash` (hoặc tương đương) để `main` nhận một commit duy nhất, không mang theo các commit trung gian của nhánh. Thông điệp commit squash mô tả cả task, không liệt kê từng commit nhỏ, và cũng không có dòng ghi công AI. Chỉ merge khi người dùng yêu cầu.

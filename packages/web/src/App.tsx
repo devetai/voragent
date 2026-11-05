@@ -4,7 +4,9 @@ import { ApiError, api, errText } from './api';
 import { Board } from './Board';
 import { INITIAL_CONNECTION, nextConnectionState } from './connection';
 import type { ConnectionEvent, ConnectionState } from './connection';
+import { GraphCanvas } from './graph/GraphCanvas';
 import { NewTaskForm } from './NewTaskForm';
+import { OfficeCanvas } from './office/OfficeCanvas';
 import { ProjectList } from './ProjectList';
 import { QuotaBar } from './QuotaBar';
 import { TaskView } from './TaskView';
@@ -62,6 +64,7 @@ export function App() {
   const sockRef = useRef<WebSocket | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
+  const [loading, setLoading] = useState(true);
   const [hash, go] = useHash();
   const nav = (h: string): void => {
     setNotice(null);
@@ -102,7 +105,6 @@ export function App() {
   const reload = useCallback(async (): Promise<void> => {
     try {
       const [tasks, providers] = await Promise.all([api.tasks(), api.providers()]);
-      // Thẻ cần số lần bàn giao, nên tải lịch sử từng task (lỗi lẻ không làm hỏng cả lần tải).
       const details = await Promise.all(tasks.map((t) => api.task(t.id).catch(() => null)));
       const events = new Map<string, VEvent[]>();
       details.forEach((d, i) => {
@@ -113,6 +115,8 @@ export function App() {
       setError(null);
     } catch (e) {
       setError(errText(e));
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -120,13 +124,33 @@ export function App() {
     api.providers().then((providers) => dispatch({ t: 'providers', providers }), () => undefined);
   }, []);
 
-  // Tải dữ liệu đầu tiên ngay, không phụ thuộc WebSocket (WS lỗi thì bảng vẫn có dữ liệu hoặc báo lỗi).
+  // Tải dữ liệu ban đầu
   useEffect(() => {
     void reload();
   }, [reload]);
 
-  // WebSocket cùng nguồn: trình duyệt tự gửi cookie khóa, URL không mang khóa.
-  // Trình duyệt không cho thấy mã 401 của WebSocket, nên sau vài lần thất bại ta dò bằng một GET có xác thực.
+  // Phím tắt toàn cục (N để mở task mới, Esc để thoát/quay lại màn trước)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      const activeTag = (document.activeElement?.tagName || '').toLowerCase();
+      const isInput = activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select';
+
+      if ((e.key === 'n' || e.key === 'N') && !isInput && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        nav('#/new');
+      } else if (e.key === 'Escape') {
+        if (window.location.hash !== '' && window.location.hash !== '#') {
+          e.preventDefault();
+          nav(listHash || '');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [nav, listHash]);
+
+  // Kết nối WebSocket thời gian thực
   useEffect(() => {
     let disposed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -154,7 +178,7 @@ export function App() {
       sock.onopen = () => {
         if (sockRef.current !== sock) return;
         apply('open');
-        void reload(); // mỗi lần kết nối lại: tải lại GET /api/tasks
+        void reload();
       };
       sock.onmessage = (m: MessageEvent<string>) => {
         if (sockRef.current !== sock) return;
@@ -171,7 +195,7 @@ export function App() {
         if (REFRESH_PROVIDER_EVENTS.has(e.type)) refreshProviders();
       };
       sock.onclose = () => {
-        if (sockRef.current !== sock) return; // socket đã bị thay thế (kể cả StrictMode chạy effect hai lần)
+        if (sockRef.current !== sock) return;
         sockRef.current = null;
         const next = apply('closed');
         if (next.probe) void probe().finally(schedule);
@@ -189,7 +213,6 @@ export function App() {
     };
   }, [reload, refreshProviders]);
 
-  // Cập nhật đồng hồ để ô "tạm nghỉ" tự chuyển màu khi hết hạn.
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 15_000);
     return () => clearInterval(id);
@@ -203,16 +226,19 @@ export function App() {
   const providers = [...state.providers.values()];
   const taskId = taskIdOf(hash);
   const open = taskId !== null ? state.tasks.get(taskId) : undefined;
-  const isListHash = hash === '' || hash === '#/board' || projectPathOf(hash) !== null;
+
+  const isListHash = hash === '' || hash === '#' || hash === '#/board' || projectPathOf(hash) !== null;
   useEffect(() => {
     if (isListHash) setListHash(hash);
   }, [hash, isListHash]);
-  const listView = isListHash ? hash : listHash;
+
+  const listView = isListHash ? hash : (listHash || '');
   const viewedPath = projectPathOf(listView);
   const viewedProject = viewedPath === null ? undefined
     : projects?.find((p) => projectKeyOf(p.path) === projectKeyOf(viewedPath));
   const viewedName = viewedProject?.name ?? (viewedPath === null ? '' : baseName(viewedPath));
   const boardTasks = viewedPath === null ? tasks : tasksOfProject(tasks, { path: viewedPath });
+
   // Dự án đã chọn không còn trong danh sách (đã tải thành công): về danh sách kèm thông báo.
   const loadState = projError !== null ? 'failed' : projects === null ? 'loading' : 'loaded';
   const route = resolveProjectRoute(hash, projects, loadState);
@@ -222,31 +248,87 @@ export function App() {
       setNotice(staleNotice);
       go('');
     }
-  }, [staleNotice]);
-  const activeTab = listView === '#/board' ? 'board' : 'projects';
+  }, [staleNotice, go]);
+
+  const activeTab = hash === '#/office'
+    ? 'office'
+    : hash === '#/graph'
+    ? 'graph'
+    : (hash === '#/board' || viewedPath !== null)
+    ? 'board'
+    : 'projects';
 
   return (
     <div className="app">
-      <header>
-        <h1>voragent</h1>
-        {conn.status !== 'connected' && <span className="offline">mất kết nối</span>}
-        <button onClick={() => nav('#/new')}>+ Task mới</button>
+      <header className="app-header">
+        <div className="brand-section">
+          <div className="logo-badge" onClick={() => nav('')} title="Về trang chủ danh sách dự án">
+            <div className="logo-icon">v</div>
+            <span className="brand-title">voragent</span>
+          </div>
+          <div className="status-pill">
+            <span className={`status-dot ${conn.status === 'connected' ? 'online' : 'offline'}`} />
+            <span>{conn.status === 'connected' ? 'Cục bộ' : 'Mất kết nối'}</span>
+          </div>
+        </div>
+
+        <div className="header-actions">
+          <button className="primary" onClick={() => nav('#/new')} title="Tạo task mới (Phím tắt: N)">
+            + Task mới <kbd>N</kbd>
+          </button>
+        </div>
       </header>
-      <nav className="tabs">
-        <button type="button" className={activeTab === 'projects' ? 'active' : ''} onClick={() => nav('')}>Dự án</button>
-        <button type="button" className={activeTab === 'board' ? 'active' : ''} onClick={() => nav('#/board')}>Bảng task</button>
-      </nav>
+
       {conn.status === 'auth-failed' && (
         <div className="error banner" role="alert">
           Khóa truy cập đã đổi (có thể voragent đã khởi động lại). Hãy mở lại URL do voragent in ra.
         </div>
       )}
+
+      {/* Quota Bar */}
       <QuotaBar providers={providers} now={now} />
+
+      {/* 4-View Switcher Tabs */}
+      <nav className="view-tabs" aria-label="Chế độ xem">
+        <button
+          type="button"
+          className={`view-tab ${activeTab === 'projects' ? 'active' : ''}`}
+          onClick={() => nav('')}
+        >
+          📁 Dự án
+        </button>
+        <button
+          type="button"
+          className={`view-tab ${activeTab === 'board' ? 'active' : ''}`}
+          onClick={() => nav('#/board')}
+        >
+          📋 Bảng task {viewedPath !== null && `(${viewedName})`}
+        </button>
+        <button
+          type="button"
+          className={`view-tab ${activeTab === 'office' ? 'active' : ''}`}
+          onClick={() => nav('#/office')}
+        >
+          🏢 Văn phòng 3D <span className="tab-badge">Giai đoạn 2</span>
+        </button>
+        <button
+          type="button"
+          className={`view-tab ${activeTab === 'graph' ? 'active' : ''}`}
+          onClick={() => nav('#/graph')}
+        >
+          🕸 Đồ thị quan hệ <span className="tab-badge">Giai đoạn 3</span>
+        </button>
+      </nav>
+
       {error !== null && <div className="error" role="alert">{error}</div>}
       {notice !== null && <div className="notice" role="status">{notice}</div>}
-      {viewedPath !== null && hash !== '#/new' && open === undefined && (
-        <div className="crumb"><a href="#" onClick={(e) => { e.preventDefault(); nav(''); }}>Dự án</a> › {viewedName}</div>
+      {viewedPath !== null && hash !== '#/new' && open === undefined && hash !== '#/office' && hash !== '#/graph' && (
+        <div className="crumb">
+          <a href="#" onClick={(e) => { e.preventDefault(); nav(''); }}>Dự án</a> › {viewedName}
+        </div>
       )}
+
+      {/* Content router */}
       {hash === '#/new' ? (
         <NewTaskForm
           providers={providers}
@@ -256,7 +338,25 @@ export function App() {
           onCancel={() => nav(listView)}
         />
       ) : open ? (
-        <TaskView task={open} events={state.events.get(open.id) ?? []} onLoaded={onHistory} onBack={() => nav(listView)} />
+        <TaskView
+          task={open}
+          events={state.events.get(open.id) ?? []}
+          onLoaded={onHistory}
+          onBack={() => nav(listView)}
+        />
+      ) : activeTab === 'office' ? (
+        <OfficeCanvas
+          tasks={tasks}
+          providers={providers}
+          onSelectTask={(id) => nav(`#/task/${encodeURIComponent(id)}`)}
+        />
+      ) : activeTab === 'graph' ? (
+        <GraphCanvas
+          tasks={tasks}
+          providers={providers}
+          events={state.events}
+          onSelectTask={(id) => nav(`#/task/${encodeURIComponent(id)}`)}
+        />
       ) : activeTab === 'projects' && viewedPath === null ? (
         <ProjectList
           projects={projects}
@@ -267,7 +367,13 @@ export function App() {
           onRefresh={() => { void loadProjects(true); }}
         />
       ) : (
-        <Board tasks={boardTasks} events={state.events} onOpen={(id) => nav(`#/task/${encodeURIComponent(id)}`)} />
+        <Board
+          tasks={boardTasks}
+          events={state.events}
+          loading={loading}
+          onOpen={(id) => nav(`#/task/${encodeURIComponent(id)}`)}
+          onCreateNew={() => nav('#/new')}
+        />
       )}
     </div>
   );

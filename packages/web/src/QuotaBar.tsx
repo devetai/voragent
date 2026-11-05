@@ -19,15 +19,33 @@ export function describeProvider(p: ProviderState, now: number): { light: Light;
 }
 
 export function QuotaBar({ providers, now }: { providers: ProviderState[]; now: number }) {
-  if (providers.length === 0) return <div className="quota-bar muted">Chưa có nền tảng nào.</div>;
+  if (providers.length === 0) {
+    return <div className="quota-bar-container muted">Đang kết nối danh sách nền tảng…</div>;
+  }
+
   return (
-    <div className="quota-bar">
+    <div className="quota-bar-container" aria-label="Hạn mức nền tảng">
       {providers.map((p) => {
         const d = describeProvider(p, now);
+        const pct = p.usedPercent !== null ? Math.min(100, Math.round(p.usedPercent * 100)) : null;
+
         return (
-          <div key={p.id} className={`quota-cell ${d.light}`} title={p.version ?? ''}>
-            <strong>{p.id}</strong>
-            <span>{d.note}</span>
+          <div
+            key={p.id}
+            className="quota-pill"
+            title={`${p.id} ${p.version ? `(${p.version})` : ''} - ${d.note}`}
+          >
+            <span className={`quota-pill-indicator ${d.light}`} />
+            <span className="quota-pill-title">{p.id}</span>
+            <span className="quota-pill-note">{d.note}</span>
+            {pct !== null && (
+              <div className="quota-pill-bar" title={`${pct}%`}>
+                <div
+                  className={`quota-pill-bar-fill ${d.light}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            )}
           </div>
         );
       })}
