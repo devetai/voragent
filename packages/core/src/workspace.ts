@@ -1,6 +1,6 @@
 import { copyFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import spawn from 'cross-spawn';
 import type { WorkspaceMode } from '@voragent/shared';
 
@@ -93,12 +93,13 @@ export async function createWorkspace(o: {
   const baseCommit = head.stdout.toString('utf8').trim();
 
   const branch = `voragent/task-${o.taskSeq}`;
-  const path = join(o.worktreesDir, `task-${o.taskSeq}`);
+  const projectSlug = basename(root).replace(/[^a-zA-Z0-9._-]/g, '_') || 'project';
+  const path = join(o.worktreesDir, projectSlug, `task-${o.taskSeq}`);
   const existing = await runGit(root, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]);
   if (existing.code === 0) {
     throw new Error(`Nhánh ${branch} đã tồn tại; task này đã có worktree.`);
   }
-  await mkdir(o.worktreesDir, { recursive: true });
+  await mkdir(join(o.worktreesDir, projectSlug), { recursive: true });
   await git(root, ['worktree', 'add', '-b', branch, path, baseCommit]);
 
   try {
@@ -172,4 +173,33 @@ export async function workspaceSummary(
   } finally {
     await rm(tmp, { recursive: true, force: true }).catch(() => undefined);
   }
+}
+
+
+export async function initGitRepository(
+  repoPath: string,
+): Promise<{ branch: string; commit: string }> {
+  const initRes = await runGit(repoPath, ['init', '-b', 'main']);
+  if (initRes.code !== 0) {
+    await git(repoPath, ['init']);
+  }
+
+  const head = await runGit(repoPath, ['rev-parse', '--verify', 'HEAD']);
+  if (head.code !== 0) {
+    await git(repoPath, [
+      '-c',
+      'user.name=voragent',
+      '-c',
+      'user.email=voragent@local',
+      'commit',
+      '--allow-empty',
+      '-m',
+      'chore: initialize git repository',
+    ]);
+  }
+
+  const branchOut = await runGit(repoPath, ['branch', '--show-current']);
+  const branch = branchOut.stdout.toString('utf8').trim() || 'main';
+  const commit = (await git(repoPath, ['rev-parse', 'HEAD'])).trim();
+  return { branch, commit };
 }

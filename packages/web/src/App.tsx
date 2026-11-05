@@ -1,24 +1,31 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import {
+  Bell,
+  Brain,
   Building2,
   ChevronRight,
+  Crown,
   Folder,
   FolderGit2,
   KanbanSquare,
   Network,
   Plus,
 } from 'lucide-react';
-import type { Project, ProviderState, Task, VEvent } from '@voragent/shared';
+import type { ManagerPlan, MemoryItem, Project, ProviderState, Task, VEvent } from '@voragent/shared';
 import { ApiError, api, errText } from './api';
 import { Board } from './Board';
+import { CustomSelect, type SelectOption } from './components/CustomSelect';
 import { Logo } from './components/Logo';
+import { GlobalTooltipLayer } from './components/Tooltip';
 import { INITIAL_CONNECTION, nextConnectionState } from './connection';
 import type { ConnectionEvent, ConnectionState } from './connection';
 import { GraphCanvas } from './graph/GraphCanvas';
+import { ManagerPanel } from './ManagerPanel';
 import { NewTaskForm } from './NewTaskForm';
 import { OfficeCanvas } from './office/OfficeCanvas';
 import { ProjectList } from './ProjectList';
 import { QuotaBar } from './QuotaBar';
+import { SharedMemoryPanel } from './SharedMemoryPanel';
 import { TaskView } from './TaskView';
 import { applyEvent, mergeEvents, projectKeyOf, resolveProjectRoute, tasksOfProject } from './state';
 import type { UiState } from './state';
@@ -55,7 +62,13 @@ function reduce(s: UiState, a: Action): UiState {
 
 const REFRESH_PROVIDER_EVENTS = new Set(['QUOTA_UPDATED', 'QUOTA_EXHAUSTED', 'RUN_FINISHED']);
 
-const baseName = (p: string): string => p.replace(/[\/]+$/, '').split(/[\/]/).pop() ?? p;
+const baseName = (p: string): string => p.replace(/[\/\\]+$/, '').split(/[\/\\]/).pop() ?? p;
+
+type OverlayKind =
+  | { kind: 'task'; taskId: string }
+  | { kind: 'manager' }
+  | { kind: 'memory'; defaultAuthor?: string }
+  | null;
 
 export function App() {
   const [state, dispatch] = useReducer(reduce, initial);
@@ -66,7 +79,6 @@ export function App() {
   const [now, setNow] = useState(Date.now());
   const [loading, setLoading] = useState(true);
 
-  // Bộ định tuyến URL Path + Query
   const [route, navTo] = useAppRoute();
   const nav = useCallback((target: string | { view: AppView; taskId?: string | null; projectPath?: string | null }): void => {
     setNotice(null);
@@ -76,13 +88,16 @@ export function App() {
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [projLoading, setProjLoading] = useState(true);
   const [projError, setProjError] = useState<string | null>(null);
-  // Màn danh sách gần nhất (dự án / bảng tất cả / bảng một dự án): nơi quay về khi thoát task hoặc form.
+  // Cửa sổ nổi (Modal Overlay) cho Trưởng phòng / Shared Memory / Chi tiết Task nhanh
+  const [overlay, setOverlay] = useState<OverlayKind>(null);
+  const [memories, setMemories] = useState<MemoryItem[]>([]);
+  const [plans, setPlans] = useState<ManagerPlan[]>([]);
   const [listUrl, setListUrl] = useState('/');
   const [notice, setNotice] = useState<string | null>(null);
   const projReq = useRef(0);
   const mounted = useRef(true);
 
-  const isListView = route.view === 'projects' || route.view === 'board';
+  const isListView = route.view === 'projects' || route.view === 'board' || route.view === 'office';
   useEffect(() => {
     if (isListView) {
       setListUrl(route.pathname + (route.search ? route.search : ''));
@@ -100,7 +115,14 @@ export function App() {
   const viewedProject = viewedPath === null ? undefined
     : projects?.find((p) => projectKeyOf(p.path) === projectKeyOf(viewedPath));
   const viewedName = viewedProject?.name ?? (viewedPath === null ? '' : baseName(viewedPath));
-  const boardTasks = viewedPath === null ? tasks : tasksOfProject(tasks, { path: viewedPath });
+
+  const officeTasks = viewedPath === null ? tasks : tasksOfProject(tasks, { path: viewedPath });
+  const officeMemories = viewedPath === null
+    ? memories
+    : memories.filter((m) => projectKeyOf(m.repoPath) === projectKeyOf(viewedPath));
+  const officePlans = viewedPath === null
+    ? plans
+    : plans.filter((p) => projectKeyOf(p.repoPath) === projectKeyOf(viewedPath));
 
   const loadProjects = useCallback(async (refresh: boolean): Promise<void> => {
     const req = ++projReq.current;
@@ -112,18 +134,32 @@ export function App() {
       setProjError(null);
     } catch (e) {
       if (!mounted.current || req !== projReq.current) return;
-      setProjError(errText(e)); // giữ danh sách cũ, không làm trắng trang
+      setProjError(errText(e));
     } finally {
       if (mounted.current && req === projReq.current) setProjLoading(false);
     }
   }, []);
 
-  // Tải danh sách dự án đúng một lần khi mở; lọc chữ không đụng tới đây.
+  const loadOfficeMeta = useCallback(async (): Promise<void> => {
+    try {
+      const [mems, mgrPlans] = await Promise.all([
+        api.memories().catch(() => [] as MemoryItem[]),
+        api.managerPlans().catch(() => [] as ManagerPlan[]),
+      ]);
+      if (!mounted.current) return;
+      setMemories(mems);
+      setPlans(mgrPlans);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   useEffect(() => {
     mounted.current = true;
     void loadProjects(false);
+    void loadOfficeMeta();
     return () => { mounted.current = false; };
-  }, [loadProjects]);
+  }, [loadProjects, loadOfficeMeta]);
 
   const reload = useCallback(async (): Promise<void> => {
     try {
@@ -135,24 +171,23 @@ export function App() {
         if (d && t) events.set(t.id, d.events);
       });
       dispatch({ t: 'load', tasks, providers, events });
+      void loadOfficeMeta();
       setError(null);
     } catch (e) {
       setError(errText(e));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadOfficeMeta]);
 
   const refreshProviders = useCallback((): void => {
     api.providers().then((providers) => dispatch({ t: 'providers', providers }), () => undefined);
   }, []);
 
-  // Tải dữ liệu ban đầu
   useEffect(() => {
     void reload();
   }, [reload]);
 
-  // Phím tắt toàn cục (N để mở task mới, Esc để thoát/quay lại màn trước)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       const activeTag = (document.activeElement?.tagName || '').toLowerCase();
@@ -160,9 +195,13 @@ export function App() {
 
       if ((e.key === 'n' || e.key === 'N') && !isInput && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
+        setOverlay(null);
         nav(viewedPath !== null ? `/new?project=${encodeURIComponent(viewedPath)}` : '/new');
       } else if (e.key === 'Escape') {
-        if (route.view === 'task' || route.view === 'new') {
+        if (overlay !== null) {
+          e.preventDefault();
+          setOverlay(null);
+        } else if (route.view === 'task' || route.view === 'new') {
           e.preventDefault();
           nav(listView);
         }
@@ -171,9 +210,8 @@ export function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nav, listView, route.view, viewedPath]);
+  }, [nav, listView, route.view, viewedPath, overlay]);
 
-  // Kết nối WebSocket thời gian thực
   useEffect(() => {
     let disposed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -214,6 +252,7 @@ export function App() {
         if (msg.type === undefined || msg.type === 'HELLO') return;
         const e = msg as VEvent;
         if (e.type === 'TASK_CREATED') void reload();
+        else if (e.type === 'MEMORY_UPDATED' || e.type === 'MANAGER_PLAN_UPDATED') void loadOfficeMeta();
         else dispatch({ t: 'event', e });
         if (REFRESH_PROVIDER_EVENTS.has(e.type)) refreshProviders();
       };
@@ -234,7 +273,7 @@ export function App() {
       sockRef.current = null;
       s?.close();
     };
-  }, [reload, refreshProviders]);
+  }, [reload, refreshProviders, loadOfficeMeta]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 15_000);
@@ -245,7 +284,6 @@ export function App() {
     dispatch({ t: 'history', taskId, events });
   }, []);
 
-  // Dự án đã chọn không còn trong danh sách (đã tải thành công): về danh sách kèm thông báo.
   const loadState = projError !== null ? 'failed' : projects === null ? 'loading' : 'loaded';
   const resolved = resolveProjectRoute(route.pathname + route.search, projects, loadState);
   const staleNotice = resolved.view === 'list' && viewedPath !== null ? resolved.notice : undefined;
@@ -257,69 +295,165 @@ export function App() {
   }, [staleNotice, nav]);
 
   const activeTab = route.activeTab;
+  const overlayTask = overlay?.kind === 'task' ? state.tasks.get(overlay.taskId) : undefined;
+
+  const managerInboxCount =
+    officePlans.filter((p) => p.status === 'draft').length +
+    officeTasks.filter((t) => t.status === 'awaiting_user' || t.status === 'failed').length;
+
+  const officeOptions: SelectOption[] = [
+    {
+      value: '',
+      label: `Tất cả dự án (${projects?.length ?? 0})`,
+      icon: <FolderGit2 size={14} color="var(--text-secondary)" />,
+    },
+    ...(projects ?? []).map((p) => ({
+      value: p.path,
+      label: p.name,
+      sublabel: p.path,
+      badge: `${tasksOfProject(tasks, p).length} task`,
+      icon: <Building2 size={14} color="var(--primary)" />,
+    })),
+  ];
+
+  const handleSelectOffice = (nextPath: string) => {
+    const targetView: AppView =
+      activeTab === 'projects' && nextPath !== ''
+        ? 'office'
+        : activeTab === 'office' && nextPath === ''
+        ? 'board'
+        : route.view === 'task' || route.view === 'new'
+        ? 'board'
+        : route.view;
+    nav({
+      view: targetView,
+      projectPath: nextPath === '' ? null : nextPath,
+    });
+  };
 
   return (
-    <div className="app">
+    <div className={`app ${activeTab === 'office' ? 'is-office-view' : ''}`}>
+
+      {/* Single-Row Sticky Command Bar — Gọn đúng 1 hàng ngang duy nhất */}
       <div className="sticky-top-header">
         <header className="header-bar">
           <div className="header-left">
-            <div className="logo-badge" onClick={() => nav('/')} title="Về trang chủ danh sách dự án">
+            <div
+              className="logo-badge"
+              onClick={() => { setOverlay(null); nav('/'); }}
+              data-tooltip="Về Đại sảnh Dự án"
+              data-tooltip-placement="bottom"
+            >
               <Logo size={22} />
               <span className="brand-title">voragent</span>
             </div>
-            <div className="status-pill">
-              <span className={`status-dot ${conn.status === 'connected' ? 'online' : 'offline'}`} />
-              <span>{conn.status === 'connected' ? 'Cục bộ' : 'Mất kết nối'}</span>
-            </div>
+            {conn.status !== 'connected' && (
+              <span
+                className="status-dot-pulse-offline"
+                data-tooltip="Mất kết nối tới Daemon cục bộ — Đang tự động thử kết nối lại"
+                data-tooltip-placement="bottom"
+                aria-label="Mất kết nối tới Daemon"
+              />
+            )}
 
             <div className="header-divider" />
 
-            {/* 4-View Switcher Tabs - Tích hợp trực tiếp lên Top Header */}
+            {/* Chỉ giữ 4 Tab cốt lõi trên Header để không bao giờ bị rớt dòng */}
             <nav className="view-tabs" aria-label="Chế độ xem">
               <button
                 type="button"
                 className={`view-tab ${activeTab === 'projects' ? 'active' : ''}`}
-                onClick={() => nav('/')}
+                onClick={() => { setOverlay(null); nav('/'); }}
               >
                 <FolderGit2 size={15} /> Dự án
               </button>
               <button
                 type="button"
-                className={`view-tab ${activeTab === 'board' ? 'active' : ''}`}
-                onClick={() => nav(viewedPath !== null ? `/board?project=${encodeURIComponent(viewedPath)}` : '/board')}
+                className={`view-tab ${activeTab === 'office' ? 'active' : ''}`}
+                onClick={() => {
+                  if (viewedPath === null && projects && projects.length > 0) {
+                    nav({ view: 'office', projectPath: projects[0]?.path });
+                  } else {
+                    nav({ view: 'office', projectPath: viewedPath });
+                  }
+                }}
               >
-                <KanbanSquare size={15} /> Bảng task {viewedPath !== null && `(${viewedName})`}
+                <Building2 size={15} /> Văn phòng 3D {viewedPath !== null && `(${viewedName})`}
               </button>
               <button
                 type="button"
-                className={`view-tab ${activeTab === 'office' ? 'active' : ''}`}
-                onClick={() => nav('/office')}
+                className={`view-tab ${activeTab === 'board' ? 'active' : ''}`}
+                onClick={() => nav({ view: 'board', projectPath: viewedPath })}
               >
-                <Building2 size={15} /> Văn phòng 3D
+                <KanbanSquare size={15} /> Bảng Kanban ({officeTasks.length})
               </button>
               <button
                 type="button"
                 className={`view-tab ${activeTab === 'graph' ? 'active' : ''}`}
-                onClick={() => nav('/graph')}
+                onClick={() => nav({ view: 'graph', projectPath: viewedPath })}
               >
-                <Network size={15} /> Đồ thị quan hệ
+                <Network size={15} /> Đồ thị
               </button>
             </nav>
           </div>
 
           <div className="header-right">
-            {/* Quota Bar gọn gàng nằm ngay trên header bên cạnh nút Tạo task */}
-            <QuotaBar providers={providers} now={now} />
-
-            <div className="header-actions">
-              <button
-                className="primary"
-                onClick={() => nav(viewedPath !== null ? `/new?project=${encodeURIComponent(viewedPath)}` : '/new')}
-                title="Tạo task mới (Phím tắt: N)"
-              >
-                <Plus size={15} /> Task mới <kbd>N</kbd>
-              </button>
+            {/* Bộ chọn nhanh Văn phòng Dự án */}
+            <div style={{ minWidth: '205px', maxWidth: '260px' }}>
+              <CustomSelect
+                options={officeOptions}
+                value={viewedPath ?? ''}
+                onChange={handleSelectOffice}
+                placeholder="Chọn dự án..."
+                searchPlaceholder="Tìm dự án..."
+              />
             </div>
+
+            {/* Nút Popover Quota gọn gàng (chỉ mở chi tiết khi bấm) */}
+            <QuotaBar
+              providers={providers}
+              now={now}
+              onProvidersUpdated={(next) => dispatch({ t: 'providers', providers: next })}
+            />
+
+            {/* Nút mở Modal Shared Memory — gọn gàng với Icon + số đếm + Tooltip */}
+            <button
+              type="button"
+              onClick={() => setOverlay(overlay?.kind === 'memory' ? null : { kind: 'memory' })}
+              data-tooltip="Mở Bộ nhớ chung của Văn phòng (Shared Memory)"
+              data-tooltip-placement="bottom"
+              aria-label="Bộ nhớ chung Văn phòng"
+              style={{ padding: '0 10px', gap: '5px' }}
+            >
+              <Brain size={15} />
+              <span className="tabular" style={{ fontSize: '12px', fontWeight: 600 }}>{officeMemories.length}</span>
+            </button>
+
+            {/* Nút mở Modal Bàn Trưởng Phòng & Báo cáo tập trung */}
+            <button
+              type="button"
+              onClick={() => setOverlay(overlay?.kind === 'manager' ? null : { kind: 'manager' })}
+              data-tooltip="Mở Bàn Trưởng phòng — Duyệt câu hỏi, nghiệm thu & giao mục tiêu"
+              data-tooltip-placement="bottom"
+              style={{
+                background: managerInboxCount > 0 ? '#FEF3C7' : 'var(--bg-surface)',
+                color: managerInboxCount > 0 ? '#92400E' : 'var(--text-primary)',
+                borderColor: managerInboxCount > 0 ? '#F59E0B' : 'var(--border-subtle)',
+                fontWeight: 600,
+              }}
+            >
+              {managerInboxCount > 0 ? <Bell size={14} /> : <Crown size={14} />}
+              <span>{managerInboxCount > 0 ? `Trưởng phòng (${managerInboxCount})` : 'Trưởng phòng'}</span>
+            </button>
+
+            <button
+              className="primary"
+              onClick={() => nav(viewedPath !== null ? `/new?project=${encodeURIComponent(viewedPath)}` : '/new')}
+              data-tooltip="Tạo task mới (N)"
+              data-tooltip-placement="bottom"
+            >
+              <Plus size={15} /> Task mới <kbd>N</kbd>
+            </button>
           </div>
         </header>
 
@@ -332,16 +466,19 @@ export function App() {
 
       {error !== null && <div className="error" role="alert">{error}</div>}
       {notice !== null && <div className="notice" role="status">{notice}</div>}
-      {viewedPath !== null && route.view !== 'new' && open === undefined && route.view !== 'office' && route.view !== 'graph' && (
+
+      {/* Breadcrumb mỏng khi đang lọc theo 1 dự án cụ thể ở màn Kanban */}
+      {viewedPath !== null && route.view === 'board' && open === undefined && (
         <div className="crumb">
           <Folder size={14} />
           <a href="/" onClick={(e) => { e.preventDefault(); nav('/'); }}>Dự án</a>
           <ChevronRight size={14} />
-          <span>{viewedName}</span>
+          <strong>{viewedName}</strong>
+          <span className="muted" style={{ fontSize: '12px' }}>({viewedPath})</span>
         </div>
       )}
 
-      {/* Content router */}
+      {/* Main Content Router */}
       {route.view === 'new' ? (
         <NewTaskForm
           providers={providers}
@@ -349,14 +486,17 @@ export function App() {
           initialPath={viewedPath}
           onCreated={(id) => { void reload(); nav(`/task/${encodeURIComponent(id)}`); }}
           onCancel={() => nav(listView)}
+          onRefreshProjects={() => { void loadProjects(true); }}
         />
       ) : route.view === 'task' || open ? (
         open ? (
           <TaskView
             task={open}
             events={state.events.get(open.id) ?? []}
+            providers={providers}
             onLoaded={onHistory}
             onBack={() => nav(listView)}
+            onDeleted={() => { void reload(); nav(listView); }}
           />
         ) : (
           <div className="card" style={{ padding: '2rem', textAlign: 'center', marginTop: '1rem' }}>
@@ -370,35 +510,128 @@ export function App() {
         )
       ) : activeTab === 'office' ? (
         <OfficeCanvas
-          tasks={tasks}
+          repoPath={viewedPath ?? projects?.[0]?.path ?? null}
+          projectName={viewedName || projects?.[0]?.name || ''}
+          tasks={officeTasks}
           providers={providers}
-          onSelectTask={(id) => nav(`/task/${encodeURIComponent(id)}`)}
+          memories={officeMemories}
+          plans={officePlans}
+          onSelectTask={(id) => setOverlay({ kind: 'task', taskId: id })}
+          onOpenManager={() => setOverlay({ kind: 'manager' })}
+          onOpenMemory={(author) => setOverlay({ kind: 'memory', ...(author ? { defaultAuthor: author } : {}) })}
+          onReload={() => { void reload(); }}
+        />
+      ) : activeTab === 'manager' ? (
+        <ManagerPanel
+          repoPath={viewedPath ?? projects?.[0]?.path ?? null}
+          projectName={viewedName || projects?.[0]?.name || ''}
+          plans={officePlans}
+          tasks={officeTasks}
+          eventsByTask={state.events}
+          providers={providers}
+          onChanged={() => { void reload(); }}
+          onSelectTask={(id) => setOverlay({ kind: 'task', taskId: id })}
+        />
+      ) : activeTab === 'memory' ? (
+        <SharedMemoryPanel
+          repoPath={viewedPath ?? projects?.[0]?.path ?? null}
+          projectName={viewedName || projects?.[0]?.name || ''}
+          memories={officeMemories}
+          providers={providers}
+          onChanged={() => { void loadOfficeMeta(); }}
         />
       ) : activeTab === 'graph' ? (
         <GraphCanvas
-          tasks={tasks}
+          tasks={officeTasks}
           providers={providers}
           events={state.events}
-          onSelectTask={(id) => nav(`/task/${encodeURIComponent(id)}`)}
+          onSelectTask={(id) => setOverlay({ kind: 'task', taskId: id })}
         />
       ) : activeTab === 'projects' && viewedPath === null ? (
         <ProjectList
           projects={projects}
+          tasks={tasks}
+          providers={providers}
+          memories={memories}
+          plans={plans}
           loading={projLoading}
           error={projError}
           taskCount={(p) => tasksOfProject(tasks, p).length}
-          onOpen={(p) => nav(`/board?project=${encodeURIComponent(p.path)}`)}
+          onOpen={(p) => nav({ view: 'board', projectPath: p.path })}
+          onOpenOffice3D={(p) => nav({ view: 'office', projectPath: p.path })}
+          onOpenManager={(p) => {
+            nav({ view: 'office', projectPath: p.path });
+            setOverlay({ kind: 'manager' });
+          }}
           onRefresh={() => { void loadProjects(true); }}
         />
       ) : (
         <Board
-          tasks={boardTasks}
+          tasks={officeTasks}
           events={state.events}
           loading={loading}
           onOpen={(id) => nav(`/task/${encodeURIComponent(id)}`)}
           onCreateNew={() => nav(viewedPath !== null ? `/new?project=${encodeURIComponent(viewedPath)}` : '/new')}
         />
       )}
+
+      {/* MODAL / SLIDE-OVER OVERLAY CHO TRƯỞNG PHÒNG, SHARED MEMORY HOẶC XEM NHANH TASK
+          (Không đẩy lệch bố cục trang bên dưới, bấm ra ngoài hoặc nhấn Esc để đóng) */}
+      {overlay !== null && (
+        <div
+          className="office-modal-backdrop"
+          onClick={() => setOverlay(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className={`office-modal-dialog ${overlay.kind === 'task' ? 'is-task-modal' : ''}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {overlay.kind === 'task' && overlayTask ? (
+              <TaskView
+                task={overlayTask}
+                events={state.events.get(overlayTask.id) ?? []}
+                providers={providers}
+                onLoaded={onHistory}
+                onBack={() => setOverlay(null)}
+                onDeleted={() => { setOverlay(null); void reload(); }}
+                inModal={true}
+                onMaximize={() => {
+                  const id = overlayTask.id;
+                  setOverlay(null);
+                  nav(`/task/${encodeURIComponent(id)}`);
+                }}
+              />
+            ) : overlay.kind === 'manager' ? (
+              <ManagerPanel
+                repoPath={viewedPath ?? projects?.[0]?.path ?? null}
+                projectName={viewedName || projects?.[0]?.name || ''}
+                plans={officePlans}
+                tasks={officeTasks}
+                eventsByTask={state.events}
+                providers={providers}
+                onChanged={() => { void reload(); }}
+                onSelectTask={(id) => setOverlay({ kind: 'task', taskId: id })}
+                onClose={() => setOverlay(null)}
+              />
+            ) : overlay.kind === 'memory' ? (
+              <SharedMemoryPanel
+                repoPath={viewedPath ?? projects?.[0]?.path ?? null}
+                projectName={viewedName || projects?.[0]?.name || ''}
+                memories={officeMemories}
+                providers={providers}
+                defaultAuthor={overlay.defaultAuthor ?? 'user'}
+                onChanged={() => { void loadOfficeMeta(); }}
+                onClose={() => setOverlay(null)}
+              />
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {/* Global Custom UI Tooltip Layer (thay thế hoàn toàn native browser title) */}
+      <GlobalTooltipLayer />
     </div>
   );
 }

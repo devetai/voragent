@@ -9,12 +9,14 @@ export type AgentExpression =
   | 'surprised' // Nhận task mới
   | 'dizzy';    // Quá tải / kẹt
 
-export type AgentAccessory = 'glasses' | 'headphones' | 'cap' | 'nightcap' | 'bow' | 'none';
+export type AgentAccessory = 'glasses' | 'headphones' | 'cap' | 'crown' | 'nightcap' | 'bow' | 'none';
 
 export interface OfficeAgentData {
   id: string;
   name: string;
-  provider: string; // 'claude' | 'codex' | 'antigravity'
+  provider: string; // 'manager' | 'claude' | 'codex' | 'antigravity'
+  role: string;
+  isManager?: boolean;
   baseColor: string;
   bandColor: string;
   accessory: AgentAccessory;
@@ -31,6 +33,7 @@ export interface ProviderThemeConfig {
   band: string;
   accessory: AgentAccessory;
   name: string;
+  defaultRole?: string;
 }
 
 export const DEFAULT_THEME: ProviderThemeConfig = {
@@ -38,25 +41,36 @@ export const DEFAULT_THEME: ProviderThemeConfig = {
   band: '#C4B5FD',       // Vằn tím nhạt
   accessory: 'none',
   name: 'Agent',
+  defaultRole: 'Nhân viên thực thi',
 };
 
 export const PROVIDER_THEMES: Record<string, ProviderThemeConfig> = {
+  manager: {
+    base: '#8B5CF6',       // Tím hoàng gia ấm
+    band: '#DDD6FE',       // Vằn tím sáng
+    accessory: 'crown',    // Vương miện / Mũ Trưởng phòng
+    name: 'Trưởng Phòng (Lead)',
+    defaultRole: 'Điều phối & Kế hoạch',
+  },
   claude: {
     base: '#D97757',       // Cam đất Claude
     band: '#F5C4B3',       // Vằn kem cam
     accessory: 'glasses',  // Kính tri thức
     name: 'Claude Code',
+    defaultRole: 'Kiến trúc & Logic lõi',
   },
   codex: {
     base: '#10A37F',       // Xanh ngọc Codex
     band: '#8CE0C8',       // Vằn xanh nhạt
     accessory: 'headphones',// Tai nghe
     name: 'Codex',
+    defaultRole: 'Kiểm thử & Review',
   },
   antigravity: {
     base: '#3B82F6',       // Xanh dương Antigravity
     band: '#93C5FD',       // Vằn xanh sáng
     accessory: 'cap',       // Mũ lưỡi trai
     name: 'Antigravity',
+    defaultRole: 'Giao diện & Tương tác',
   },
 };

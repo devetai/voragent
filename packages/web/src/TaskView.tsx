@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
   AlertCircle,
+  Cpu,
+  Globe,
   AlertTriangle,
   ArrowLeft,
-  Bot,
   Check,
   CheckCircle2,
   Clock,
@@ -12,19 +13,25 @@ import {
   Folder,
   GitBranch,
   GitCommit,
+  Maximize2,
   MessagesSquare,
   RotateCcw,
   Send,
-  Settings2,
+  Terminal,
+  Trash2,
   UserCheck,
+  X,
   Zap,
 } from 'lucide-react';
-import type { Task, VEvent } from '@voragent/shared';
+import { PROVIDER_MODELS, type ProviderState, type Task, type Turn, type VEvent } from '@voragent/shared';
 import { api, errText } from './api';
 import type { Diff } from './api';
 import { SnakeLoader } from './components/SnakeLoader';
 import { isUnisolated, transcript } from './state';
 import { TimeBadge } from './components/TimeBadge';
+import { ProviderIcon } from './components/ProviderIcon';
+import { MarkdownContent } from './components/MarkdownContent';
+import { CustomSelect, type SelectOption } from './components/CustomSelect';
 
 function TaskStatusBadge({ status }: { status: Task['status'] }) {
   switch (status) {
@@ -54,14 +61,15 @@ function CopyableTag({ text, label, icon }: { text: string; label: string; icon:
   };
 
   return (
-    <div className="task-meta-item" title={label}>
+    <div className="task-meta-item" data-tooltip={label}>
       {icon}
-      <span>{text}</span>
+      <span style={{ maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</span>
       <button
         type="button"
         className="copy-btn"
         onClick={copy}
-        title={copied ? 'Đã sao chép!' : 'Sao chép'}
+        data-tooltip={copied ? 'Đã sao chép!' : 'Sao chép đường dẫn / nhánh'}
+        aria-label="Sao chép"
       >
         {copied ? <Check size={11} color="var(--green-base)" /> : <Copy size={11} />}
       </button>
@@ -72,25 +80,40 @@ function CopyableTag({ text, label, icon }: { text: string; label: string; icon:
 export function TaskView({
   task,
   events,
+  providers = [],
   onLoaded,
   onBack,
+  onDeleted,
+  inModal = false,
+  onMaximize,
 }: {
   task: Task;
   events: VEvent[];
+  providers?: ProviderState[];
   onLoaded: (taskId: string, events: VEvent[]) => void;
   onBack: () => void;
+  onDeleted?: (taskId: string) => void;
+  inModal?: boolean;
+  onMaximize?: () => void;
 }) {
+  const [turns, setTurns] = useState<Turn[]>([]);
   const [diff, setDiff] = useState<Diff | null>(null);
+  const [diffTab, setDiffTab] = useState<'diff' | 'files' | 'commits'>('diff');
+  const [modalPane, setModalPane] = useState<'chat' | 'diff'>('chat');
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Tải lịch sử đầy đủ khi mở.
   useEffect(() => {
     let live = true;
     api.task(task.id).then(
       (d) => {
-        if (live) onLoaded(task.id, d.events);
+        if (live) {
+          setTurns(d.turns);
+          onLoaded(task.id, d.events);
+        }
       },
       (e: unknown) => {
         if (live) setError(errText(e));
@@ -132,8 +155,35 @@ export function TaskView({
     );
   };
 
-  const canSend = task.status === 'awaiting_user' || task.status === 'failed';
-  const items = transcript(events);
+  const handleDeleteTask = () => {
+    act(
+      () => api.deleteTask(task.id),
+      () => {
+        if (onDeleted) onDeleted(task.id);
+        else onBack();
+      },
+    );
+  };
+
+  const handleAssignProvider = (providerId: string) => {
+    act(() => api.assignTask(task.id, providerId));
+  };
+
+  const canSend =
+    task.status === 'awaiting_user' ||
+    task.status === 'failed' ||
+    task.status === 'waiting_quota' ||
+    task.status === 'queued';
+
+  const items = transcript(events).filter((it) => it.text.trim().length > 0);
+  const initialPrompt = turns[0]?.message || task.title;
+
+  const displayItems =
+    items.length > 0
+      ? items
+      : initialPrompt
+      ? [{ kind: 'user' as const, text: initialPrompt, ts: task.createdAt }]
+      : [];
 
   const handleSend = (): void => {
     if (canSend && text.trim() !== '' && !busy) {
@@ -142,199 +192,656 @@ export function TaskView({
   };
 
   const displayPath = task.workspacePath ?? task.repoPath;
+  const changedFileLines = diff?.status ? diff.status.split('\n').filter((l) => l.trim().length > 0) : [];
+  const diffBadgeCount = changedFileLines.length || diff?.commits.length || 0;
 
-  return (
-    <div className="panel">
-      <div className="task-nav">
-        <button type="button" onClick={onBack} title="Quay lại bảng Kanban (Phím tắt: Esc)">
-          <ArrowLeft size={15} /> Quay lại bảng <kbd>Esc</kbd>
-        </button>
-        <TaskStatusBadge status={task.status} />
-      </div>
+  // Danh sách các agent khác đã cài đặt sẵn sàng để đổi ngay
+  const switchableProviders = providers.filter(
+    (p) => p.installed && p.id !== task.currentProvider,
+  );
 
-      <div className="task-header">
-        <div className="task-title-row">
-          <h2>
-            <span className="mono text-muted">#{task.seq}</span> {task.title}
-          </h2>
-        </div>
+  const latestQuotaEvent = events.filter((e) => e.type === 'QUOTA_EXHAUSTED').at(-1);
+  const isModelQuotaExhausted =
+    Boolean(latestQuotaEvent?.data?.suggestedModel) &&
+    (task.status === 'awaiting_user' || task.status === 'waiting_quota');
 
-        <div className="task-meta-grid">
-          <CopyableTag
-            text={displayPath}
-            label="Đường dẫn thư mục làm việc"
-            icon={<Folder size={13} style={{ flexShrink: 0 }} />}
-          />
-          {task.branch && (
-            <CopyableTag
-              text={task.branch}
-              label="Nhánh git cách ly"
-              icon={<GitBranch size={13} style={{ flexShrink: 0 }} />}
-            />
-          )}
-          {task.currentProvider && (
-            <div className="task-meta-item" title="Nền tảng thực thi hiện hành">
-              <Bot size={13} /> {task.currentProvider}
+  const renderTranscriptPane = () => (
+    <div className="task-pane-left">
+      <div className="transcript-container">
+        {!inModal && (
+          <div className="transcript-header">
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.925rem' }}>
+              <MessagesSquare size={15} /> Nhật ký trao đổi ({displayItems.length})
+            </h3>
+          </div>
+        )}
+
+        {/* CẢNH BÁO MODEL HẾT HẠN MỨC & QUYẾT ĐỊNH CHUYỂN MODEL HAY DỪNG */}
+        {isModelQuotaExhausted && (
+          <div
+            className="task-recovery-banner"
+            style={{
+              margin: '0.5rem 0.75rem',
+              padding: '0.85rem 1rem',
+              borderRadius: 'var(--radius-md)',
+              background: '#FFFBEB',
+              border: '1px solid #FCD34D',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.6rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertTriangle size={18} color="#D97706" style={{ flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#92400E' }}>
+                  Model {String(latestQuotaEvent?.data?.model ?? 'hiện tại')} đã hết hạn mức (Quota)
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#78350F', marginTop: '2px' }}>
+                  Hệ thống tạm dừng để bạn quyết định: bạn có muốn chuyển sang <strong>{String(latestQuotaEvent?.data?.suggestedModelName ?? latestQuotaEvent?.data?.suggestedModel)}</strong> (còn quota) để tiếp tục ngay, hay dừng công việc?
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.2rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="primary"
+                disabled={busy}
+                onClick={() => {
+                  const targetModel = String(latestQuotaEvent?.data?.suggestedModel);
+                  act(async () => {
+                    await api.updateTaskModel(task.id, targetModel);
+                    await api.retry(task.id, false);
+                  });
+                }}
+                style={{ height: '30px', minHeight: '30px', fontSize: '0.8rem', padding: '0 12px', background: '#D97706', borderColor: '#B45309' }}
+              >
+                <Zap size={13} />
+                <span>Chuyển sang {String(latestQuotaEvent?.data?.suggestedModelName ?? latestQuotaEvent?.data?.suggestedModel)} &amp; Chạy tiếp</span>
+              </button>
+
+              <button
+                type="button"
+                className="office-mini-btn"
+                disabled={busy}
+                onClick={() => act(() => api.close(task.id))}
+                style={{ height: '30px', fontSize: '0.8rem', padding: '0 10px' }}
+              >
+                <span>Dừng công việc</span>
+              </button>
+
+              <button
+                type="button"
+                className="office-mini-btn"
+                disabled={busy}
+                onClick={() => act(() => api.retry(task.id, false))}
+                style={{ height: '30px', fontSize: '0.8rem', padding: '0 10px' }}
+                data-tooltip="Ép thử chạy lại trên model hiện tại"
+              >
+                <RotateCcw size={13} />
+                <span>Thử lại</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* CẢNH BÁO VÀ THANH CỨU HỘ KHI CHỜ HẠN MỨC HOẶC LỖI */}
+        {!isModelQuotaExhausted && (task.status === 'waiting_quota' || task.status === 'failed') && (
+          <div
+            className="task-recovery-banner"
+            style={{
+              margin: '0.5rem 0.75rem',
+              padding: '0.75rem 0.9rem',
+              borderRadius: 'var(--radius-md)',
+              background: task.status === 'waiting_quota' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+              border: `1px solid ${task.status === 'waiting_quota' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                {task.status === 'waiting_quota' ? (
+                  <Clock size={16} color="var(--amber-base)" style={{ flexShrink: 0 }} />
+                ) : (
+                  <AlertCircle size={16} color="var(--red-base)" style={{ flexShrink: 0 }} />
+                )}
+                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                  {task.status === 'waiting_quota'
+                    ? `Task đang tạm dừng do ${task.currentProvider ? `agent ${task.currentProvider}` : 'nền tảng'} hết hạn mức (quota) hoặc bị giới hạn tốc độ.`
+                    : 'Lượt thực thi trước bị lỗi hoặc gián đoạn.'}
+                </span>
+              </div>
+            </div>
+
+            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Bạn có thể chuyển ngay sang Agent khác còn lượt thực thi, ép thử chạy lại, hoặc xóa task này:
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
+              {switchableProviders.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="office-mini-btn"
+                  disabled={busy}
+                  onClick={() => handleAssignProvider(p.id)}
+                  style={{
+                    background: 'var(--bg-surface)',
+                    borderColor: 'var(--border-subtle)',
+                    padding: '0 8px',
+                    height: '28px',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                  }}
+                  data-tooltip={`Đổi sang agent ${p.id} và tiếp quản chạy task này ngay`}
+                >
+                  <ProviderIcon provider={p.id} size={13} />
+                  <span>Đổi sang {p.id}</span>
+                </button>
+              ))}
+
+              <button
+                type="button"
+                className="office-mini-btn"
+                disabled={busy}
+                onClick={() => act(() => api.retry(task.id, false))}
+                style={{ height: '28px', fontSize: '0.78rem', padding: '0 8px' }}
+                data-tooltip="Bỏ qua thời gian chờ, ép chạy lại ngay trên nền tảng hiện tại"
+              >
+                <RotateCcw size={13} className={busy ? 'spin' : ''} />
+                <span>Chạy lại ngay</span>
+              </button>
+
+              <button
+                type="button"
+                className="office-mini-btn danger"
+                disabled={busy}
+                onClick={() => setConfirmDelete(true)}
+                style={{ height: '28px', fontSize: '0.78rem', padding: '0 8px' }}
+                data-tooltip="Xóa vĩnh viễn task này"
+              >
+                <Trash2 size={13} />
+                <span>Xóa task</span>
+              </button>
+
+              {(() => {
+                const pKey = (task.currentProvider ?? 'antigravity').toLowerCase();
+                const models = PROVIDER_MODELS[pKey] ?? [];
+                const otherModels = models.filter((m) => m.id !== task.model);
+                if (otherModels.length === 0) return null;
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', width: '100%', marginTop: '0.2rem' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Mô hình tiết kiệm:</span>
+                    {otherModels.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        className="office-mini-btn"
+                        onClick={() => {
+                          void api.updateTaskModel(task.id, m.id).then(() => {
+                            void api.retry(task.id, false);
+                          });
+                        }}
+                        data-tooltip={`Đổi sang ${m.name} và chạy lại ngay`}
+                        style={{ fontSize: '0.72rem', height: '24px', padding: '0 6px' }}
+                      >
+                        <span>⚡ {m.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+
+            </div>
+          </div>
+        )}
+
+        <div className="transcript">
+          {displayItems.map((it, i) => {
+            if (it.kind === 'handoff') {
+              return (
+                <div key={i} className="handoff-divider-wrap">
+                  <div className="handoff-divider-line" />
+                  <div className="handoff-divider-badge">
+                    <Zap size={13} /> <span>Handoff:</span> {it.text}
+                  </div>
+                </div>
+              );
+            }
+            if (it.kind === 'tool') {
+              const firstLine = (it.text.split('\n')[0] || 'Thực thi công cụ').slice(0, 96);
+              const hasMore = it.text.includes('\n') || it.text.length > 96;
+              return (
+                <details key={i} className="msg-tool-collapsible">
+                  <summary className="msg-tool-summary">
+                    <Terminal size={12} style={{ flexShrink: 0, color: 'var(--text-secondary)' }} />
+                    <span className="mono" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                      {firstLine}
+                    </span>
+                    {hasMore && (
+                      <span className="muted" style={{ fontSize: '11px', flexShrink: 0 }}>
+                        Chi tiết ▾
+                      </span>
+                    )}
+                  </summary>
+                  <pre className="msg-tool-body">{it.text}</pre>
+                </details>
+              );
+            }
+            if (it.kind === 'agent' || it.kind === 'user') {
+              return (
+                <div key={i} className={`msg ${it.kind}`}>
+                  <MarkdownContent content={it.text} />
+                </div>
+              );
+            }
+            return (
+              <div key={i} className={`msg ${it.kind}`}>
+                {it.text}
+              </div>
+            );
+          })}
+          {displayItems.length === 0 && (
+            <div className="muted" style={{ padding: '2rem 1rem', textAlign: 'center' }}>
+              Chưa có nội dung trao đổi.
             </div>
           )}
-          <div className="task-meta-item" title="Chế độ không gian làm việc">
-            <Settings2 size={13} /> {task.mode}
+        </div>
+      </div>
+
+      {/* Sticky Bottom Action Dock */}
+      <div className={`chat-action-bar ${!canSend ? 'is-readonly' : ''}`}>
+        <div className="chat-input-row">
+          <textarea
+            value={text}
+            rows={canSend ? 2 : 1}
+            placeholder={
+              canSend
+                ? 'Nhập hướng dẫn hoặc phản hồi bổ sung (Ctrl + Enter để gửi)…'
+                : 'Task đang thực thi hoặc đã kết thúc.'
+            }
+            disabled={!canSend}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+          />
+          <button
+            type="button"
+            className="primary chat-btn-send"
+            disabled={busy || !canSend || text.trim() === ''}
+            onClick={handleSend}
+            data-tooltip="Gửi phản hồi (Ctrl+Enter)"
+          >
+            <Send size={14} /> <span>Gửi</span> <kbd>Ctrl+↵</kbd>
+          </button>
+        </div>
+
+        {task.status === 'failed' && (
+          <div className="chat-lifecycle-actions">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => act(() => api.retry(task.id, false))}
+              data-tooltip="Thử lại trên nền tảng hiện tại"
+            >
+              <RotateCcw size={14} className={busy ? 'spin' : ''} /> Thử lại
+            </button>
+            <button
+              type="button"
+              className="danger"
+              disabled={busy}
+              onClick={() => act(() => api.retry(task.id, true))}
+              data-tooltip="Chuyển sang nền tảng kế tiếp trong danh sách ưu tiên"
+            >
+              <Zap size={14} /> Chuyển agent kế tiếp
+            </button>
           </div>
-          <div className="task-meta-item" title="Thời gian cập nhật gần nhất">
-            <TimeBadge timestamp={task.updatedAt || task.createdAt} />
+        )}
+      </div>
+    </div>
+  );
+
+  const renderDiffPane = () => (
+    <div className="task-pane-right">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.925rem' }}>
+          <FileCode2 size={15} /> Thay đổi mã nguồn
+        </h3>
+
+        {diff !== null && (
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button
+              type="button"
+              className="office-mini-btn"
+              onClick={() => setDiffTab('diff')}
+              style={{
+                fontWeight: diffTab === 'diff' ? 700 : 500,
+                background: diffTab === 'diff' ? 'var(--bg-subtle)' : 'var(--bg-surface)',
+              }}
+            >
+              Nội dung Diff
+            </button>
+            {changedFileLines.length > 0 && (
+              <button
+                type="button"
+                className="office-mini-btn"
+                onClick={() => setDiffTab('files')}
+                style={{
+                  fontWeight: diffTab === 'files' ? 700 : 500,
+                  background: diffTab === 'files' ? 'var(--bg-subtle)' : 'var(--bg-surface)',
+                }}
+              >
+                Tệp ({changedFileLines.length})
+              </button>
+            )}
+            {diff.commits.length > 0 && (
+              <button
+                type="button"
+                className="office-mini-btn"
+                onClick={() => setDiffTab('commits')}
+                style={{
+                  fontWeight: diffTab === 'commits' ? 700 : 500,
+                  background: diffTab === 'commits' ? 'var(--bg-subtle)' : 'var(--bg-surface)',
+                }}
+              >
+                <GitCommit size={11} /> Commits ({diff.commits.length})
+              </button>
+            )}
           </div>
-          {isUnisolated(task) && (
-            <div className="badge warn">
-              <AlertTriangle size={12} /> Không cách ly: làm việc trực tiếp trên repo gốc
+        )}
+      </div>
+
+      {diff === null ? (
+        <div style={{ padding: '2rem 1rem', background: 'var(--bg-canvas)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', textAlign: 'center' }}>
+          <SnakeLoader size="sm" inline label="Đang tải thay đổi git…" />
+        </div>
+      ) : (
+        <div className="diff-container">
+          {diffTab === 'commits' && diff.commits.length > 0 ? (
+            <pre className="diff">
+              {diff.commits.join('\n')}
+            </pre>
+          ) : diffTab === 'files' && diff.status !== '' ? (
+            <pre className="diff">
+              {diff.status}
+            </pre>
+          ) : (
+            <pre className="diff">
+              {diff.diff === '' ? '(Không có thay đổi mã nguồn chưa commit)' : diff.diff}
+            </pre>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className={`panel task-view-panel ${inModal ? 'in-modal' : ''}`}>
+      {/* Thanh xác nhận xóa task */}
+      {confirmDelete && (
+        <div
+          style={{
+            background: 'var(--red-light, #FEE2E2)',
+            border: '1px solid var(--red-base)',
+            borderRadius: 'var(--radius-md)',
+            padding: '0.6rem 0.85rem',
+            marginBottom: '0.65rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.5rem',
+          }}
+        >
+          <span style={{ fontSize: '0.85rem', color: 'var(--red-dark, #991B1B)', fontWeight: 600 }}>
+            Bạn có chắc chắn muốn xóa vĩnh viễn Task #{task.seq} ("{task.title}") không?
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <button
+              type="button"
+              className="danger"
+              disabled={busy}
+              onClick={handleDeleteTask}
+              style={{ height: '28px', minHeight: '28px', padding: '0 0.65rem', fontSize: '0.78rem' }}
+            >
+              Xác nhận xóa
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setConfirmDelete(false)}
+              style={{ height: '28px', minHeight: '28px', padding: '0 0.65rem', fontSize: '0.78rem' }}
+            >
+              Hủy
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Header gọn gàng 1 khối duy nhất */}
+      <div className="task-header" style={{ marginBottom: '0.65rem', paddingBottom: '0.65rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0, flex: 1 }}>
+            {!inModal ? (
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={onBack}
+                data-tooltip="Quay lại (Esc)"
+                aria-label="Quay lại"
+              >
+                <ArrowLeft size={16} />
+              </button>
+            ) : (
+              <span className="badge info" style={{ flexShrink: 0 }}>🔍 Task #{task.seq}</span>
+            )}
+            <h2
+              style={{
+                fontSize: inModal ? '1.02rem' : '1.15rem',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                margin: 0,
+              }}
+              data-tooltip={`#${task.seq} ${task.title}`}
+            >
+              {!inModal && <span className="mono text-muted">#{task.seq} </span>}
+              {task.title}
+            </h2>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
+            {task.status !== 'closed' && (
+              <button
+                type="button"
+                className="primary"
+                disabled={busy}
+                onClick={() => act(() => api.close(task.id))}
+                style={{ height: '30px', minHeight: '30px', padding: '0 0.7rem', fontSize: '0.78rem' }}
+                data-tooltip="Nghiệm thu và đóng công việc này"
+              >
+                <CheckCircle2 size={13} /> Hoàn tất
+              </button>
+            )}
+
+            <button
+              type="button"
+              className="icon-btn-sm danger"
+              disabled={busy}
+              onClick={() => setConfirmDelete(true)}
+              data-tooltip="Xóa vĩnh viễn task này"
+              aria-label="Xóa task"
+            >
+              <Trash2 size={13} />
+            </button>
+
+            
+            {/* Nút Live Preview giao diện trực tiếp từ daemon voragent */}
+            <a
+              href={`/api/tasks/${task.id}/preview/index.html${typeof window !== 'undefined' ? window.location.search : ''}`}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="btn-live-preview"
+              data-tooltip="Mở Live Preview giao diện web (HTML) trực tiếp từ daemon voragent"
+            >
+              <Globe size={13} />
+              <span>Live Preview</span>
+            </a>
+
+            <TaskStatusBadge status={task.status} />
+
+            {inModal && onMaximize && (
+              <button
+                type="button"
+                className="icon-btn-sm"
+                onClick={onMaximize}
+                data-tooltip="Mở chi tiết Task toàn màn hình"
+                aria-label="Mở toàn màn hình"
+              >
+                <Maximize2 size={13} />
+              </button>
+            )}
+            {inModal && (
+              <button
+                type="button"
+                className="icon-btn-sm"
+                onClick={onBack}
+                data-tooltip="Đóng cửa sổ (Esc)"
+                aria-label="Đóng cửa sổ"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <div className="task-meta-grid">
+            <CopyableTag
+              text={displayPath}
+              label="Đường dẫn thư mục làm việc"
+              icon={<Folder size={12} style={{ flexShrink: 0 }} />}
+            />
+            {task.branch && (
+              <CopyableTag
+                text={task.branch}
+                label="Nhánh git cách ly"
+                icon={<GitBranch size={12} style={{ flexShrink: 0 }} />}
+              />
+            )}
+            {task.currentProvider && (
+              <div className="task-meta-item" data-tooltip="Nền tảng thực thi hiện hành">
+                <ProviderIcon provider={task.currentProvider} size={13} />
+                <span style={{ textTransform: 'capitalize' }}>{task.currentProvider}</span>
+              </div>
+            )}
+
+            {(() => {
+              const pKey = (task.currentProvider ?? 'antigravity').toLowerCase();
+              const models = PROVIDER_MODELS[pKey] ?? [];
+              if (models.length === 0) return null;
+              const curModel = task.model || models.find((m) => m.default)?.id || models[0]?.id;
+              const modelOpts: SelectOption[] = models.map((m) => ({
+                value: m.id,
+                label: m.name,
+                sublabel: m.description,
+                badge: m.default ? 'Mặc định' : undefined,
+                badgeType: m.default ? 'info' : undefined,
+              }));
+              return (
+                <div className="task-meta-item" style={{ minWidth: '150px', padding: '0 4px' }} data-tooltip="Mô hình AI thực thi (Bấm để đổi mô hình)">
+                  <CustomSelect
+                    options={modelOpts}
+                    value={curModel || ''}
+                    onChange={(newM) => {
+                      void api.updateTaskModel(task.id, newM).then(() => {
+                        window.location.reload();
+                      });
+                    }}
+                    searchable={false}
+                    icon={<Cpu size={12} style={{ color: 'var(--amber-base)' }} />}
+                  />
+                </div>
+              );
+            })()}
+
+            <div className="task-meta-item" data-tooltip="Thời gian cập nhật gần nhất">
+              <TimeBadge timestamp={task.updatedAt || task.createdAt} />
+            </div>
+            {isUnisolated(task) && (
+              <div className="badge warn">
+                <AlertTriangle size={11} /> Không cách ly Git
+              </div>
+            )}
+          </div>
+
+          {/* Khi mở trong Modal, dùng Tab chuyển đổi mượt mà giữa Nhật ký trao đổi & Thay đổi mã nguồn */}
+          {inModal && (
+            <div className="projects-view-switcher" role="tablist" aria-label="Chế độ xem chi tiết Task">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={modalPane === 'chat'}
+                className={`office-mini-btn ${modalPane === 'chat' ? 'active' : ''}`}
+                onClick={() => setModalPane('chat')}
+                style={{
+                  height: '26px',
+                  minHeight: '26px',
+                  padding: '0 10px',
+                  background: modalPane === 'chat' ? 'var(--bg-surface)' : 'transparent',
+                  borderColor: modalPane === 'chat' ? 'var(--border-subtle)' : 'transparent',
+                  fontWeight: modalPane === 'chat' ? 700 : 500,
+                }}
+              >
+                <MessagesSquare size={12} />
+                <span>Nhật ký trao đổi ({displayItems.length})</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={modalPane === 'diff'}
+                className={`office-mini-btn ${modalPane === 'diff' ? 'active' : ''}`}
+                onClick={() => setModalPane('diff')}
+                style={{
+                  height: '26px',
+                  minHeight: '26px',
+                  padding: '0 10px',
+                  background: modalPane === 'diff' ? 'var(--bg-surface)' : 'transparent',
+                  borderColor: modalPane === 'diff' ? 'var(--border-subtle)' : 'transparent',
+                  fontWeight: modalPane === 'diff' ? 700 : 500,
+                }}
+              >
+                <FileCode2 size={12} />
+                <span>Thay đổi mã nguồn {diffBadgeCount > 0 ? `(${diffBadgeCount})` : ''}</span>
+              </button>
             </div>
           )}
         </div>
       </div>
 
       {error !== null && (
-        <div className="error" role="alert" style={{ marginBottom: '1rem' }}>
+        <div className="error" role="alert" style={{ marginBottom: '0.65rem', flexShrink: 0 }}>
           <AlertCircle size={16} /> {error}
         </div>
       )}
 
-      {/* 2-Column Split-Screen Layout (Bao phủ tối đa màn hình) */}
-      <div className="task-split-layout">
-        {/* Left Column: Transcript & Sticky Chat Action Dock */}
-        <div className="task-pane-left">
-          <div className="transcript-container">
-            <div className="transcript-header">
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '1rem' }}>
-                <MessagesSquare size={16} /> Nhật ký trao đổi & hành động
-              </h3>
-            </div>
-            <div className="transcript">
-              {items.map((it, i) =>
-                it.kind === 'handoff' ? (
-                  <div key={i} className="handoff-divider-wrap">
-                    <div className="handoff-divider-line" />
-                    <div className="handoff-divider-badge">
-                      <Zap size={13} /> <span>Handoff:</span> {it.text}
-                    </div>
-                  </div>
-                ) : (
-                  <div key={i} className={`msg ${it.kind}`}>
-                    {it.text}
-                  </div>
-                ),
-              )}
-              {items.length === 0 && (
-                <div className="muted" style={{ padding: '2rem 1rem', textAlign: 'center' }}>
-                  Chưa có nội dung trao đổi.
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Sticky Bottom Action Dock (Zero Excessive Scrolling) */}
-          <div className="chat-action-bar">
-            <div className="chat-input-row">
-              <textarea
-                value={text}
-                rows={2}
-                placeholder={
-                  canSend
-                    ? 'Nhập hướng dẫn hoặc phản hồi cho agent (Ctrl + Enter để gửi nhanh)…'
-                    : 'Task đang thực thi hoặc đã kết thúc, không thể gửi thêm tin nhắn.'
-                }
-                disabled={!canSend}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className="primary chat-btn-send"
-                disabled={busy || !canSend || text.trim() === ''}
-                onClick={handleSend}
-                title="Gửi phản hồi (Ctrl + Enter)"
-              >
-                <Send size={15} /> Gửi <kbd>Ctrl+↵</kbd>
-              </button>
-            </div>
-
-            <div className="chat-lifecycle-actions">
-              <button
-                type="button"
-                disabled={busy || task.status === 'closed'}
-                onClick={() => act(() => api.close(task.id))}
-                title="Đánh dấu công việc đã hoàn thành trọn vẹn"
-              >
-                <CheckCircle2 size={14} /> Hoàn tất
-              </button>
-              <button
-                type="button"
-                disabled={busy || task.status !== 'failed'}
-                onClick={() => act(() => api.retry(task.id, false))}
-                title="Thử lại trên nền tảng hiện tại"
-              >
-                <RotateCcw size={14} className={busy ? 'spin' : ''} /> Thử lại
-              </button>
-              <button
-                type="button"
-                className="danger"
-                disabled={busy || task.status !== 'failed'}
-                onClick={() => act(() => api.retry(task.id, true))}
-                title="Chuyển sang nền tảng kế tiếp trong danh sách ưu tiên"
-              >
-                <Zap size={14} /> Chuyển agent kế tiếp
-              </button>
-            </div>
-          </div>
+      {/* Trong Modal: Hiển thị theo Tab rộng rãi (100% chiều ngang). Toàn màn hình: Chia 2 cột cân đối */}
+      {inModal ? (
+        <div className="task-modal-body">
+          {modalPane === 'chat' ? renderTranscriptPane() : renderDiffPane()}
         </div>
-
-        {/* Right Column: Source Code Diff & Commits */}
-        <div className="task-pane-right">
-          <div style={{ marginBottom: '0.75rem' }}>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '1rem' }}>
-              <FileCode2 size={16} /> Thay đổi mã nguồn (Git Diff)
-            </h3>
-          </div>
-
-          {diff === null ? (
-            <div style={{ padding: '2rem 1rem', background: 'var(--bg-canvas)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', textAlign: 'center' }}>
-              <SnakeLoader size="sm" inline label="Đang tải thay đổi git…" />
-            </div>
-          ) : (
-            <div className="diff-container">
-              {diff.commits.length > 0 && (
-                <div className="diff-header">
-                  <GitCommit size={13} /> Các commit đã tạo ({diff.commits.length}):
-                </div>
-              )}
-              {diff.commits.length > 0 && (
-                <pre className="diff" style={{ maxHeight: '140px', borderBottom: '1px solid #27272A' }}>
-                  {diff.commits.join('\n')}
-                </pre>
-              )}
-              {diff.status !== '' && (
-                <div className="diff-header">
-                  <FileCode2 size={13} /> Trạng thái file:
-                </div>
-              )}
-              {diff.status !== '' && (
-                <pre className="diff" style={{ maxHeight: '140px', borderBottom: '1px solid #27272A' }}>
-                  {diff.status}
-                </pre>
-              )}
-              <div className="diff-header">
-                Nội dung diff:
-              </div>
-              <pre className="diff">
-                {diff.diff === '' ? '(Không có thay đổi mã nguồn chưa commit)' : diff.diff}
-              </pre>
-            </div>
-          )}
+      ) : (
+        <div className="task-split-layout">
+          {renderTranscriptPane()}
+          {renderDiffPane()}
         </div>
-      </div>
+      )}
     </div>
   );
 }

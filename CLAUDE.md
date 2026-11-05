@@ -54,3 +54,9 @@ voragent là chương trình chạy trên máy người dùng. Nó điều phố
 - Markdown phải qua markdownlint theo `.markdownlint.json`.
 - `.superpowers/` (bản thử, phiên brainstorm) không commit.
 - **Chỉ dọn dẹp rác thuộc session của mình:** Khi dọn rác, xóa file tạm hay xóa worktree sau khi merge, AI agent chỉ được dọn tài nguyên do chính session hiện tại của mình tạo ra; tuyệt đối không đụng chạm tới các worktree, branch hoặc file của các session/agent khác đang cùng làm việc song song.
+
+- **Chống quá tải thị giác & ưu tiên Popover/Modal ngữ cảnh:** Không hiển thị mọi thông tin rỗng/lặp lại lên thẻ danh sách; giữ thanh Header gọn trên 1 dòng; đưa các bảng chi tiết (Quota, Bàn Trưởng phòng, Shared Memory) vào Popover/Modal chỉ mở khi người dùng cần.
+
+- **Hiển thị chuẩn xác (Rule 12):** Hỗ trợ khởi tạo Git 1-click (`POST /api/projects/git-init`) cho thư mục chưa có Git; parse & render Markdown (`<MarkdownContent />`) thay vì raw text; reset `padding: 0` cho `input[type="checkbox"]`; dùng biểu tượng thương hiệu nhà cung cấp (`<ProviderIcon />` cho Claude/Codex/Antigravity) thay vì emoji `🐍` trên đồ thị và badge 2D; ưu tiên nút `.icon-btn` kèm Custom UI Tooltip (`<Tooltip />` / `data-tooltip` qua `<GlobalTooltipLayer />`, cấm chỉ dùng native `title`); cô lập `zIndexRange={[5, 0]}` và `isolation: isolate` cho `<Html>` 3D để không che khuất Popover/Modal hay nhân vật 3D.
+
+- **Con trỏ chuột ngữ nghĩa (Rule 14):** Dùng đúng `cursor: pointer` cho phần tử bấm được (kể cả vật thể 3D tương tác), `cursor: grab` / `grabbing` cho bề mặt kéo/xoay (Canvas 3D & Đồ thị 2D), `cursor: not-allowed` cho phần tử bị khóa (`disabled`), `cursor: text` cho vùng nhập liệu/code diff, và `cursor: help` cho badge có tooltip giải thích.

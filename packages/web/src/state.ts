@@ -50,6 +50,13 @@ export function applyEvent(s: UiState, e: VEvent): UiState {
     events.set(e.taskId, [...cur, e].sort((a, b) => a.id - b.id));
   }
 
+  if (e.type === 'STATE_CHANGED' && e.data.deleted === true) {
+    const tasks = new Map(s.tasks);
+    tasks.delete(e.taskId);
+    events.delete(e.taskId);
+    return { ...s, tasks, events };
+  }
+
   let tasks = s.tasks;
   const t = s.tasks.get(e.taskId);
   if (t) {
@@ -295,4 +302,50 @@ export function resolveProjectRoute(
   const key = projectKeyOf(path);
   if (projects.some((p) => projectKeyOf(p.path) === key)) return { view: 'project', path };
   return { view: 'list', notice: PROJECT_NOT_FOUND_NOTICE };
+}
+
+
+/**
+ * Kiểm tra xem một nhà cung cấp (Provider) có được cài đặt CLI trên máy hay không.
+ * Nếu mảng `providers` rỗng (đang tải lần đầu), tạm coi là true; khi đã có dữ liệu thì bắt buộc `p.installed === true`.
+ */
+export function isProviderInstalledById(providers: ProviderState[], id: string): boolean {
+  if (providers.length === 0) return true;
+  const key = id.toLowerCase();
+  const found = providers.find((p) => p.id.toLowerCase().includes(key));
+  return found ? found.installed : false;
+}
+
+/**
+ * Kiểm tra xem một nhà cung cấp (Provider) có đang KHẢ DỤNG (đã cài đặt CLI + không bị tạm nghỉ cooldown + chưa cạn 100% quota) hay không.
+ */
+export function isProviderAvailable(
+  providers: ProviderState[],
+  id: string,
+  nowMs: number = Date.now(),
+): boolean {
+  if (providers.length === 0) return true;
+  const key = id.toLowerCase();
+  const found = providers.find((p) => p.id.toLowerCase().includes(key));
+  if (!found || !found.installed) return false;
+  if (found.cooldownUntil !== null && found.cooldownUntil > nowMs) return false;
+  if (found.usedPercent !== null && found.usedPercent >= 1) return false;
+  return true;
+}
+
+/**
+ * Trả về lý do tại sao một Provider không khả dụng (hoặc `null` nếu đang sẵn sàng).
+ */
+export function getProviderUnavailableReason(
+  providers: ProviderState[],
+  id: string,
+  nowMs: number = Date.now(),
+): string | null {
+  if (providers.length === 0) return null;
+  const key = id.toLowerCase();
+  const found = providers.find((p) => p.id.toLowerCase().includes(key));
+  if (!found || !found.installed) return 'Chưa cài CLI';
+  if (found.cooldownUntil !== null && found.cooldownUntil > nowMs) return 'Đang tạm nghỉ (Quota)';
+  if (found.usedPercent !== null && found.usedPercent >= 1) return 'Đã cạn Quota';
+  return null;
 }

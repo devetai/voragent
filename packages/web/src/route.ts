@@ -1,9 +1,11 @@
 /**
  * Quản lý định tuyến URL dạng Path + Query cho voragent SPA.
  * Thay thế Hash routing cũ bằng Semantic HTML5 History API:
- *   /              hoặc /projects         -> Trang chủ danh sách dự án
+ *   /              hoặc /projects         -> Đại sảnh Dự án
  *   /board         hoặc /board?project=.. -> Bảng task Kanban (toàn bộ hoặc theo dự án)
  *   /office        hoặc /office?project=. -> Không gian Văn phòng 3D
+ *   /manager       hoặc /manager?project= -> Bàn Trưởng phòng & Sub-agents
+ *   /memory        hoặc /memory?project=. -> Bộ nhớ dùng chung (Shared Memory)
  *   /graph         hoặc /graph?project=.. -> Đồ thị quan hệ
  *   /new           hoặc /new?project=..   -> Tạo task mới
  *   /task/<id>                            -> Chi tiết task và phiên làm việc
@@ -15,8 +17,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-export type AppView = 'projects' | 'board' | 'office' | 'graph' | 'new' | 'task';
-export type TabId = 'projects' | 'board' | 'office' | 'graph';
+export type AppView = 'projects' | 'board' | 'office' | 'manager' | 'memory' | 'graph' | 'new' | 'task';
+export type TabId = 'projects' | 'board' | 'office' | 'manager' | 'memory' | 'graph';
 
 export interface AppRoute {
   view: AppView;
@@ -73,6 +75,10 @@ export function parseLocation(loc: { pathname: string; search: string; hash?: st
     view = 'new';
   } else if (pathname === '/office' || hash === '#/office') {
     view = 'office';
+  } else if (pathname === '/manager' || hash === '#/manager') {
+    view = 'manager';
+  } else if (pathname === '/memory' || hash === '#/memory') {
+    view = 'memory';
   } else if (pathname === '/graph' || hash === '#/graph') {
     view = 'graph';
   } else if (pathname === '/board' || hash === '#/board' || projectPath !== null) {
@@ -84,6 +90,8 @@ export function parseLocation(loc: { pathname: string; search: string; hash?: st
   // 4. Quyết định Tab active trên Header
   let activeTab: TabId = 'projects';
   if (view === 'office') activeTab = 'office';
+  else if (view === 'manager') activeTab = 'manager';
+  else if (view === 'memory') activeTab = 'memory';
   else if (view === 'graph') activeTab = 'graph';
   else if (view === 'board' || projectPath !== null) activeTab = 'board';
   else activeTab = 'projects';
@@ -110,7 +118,6 @@ export function buildUrl(
   const currentKey = currentParams.get('key');
 
   if (typeof target === 'string') {
-    // Hỗ trợ target dạng legacy hash nếu có
     let normalized = target;
     if (normalized.startsWith('#/task/')) {
       normalized = `/task/${normalized.slice('#/task/'.length)}`;
@@ -131,7 +138,6 @@ export function buildUrl(
     return (pathPart || '/') + (q ? `?${q}` : '');
   }
 
-  // Nếu target là object
   const params = new URLSearchParams();
   if (target.projectPath) {
     params.set('project', target.projectPath);
@@ -150,6 +156,12 @@ export function buildUrl(
       break;
     case 'office':
       basePath = '/office';
+      break;
+    case 'manager':
+      basePath = '/manager';
+      break;
+    case 'memory':
+      basePath = '/memory';
       break;
     case 'graph':
       basePath = '/graph';
@@ -188,13 +200,11 @@ export function useAppRoute(): [
     setRoute(cur);
   }, []);
 
-  // Lắng nghe nút Back/Forward của trình duyệt
   useEffect(() => {
     window.addEventListener('popstate', sync);
     return () => window.removeEventListener('popstate', sync);
   }, [sync]);
 
-  // Migration hash cũ sang path + query khi khởi động (nếu có)
   useEffect(() => {
     if (window.location.hash && window.location.hash !== '#' && window.location.hash !== '#/') {
       const parsed = parseLocation({
@@ -207,7 +217,6 @@ export function useAppRoute(): [
         taskId: parsed.taskId,
         projectPath: parsed.projectPath,
       }, window.location.search);
-      // Thay thế URL sạch không còn hash
       window.history.replaceState(null, '', canonical);
       sync();
     }

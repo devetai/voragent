@@ -114,6 +114,7 @@ export function createCodexAdapter(): Adapter {
         args: [
           ...(input.sessionId ? ['exec', 'resume', input.sessionId] : ['exec']),
           '--json',
+          ...(input.model ? ['-m', input.model] : []),
           '-c', 'sandbox_mode="workspace-write"',
           ...(input.network ? ['-c', 'sandbox_workspace_write.network_access=true'] : []),
           '-',

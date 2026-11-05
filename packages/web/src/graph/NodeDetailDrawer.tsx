@@ -1,3 +1,4 @@
+import { ProviderIcon } from '../components/ProviderIcon';
 import type { GraphEdge, GraphNode } from './types';
 
 interface NodeDetailDrawerProps {
@@ -18,20 +19,22 @@ export function NodeDetailDrawer({
   if (!node) return null;
 
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
-
-  // Tìm tất cả các cạnh kết nối trực tiếp với node này
   const connectedEdges = edges.filter((e) => e.source === node.id || e.target === node.id);
 
-  // Danh sách các node lân cận
-  const neighborNodes = connectedEdges.map((e) => {
-    const isSource = e.source === node.id;
-    const neighborId = isSource ? e.target : e.source;
-    return {
-      neighbor: nodeMap.get(neighborId),
-      edge: e,
-      direction: isSource ? 'outgoing' : 'incoming',
-    };
-  }).filter((item): item is { neighbor: GraphNode; edge: GraphEdge; direction: 'outgoing' | 'incoming' } => item.neighbor !== undefined);
+  const neighborNodes = connectedEdges
+    .map((e) => {
+      const isSource = e.source === node.id;
+      const neighborId = isSource ? e.target : e.source;
+      return {
+        neighbor: nodeMap.get(neighborId),
+        edge: e,
+        direction: isSource ? 'outgoing' : 'incoming',
+      };
+    })
+    .filter(
+      (item): item is { neighbor: GraphNode; edge: GraphEdge; direction: 'outgoing' | 'incoming' } =>
+        item.neighbor !== undefined,
+    );
 
   return (
     <aside
@@ -55,10 +58,9 @@ export function NodeDetailDrawer({
         animation: 'slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
-      {/* Header Drawer */}
       <div
         style={{
-          padding: '16px 20px',
+          padding: '14px 18px',
           borderBottom: '1px solid #F1ECE4',
           display: 'flex',
           alignItems: 'center',
@@ -67,42 +69,39 @@ export function NodeDetailDrawer({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '24px' }}>{node.icon}</span>
+          {node.type === 'provider' ? (
+            <ProviderIcon provider={node.label} size={24} />
+          ) : (
+            <span style={{ fontSize: '22px' }}>{node.icon}</span>
+          )}
           <div>
             <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#1E293B' }}>
               {node.label}
             </h3>
             <span style={{ fontSize: '11px', color: '#64748B', fontFamily: 'monospace' }}>
-              {node.type === 'provider' ? 'Agent / Nền tảng' : node.type === 'task' ? 'Nhiệm vụ' : node.type === 'file' ? 'Tệp mã nguồn' : 'Mốc bàn giao'}
+              {node.type === 'provider'
+                ? 'Agent / Nền tảng AI'
+                : node.type === 'task'
+                ? 'Nhiệm vụ'
+                : node.type === 'file'
+                ? 'Tệp mã nguồn'
+                : 'Mốc bàn giao'}
             </span>
           </div>
         </div>
 
         <button
           type="button"
+          className="icon-btn-sm"
           onClick={onClose}
           title="Đóng (Esc)"
-          style={{
-            width: '28px',
-            height: '28px',
-            borderRadius: '8px',
-            border: '1px solid #E2E8F0',
-            backgroundColor: '#FFFFFF',
-            color: '#64748B',
-            cursor: 'pointer',
-            fontSize: '14px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
+          aria-label="Đóng"
         >
           ✕
         </button>
       </div>
 
-      {/* Nội dung chi tiết cuộn êm */}
-      <div style={{ padding: '20px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '18px' }}>
-        {/* ================= THÔNG TIN THEO LOẠI NÚT ================= */}
+      <div style={{ padding: '18px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {node.type === 'file' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
@@ -138,13 +137,14 @@ export function NodeDetailDrawer({
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <div style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', backgroundColor: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>
                 Trạng thái: <strong>{node.data.task.status}</strong>
               </div>
               {node.data.task.currentProvider && (
-                <div style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', backgroundColor: '#F8FAFC', color: '#334155', border: '1px solid #E2E8F0' }}>
-                  Agent: <strong>{node.data.task.currentProvider}</strong>
+                <div style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', backgroundColor: '#F8FAFC', color: '#334155', border: '1px solid #E2E8F0', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <ProviderIcon provider={node.data.task.currentProvider} size={12} />
+                  <strong>{node.data.task.currentProvider}</strong>
                 </div>
               )}
             </div>
@@ -161,22 +161,9 @@ export function NodeDetailDrawer({
             {onSelectTask && (
               <button
                 type="button"
+                className="primary"
                 onClick={() => onSelectTask(node.data.task!.id)}
-                style={{
-                  padding: '9px 14px',
-                  borderRadius: '8px',
-                  backgroundColor: '#2563EB',
-                  color: '#FFFFFF',
-                  fontWeight: 600,
-                  fontSize: '13px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  marginTop: '4px',
-                }}
+                style={{ width: '100%' }}
               >
                 Mở chi tiết Task #{node.data.task.seq} ›
               </button>
@@ -210,7 +197,6 @@ export function NodeDetailDrawer({
           </div>
         )}
 
-        {/* ================= DANH SÁCH LIÊN KẾT TRỰC TIẾP ================= */}
         <div>
           <div style={{ fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>
             Các thực thể liên kết ({neighborNodes.length})
@@ -237,7 +223,11 @@ export function NodeDetailDrawer({
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                    <span>{neighbor.icon}</span>
+                    {neighbor.type === 'provider' ? (
+                      <ProviderIcon provider={neighbor.label} size={14} />
+                    ) : (
+                      <span>{neighbor.icon}</span>
+                    )}
                     <span style={{ fontWeight: 500, color: '#1E293B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {neighbor.label}
                     </span>

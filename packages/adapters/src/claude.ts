@@ -132,6 +132,7 @@ export function createClaudeAdapter(): Adapter {
         args: [
           '-p',
           ...(input.sessionId ? ['--resume', input.sessionId] : []),
+          ...(input.model ? ['--model', input.model] : []),
           '--output-format', 'stream-json', '--include-partial-messages', '--verbose',
           '--permission-mode', 'auto',
           ...(input.systemPrompt ? ['--append-system-prompt', input.systemPrompt] : []),

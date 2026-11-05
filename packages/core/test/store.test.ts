@@ -100,3 +100,75 @@ test('EventBus publish/subscribe/unsubscribe', () => {
   bus.publish({ ...ev, id: 2 });
   expect(got).toEqual([1]);
 });
+
+
+test('Shared Memory (project_memories) và Kế hoạch Trưởng phòng (manager_plans)', () => {
+  const s = openStore(':memory:');
+  const m1 = s.upsertMemory({
+    repoPath: 'D:\\Projects\\Voragent',
+    category: 'architecture',
+    title: 'Luôn dùng Git Worktree',
+    content: 'Mọi agent làm việc trong .worktrees/<branch>',
+    author: 'user',
+    pinned: true,
+  });
+  expect(m1.pinned).toBe(true);
+  // Khớp đường dẫn không phân biệt hoa thường và dấu gạch
+  expect(s.listMemories('d:/projects/voragent/')).toHaveLength(1);
+  expect(s.listMemories('d:/projects/other')).toHaveLength(0);
+
+  const m1Updated = s.upsertMemory({
+    id: m1.id,
+    repoPath: 'D:\\Projects\\Voragent',
+    category: 'decision',
+    title: 'Luôn dùng Git Worktree',
+    content: 'Đã cập nhật nội dung',
+    author: 'manager',
+    pinned: false,
+  });
+  expect(m1Updated.category).toBe('decision');
+  expect(m1Updated.pinned).toBe(false);
+  expect(s.deleteMemory(m1.id)).toBe(true);
+  expect(s.listMemories()).toHaveLength(0);
+
+  const plan = s.createManagerPlan({
+    repoPath: 'D:/Projects/Voragent',
+    goal: 'Xây dựng Văn phòng Dự án',
+    mode: 'semi-auto',
+    subtasks: [
+      { id: 's1', title: 'Lõi', message: 'Làm lõi', assignedProvider: 'claude', role: 'Kiến trúc', taskId: null },
+    ],
+  });
+  expect(plan.status).toBe('draft');
+  expect(s.listManagerPlans('d:\\projects\\voragent')).toHaveLength(1);
+  const dispatched = s.updateManagerPlan(plan.id, { status: 'dispatched' });
+  expect(dispatched.status).toBe('dispatched');
+  s.close();
+});
+
+
+test('Hạn mức theo từng Model (model_quotas) độc lập cho Antigravity', () => {
+  const s = openStore(':memory:');
+  s.upsertModelQuota({
+    provider: 'antigravity',
+    model: 'gemini-4-argon',
+    cooldownUntil: Date.now() + 3600000,
+    usedPercent: 1.0,
+    updatedAt: Date.now(),
+    lastError: 'RESOURCE_EXHAUSTED',
+  });
+  const argon = s.getModelQuota('antigravity', 'gemini-4-argon');
+  expect(argon).not.toBeNull();
+  expect(argon?.model).toBe('gemini-4-argon');
+  expect(argon?.lastError).toBe('RESOURCE_EXHAUSTED');
+
+  const flash = s.getModelQuota('antigravity', 'gemini-3.8-flash');
+  expect(flash).toBeNull(); // flash vẫn chưa bị cooldown, hoàn toàn khả dụng!
+
+  const list = s.listModelQuotas('antigravity');
+  expect(list).toHaveLength(1);
+
+  s.resetModelQuota('antigravity', 'gemini-4-argon');
+  expect(s.getModelQuota('antigravity', 'gemini-4-argon')?.cooldownUntil).toBeNull();
+  s.close();
+});

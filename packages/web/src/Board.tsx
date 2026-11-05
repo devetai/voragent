@@ -1,20 +1,16 @@
 import {
-  AlertCircle,
   AlertTriangle,
   ArrowLeftRight,
-  Bot,
-  CheckCircle2,
   Clock,
   Folder,
   GitBranch,
   KanbanSquare,
   Plus,
-  UserCheck,
-  Zap,
 } from 'lucide-react';
 import type { Task, VEvent } from '@voragent/shared';
 import { COLUMNS, columnOf, handoffCount, isUnisolated } from './state';
 import { TimeBadge } from './components/TimeBadge';
+import { ProviderIcon } from './components/ProviderIcon';
 
 const FOLDER_NAME = (path: string): string => {
   const parts = path.replace(/[\\/]+$/, '').split(/[\\/]/);
@@ -29,23 +25,6 @@ const AGENT_CLASS = (provider: string | null): string => {
   if (p.includes('antigravity') || p.includes('agy')) return 'antigravity';
   return '';
 };
-
-function StatusBadge({ status }: { status: Task['status'] }) {
-  switch (status) {
-    case 'waiting_quota':
-      return <span className="badge warn"><Clock size={11} /> Chờ quota</span>;
-    case 'running':
-      return <span className="badge info"><Zap size={11} /> Đang chạy</span>;
-    case 'awaiting_user':
-      return <span className="badge warn"><UserCheck size={11} /> Chờ bạn duyệt</span>;
-    case 'closed':
-      return <span className="badge success"><CheckCircle2 size={11} /> Đã xong</span>;
-    case 'failed':
-      return <span className="badge danger"><AlertCircle size={11} /> Có lỗi</span>;
-    default:
-      return <span className="badge neutral"><Clock size={11} /> Chờ lượt</span>;
-  }
-}
 
 export function Board({
   tasks,
@@ -112,7 +91,7 @@ export function Board({
               ) : items.length === 0 ? (
                 <div className="column-empty">
                   <Clock size={18} strokeWidth={1.5} style={{ marginBottom: '0.35rem', opacity: 0.6 }} />
-                  <span>Chưa có việc nào</span>
+                  <span>Trống</span>
                 </div>
               ) : (
                 items.map((t) => {
@@ -129,45 +108,46 @@ export function Board({
                     >
                       <div className="card-top">
                         <span className="card-seq">#{t.seq}</span>
-                        {t.currentProvider && (
-                          <span className={`card-agent-badge ${agentClass}`}>
-                            <Bot size={11} /> {t.currentProvider}
-                          </span>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          {t.status === 'waiting_quota' && (
+                            <span className="badge warn" style={{ fontSize: '10.5px', padding: '1px 6px' }}>
+                              <Clock size={10} /> Chờ quota
+                            </span>
+                          )}
+                          {isUnisolated(t) && (
+                            <span className="badge warn" style={{ fontSize: '10.5px', padding: '1px 6px' }} title="Không cách ly Git Worktree">
+                              <AlertTriangle size={10} />
+                            </span>
+                          )}
+                          {t.currentProvider && (
+                            <span className={`card-agent-badge ${agentClass}`} title={`Đang thực thi bởi ${t.currentProvider}`}>
+                              <ProviderIcon provider={t.currentProvider} size={11} /> {t.currentProvider}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <div className="card-title">{t.title}</div>
 
-                      <div className="card-meta">
-                        <div className="card-path" title={t.repoPath} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                          <Folder size={12} style={{ flexShrink: 0 }} />
-                          <span>{folder}</span>
+                      <div className="card-footer">
+                        <div className="card-path" title={t.repoPath} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', minWidth: 0, flex: 1 }}>
+                          <Folder size={11} style={{ flexShrink: 0 }} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folder}</span>
                           {t.branch && (
                             <>
-                              <GitBranch size={11} style={{ flexShrink: 0, marginLeft: '0.2rem' }} />
-                              <span>{t.branch}</span>
+                              <GitBranch size={10} style={{ flexShrink: 0, marginLeft: '0.15rem' }} />
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80px' }}>{t.branch}</span>
                             </>
                           )}
                         </div>
 
-                        {isUnisolated(t) && (
-                          <div className="badge warn" style={{ alignSelf: 'flex-start' }}>
-                            <AlertTriangle size={11} /> Không cách ly
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="card-footer">
-                        <StatusBadge status={t.status} />
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginLeft: 'auto' }}>
-                          <TimeBadge timestamp={t.updatedAt || t.createdAt} />
-
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
                           {handoffs > 0 && (
                             <span className="handoff-chip" title="Số lần tự động chuyển nền tảng do hết quota">
                               <ArrowLeftRight size={10} /> {handoffs}
                             </span>
                           )}
+                          <TimeBadge timestamp={t.updatedAt || t.createdAt} />
                         </div>
                       </div>
                     </button>

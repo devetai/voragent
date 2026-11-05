@@ -90,7 +90,7 @@ describe('createWorkspace', () => {
     expect(ws.isolated).toBe(true);
     expect(ws.branch).toBe('voragent/task-7');
     expect(ws.baseCommit).toBe(baseBefore);
-    expect(ws.path).toBe(join(wtDir, 'task-7'));
+    expect(ws.path).toBe(join(wtDir, 'repo', 'task-7'));
     expect(readFileSync(join(ws.path, 'a.txt'), 'utf8')).toBe('một\nhai (sửa)\nba\n');
     expect(readFileSync(join(ws.path, 'new.txt'), 'utf8')).toBe('mới\n');
     expect(readFileSync(join(ws.path, SPACE_NAME), 'utf8')).toBe('nội dung\n');
@@ -194,7 +194,7 @@ describe('failure cleanup and config independence', () => {
     await expect(
       createWorkspace({ repoPath: repo, worktreesDir: wtDir, taskSeq: 5, mode: 'head-dirty-commit' }),
     ).rejects.toThrow();
-    expect(existsSync(join(wtDir, 'task-5'))).toBe(false);
+    expect(existsSync(join(wtDir, 'repo', 'task-5'))).toBe(false);
     expect(git(repo, ['branch', '--list', 'voragent/task-5'])).toBe('');
     expect(git(repo, ['worktree', 'list', '--porcelain'])).not.toContain('task-5');
 

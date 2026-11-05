@@ -334,3 +334,43 @@ Sử dụng bảng kiểm tra này trước khi merge bất kỳ thay đổi UI 
 - [ ] Di chuyển và tương tác được bằng bàn phím (Tab, Enter, Esc).
 - [ ] Hiển thị tốt trên cả màn hình nhỏ (Laptop, Tablet) không bị vỡ layout hoặc tràn viền ngang ngoài ý muốn.
 - [ ] Dữ liệu quan trọng không chỉ dựa vào màu sắc mà có nhãn/biểu tượng đi kèm.
+
+
+---
+
+## 11. Quy Chuẩn Chống Quá Tải Thị Giác & Contextual Overlays (Rule 11)
+
+- **Nguyên tắc:** Không bao giờ hiển thị mọi thứ lên màn hình cùng một lúc. Mắt người dùng chỉ tập trung vào 1 luồng công việc chính tại một thời điểm.
+- **Cấm lặp lại thông tin rỗng trên thẻ danh sách (Zero Redundant Card Noise):**
+  - Khi hiển thị danh sách hàng chục dự án, **TUYỆT ĐỐI KHÔNG** lặp lại các dòng trạng thái tĩnh hoặc bằng 0 (`0 kế hoạch`, `0 nhớ chung`, `CLAUDE: Sẵn sàng`, `CODEX: Chưa cài`) và không đặt 3 nút bấm to ở đáy mọi thẻ.
+  - Chỉ hiển thị các badge khi có tín hiệu hoạt động thực sự (`> 0`, ví dụ: `⚡ 1 đang chạy`, `🔔 2 cần duyệt`). Các nút điều hướng phụ (`3D`, `Trưởng phòng`, `Kanban`) chỉ hiện nhẹ khi rê chuột (`hover`) vào thẻ.
+- **Sử dụng Popover & Modal cho công cụ ngữ cảnh (Contextual Popovers & Modals):**
+  - Thanh Header chỉ giữ đúng 4 Tab chính (`Dự án`, `Văn phòng 3D`, `Bảng Kanban`, `Đồ thị`) để không bao giờ bị gãy thành 2 dòng.
+  - Chi tiết hạn mức Quota của từng CLI phải gom vào 1 nút Popover gọn (`2/3 CLI`), chỉ xổ ra khi bấm.
+  - Các trung tâm điều hành phụ trợ (như **Bàn Trưởng phòng**, **Shared Memory**, hoặc **Xem nhanh Task từ 3D**) phải mở dưới dạng **Modal / Overlay nổi** và chia thành các Sub-tab gọn gàng (`Cần bạn duyệt` | `Giao mục tiêu mới` | `Kế hoạch đã giao`), không xếp chồng toàn bộ form và danh sách lên cùng một mặt phẳng.
+
+- **Chuẩn hóa Hiển thị Thương hiệu, Markdown, Nút Icon-Only & Không gian 3D (Rule 12):**
+  - **1-Click Git Init:** Thư mục chưa có Git phải có nút `+ Khởi tạo Git` ngay trên thẻ dự án thay vì chỉ báo lỗi.
+  - **Markdown Rendering:** Mọi phản hồi của Agent, báo cáo Trưởng phòng và Shared Memory phải render qua `<MarkdownContent />` (hoặc `stripMarkdown` trên nhãn tóm tắt 3D), không hiển thị cú pháp Markdown thô.
+  - **Provider Brand Icons:** Dùng logo vector đặc trưng của Claude (`#D97757`), Codex (`#10A37F`), Antigravity (`#2563EB`) trên Đồ thị 2D và toàn bộ badge/danh sách; không dùng emoji `🐍` thay cho logo nhà cung cấp.
+  - **Icon-Only Buttons + Custom UI Tooltip (Cấm chỉ dùng native `title`):** Các nút công cụ phụ trợ (Refresh, Close, Back, Copy, Pin, Delete, Zoom, Quick Actions) sử dụng `.icon-btn` / `.icon-btn-sm` kết hợp **Custom UI Tooltip** (`<Tooltip content="..." />` hoặc `data-tooltip="..."` được render qua `<GlobalTooltipLayer />` với hiệu ứng hiện tức thì ~75ms, mũi tên định hướng và badge phím tắt `<kbd>`). **TUYỆT ĐỐI KHÔNG** phụ thuộc vào thuộc tính `title` mặc định thô sơ và trễ của trình duyệt.
+  - **Zero 3D Occlusion:** Mọi `<Html>` trong Three.js phải khai báo `zIndexRange={[5, 0]}` bên trong `.office-canvas-wrapper { isolation: isolate; z-index: 1; }` để không bao giờ đè lên Popover/Modal 2D; bố trí TV và Bảng Trắng lệch sang hai bên tường sau (`x = ±5.4, z = -9.8`) để không che khuất nhân vật 3D.
+
+- **Ràng buộc nghiêm ngặt các lựa chọn không khả dụng (Rule 13):**
+  - Mọi Dropdown / Select (`CustomSelect`, `AgentPriorityMultiSelect`, phân công Subtask trong `ManagerPanel`, chọn Người ghi nhận trong `SharedMemoryPanel`, bàn giao trong `OfficeCanvas`) **TUYỆT ĐỐI KHÔNG** cho phép chọn các CLI chưa cài đặt (`!installed`) hoặc đang cạn Quota (`cooldownUntil > now`). Các mục chưa cài phải được ẩn khỏi danh sách chọn, còn các mục tạm nghỉ phải khóa cứng (`disabled: true`, `pointer-events: none`) kèm nhãn lý do rõ ràng.
+  - Khi chọn một thư mục chưa có Git trong `NewTaskForm`, tự động khóa (`disabled`) tùy chọn chế độ Git Worktree và hiển thị nút `+ Khởi tạo Git ngay`.
+
+- **Chuẩn hóa Con trỏ chuột theo Ngữ nghĩa Tương tác (Rule 14):**
+  - **`cursor: pointer`:** Mọi phần tử có thể click (Button, Link, Card dự án/task, hàng trong Table, Tab, Checkbox/Radio, mục Select khả dụng, nhân vật & vật thể tương tác trong 3D).
+  - **`cursor: grab` / `cursor: grabbing`:** Mọi bề mặt có thể nhấn giữ để xoay, kéo hoặc di chuyển khung nhìn (Canvas Văn phòng 3D, Canvas Đồ thị 2D và các Node khi đang kéo).
+  - **`cursor: not-allowed`:** Mọi nút, ô nhập hoặc tùy chọn bị khóa (`:disabled`, `.disabled`, `aria-disabled="true"`).
+  - **`cursor: text`:** Các ô nhập văn bản và vùng hiển thị mã nguồn / Git Diff / Log cần bôi đen sao chép.
+  - **`cursor: help`:** Các badge thông tin tĩnh có gắn Custom UI Tooltip giải thích ngữ cảnh.
+
+- **Triệt tiêu Dialog gốc của Trình duyệt (Zero Native alert, confirm, prompt) (Rule 15):**
+  - **TUYỆT ĐỐI CẤM** sử dụng các hộp thoại mặc định của trình duyệt (`window.alert()`, `window.confirm()`, `window.prompt()`).
+  - **Lý do kỹ thuật & UX:**
+    1. Hộp thoại trình duyệt chặn đứng luồng thực thi (blocking thread), làm khựng / đơ vòng lặp Three.js / WebGL trong Văn phòng 3D và Canvas Đồ thị 2D.
+    2. Xuất hiện tiêu đề địa chỉ IP cục bộ thô kệch (`127.0.0.1:4717 says`), phá vỡ thẩm mỹ và trải nghiệm Warm Cozy Tech.
+    3. Không thể tùy chỉnh kiểu dáng, màu sắc, phím tắt hoặc văn bản nút bấm theo ngữ cảnh.
+  - **Quy chuẩn bắt buộc:** Mọi thao tác xác nhận phá hủy (Hủy/xóa kế hoạch Trưởng phòng, xóa task, xóa bộ nhớ chung, reset trạng thái) phải sử dụng component Modal chuyên dụng (`<ConfirmModal />` hoặc In-place Confirm Card). Modal phải được render qua React Portal (`createPortal(..., document.body)`), có lớp nền mờ (`backdrop-filter: blur(...)`), tự động bẫy phím `Escape` để hủy và tự động focus nút Hủy an toàn.

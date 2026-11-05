@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Config, WorkspaceMode } from '@voragent/shared';
 
 export const DEFAULT_CONFIG: Omit<Config, 'dataDir'> = {
   port: 4717,
-  priority: ['claude', 'codex'],
+  priority: ['claude', 'antigravity', 'codex'],
   concurrency: { perProvider: 2, total: 4 },
   quotaThreshold: 0.9,
   defaultCooldownMs: 3_600_000,
@@ -12,6 +12,12 @@ export const DEFAULT_CONFIG: Omit<Config, 'dataDir'> = {
   network: true,
   defaultMode: 'head-dirty-commit',
   handoffMaxChars: 24_000,
+  models: {
+    claude: 'sonnet-5.5',
+    codex: 'gpt-5.6-luna',
+    antigravity: 'gemini-3.8-flash',
+  },
+  modelFallbackPolicy: 'auto',
 };
 
 const MODES: WorkspaceMode[] = ['head-dirty-commit', 'head-commit', 'dirty-nocommit'];
@@ -51,7 +57,7 @@ export function loadConfig(dataDir: string): Config {
 
   let raw: unknown;
   try {
-    raw = JSON.parse(text.replace(/^﻿/, ''));
+    raw = JSON.parse(text.replace(/^\uFEFF/, ''));
   } catch (e) {
     throw new Error(`Tệp ${file} không phải JSON hợp lệ: ${(e as Error).message}`);
   }
@@ -86,5 +92,33 @@ export function loadConfig(dataDir: string): Config {
     base.defaultMode = raw.defaultMode as WorkspaceMode;
   }
   if (raw.handoffMaxChars !== undefined) base.handoffMaxChars = num(file, 'handoffMaxChars', raw.handoffMaxChars);
+  if (raw.models !== undefined) {
+    if (!isObject(raw.models)) fail(file, 'models', 'một đối tượng JSON');
+    base.models = { ...base.models, ...(raw.models as Record<string, string>) };
+  }
+  if (raw.modelFallbackPolicy !== undefined) {
+    if (raw.modelFallbackPolicy !== 'auto' && raw.modelFallbackPolicy !== 'ask') {
+      fail(file, 'modelFallbackPolicy', 'một trong: "auto", "ask"');
+    }
+    base.modelFallbackPolicy = raw.modelFallbackPolicy;
+  }
   return base;
+}
+
+
+export function saveConfig(dataDir: string, patch: Partial<Config>): Config {
+  const current = loadConfig(dataDir);
+  const updated: Config = {
+    ...current,
+    ...patch,
+    models: patch.models ? { ...current.models, ...patch.models } : current.models,
+    modelFallbackPolicy: patch.modelFallbackPolicy ?? current.modelFallbackPolicy,
+  };
+  const cfgFile = join(dataDir, 'config.json');
+  try {
+    writeFileSync(cfgFile, JSON.stringify(updated, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Không thể lưu cấu hình:', err);
+  }
+  return updated;
 }

@@ -1,8 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import type { Adapter, ParsedEvent, TurnResult } from '@voragent/adapters';
 import type {
-  Config, EventType, ProviderId, ProviderState, Run, Task, Turn, WorkspaceMode,
+  Config, EventType, ManagerMode, ManagerPlan, ManagerSubtask, MemoryItem,
+  ProviderId, ProviderState, Run, Task, Turn, WorkspaceMode,
 } from '@voragent/shared';
+import { MEMORY_CATEGORY_LABEL, PROVIDER_MODELS } from '@voragent/shared';
 import type { EventBus } from './bus.js';
 import { buildHandoff } from './handoff.js';
 import { runTurn } from './proc.js';
@@ -18,10 +21,28 @@ export interface Orchestrator {
     title?: string;
     mode?: WorkspaceMode;
     priority?: ProviderId[];
+    parentTaskId?: string | null;
+    role?: string | null;
+    model?: string | null;
   }): Promise<Task>;
   sendMessage(taskId: string, message: string): Turn; // chỉ khi status 'awaiting_user' hoặc 'failed'
   closeTask(taskId: string): void;
+  updateTask(taskId: string, patch: Partial<Task>): Task;
+  deleteTask(taskId: string): boolean;
   retry(taskId: string, o?: { switchProvider?: boolean }): void;
+  /** Chuyển giao hoặc chỉ định trực tiếp một agent cụ thể cho task (từ menu 3D/2D). */
+  assignTask(taskId: string, provider: ProviderId): Task;
+  /** Trưởng phòng lập kế hoạch chia việc cho các nhân viên trong văn phòng dự án. */
+  createManagerPlan(i: {
+    repoPath: string;
+    goal: string;
+    mode?: ManagerMode;
+    subtasks?: Array<{ title: string; message: string; assignedProvider: ProviderId; role: string }>;
+  }): Promise<ManagerPlan>;
+  /** Duyệt và phát lệnh thực thi kế hoạch của Trưởng phòng tới các sub-agent. */
+  dispatchManagerPlan(planId: string, subtasksOverride?: ManagerSubtask[]): Promise<ManagerPlan>;
+  deleteManagerPlan(planId: string): boolean;
+  updateManagerPlan(planId: string, patch: Partial<ManagerPlan>): ManagerPlan;
   tick(): Promise<void>; // khởi động các lượt đủ điều kiện; không chờ chúng chạy xong
   idle(): Promise<void>; // chờ mọi lượt đang chạy xong (dùng trong test)
   recover(): void; // gọi một lần lúc khởi động
@@ -33,8 +54,71 @@ export interface Orchestrator {
 
 const DEFAULT_TICK_MS = 2000;
 const TITLE_MAX = 60;
-const SYSTEM_PROMPT = (path: string): string =>
-  `Bạn đang làm việc trong thư mục ${path}. Chỉ sửa file trong thư mục này.`;
+const SYSTEM_PROMPT = (path: string, memories: MemoryItem[] = [], role?: string | null, taskId?: string): string => {
+  const base = `Bạn đang làm việc trong thư mục ${path}. Chỉ sửa file trong thư mục này.`;
+  const guidelines = [
+    '## QUY CHUẨN TRÌNH BÀY HƯỚNG DẪN NGƯỜI DÙNG:',
+    '- Khi hướng dẫn chạy lệnh terminal: Luôn đặt lệnh trong khối mã fenced code block chuẩn (ví dụ ```bash\nnpm test\n```) để người dùng sao chép bằng 1 click. Không viết lệnh lửng lơ trên dòng văn bản.',
+    '- Khi hướng dẫn xem file giao diện HTML hoặc tệp trong dự án:',
+    `  + Luôn cung cấp đường dẫn tệp tuyệt đối định dạng file:/// (ví dụ [Mở file giao diện](file:///${path.replace(/\\/g, '/')}/index.html)).`,
+    ...(taskId ? [`  + Hoặc cung cấp đường dẫn Live Preview trực tiếp trên voragent: http://127.0.0.1:4717/api/tasks/${taskId}/preview/index.html`] : []),
+    '- Luôn trả lời ngắn gọn, trực diện, không dài dòng triết lý.',
+  ].join('\n');
+  const parts = [base, guidelines];
+  if (role) {
+    parts.push(`Vai trò của bạn trong văn phòng dự án: ${role}.`);
+  }
+  if (memories.length > 0) {
+    const memLines = memories.slice(0, 12).map(
+      (m) => `- [${MEMORY_CATEGORY_LABEL[m.category] ?? m.category}] ${m.title}: ${m.content} (bởi ${m.author})`,
+    );
+    parts.push(
+      `## BỘ NHỚ DÙNG CHUNG CỦA VĂN PHÒNG DỰ ÁN (Shared Memory)\nCác nhân viên (Claude, Codex, Antigravity) và Trưởng phòng đang chia sẻ các ngữ cảnh sau:\n${memLines.join('\n')}`,
+    );
+  }
+  return parts.join('\n\n');
+};
+
+/**
+ * Trưởng phòng tự động phân rã mục tiêu lớn thành các nhiệm vụ chuyên môn,
+ * CHỈ phân công cho các nền tảng đã thực sự được cài đặt trên máy (`installedProviders`).
+ */
+export function buildDefaultSubtasks(goal: string, installedProviders: ProviderId[]): ManagerSubtask[] {
+  const cleanGoal = goal.trim();
+  const shortGoal = (cleanGoal.split('\n')[0] ?? cleanGoal).slice(0, 48);
+  const pool = installedProviders.length > 0 ? installedProviders : ['claude'];
+
+  const pArch = pool.find((p) => p.includes('claude')) ?? pool[0]!;
+  const pUi = pool.find((p) => p.includes('antigravity') || p.includes('agy')) ?? pool[1 % pool.length]!;
+  const pQa = pool.find((p) => p.includes('codex')) ?? pool[2 % pool.length]!;
+
+  return [
+    {
+      id: randomUUID(),
+      title: `[Kiến trúc & Lõi] ${shortGoal}`,
+      message: `Trưởng phòng giao việc (Vai trò: Kiến trúc & Lõi):\nMục tiêu chung của dự án: "${cleanGoal}"\n\nNhiệm vụ của bạn:\n1. Phân tích cấu trúc hiện tại và thiết kế/cập nhật tầng dữ liệu, API hoặc logic nghiệp vụ cốt lõi.\n2. Đảm bảo tương thích với quy chuẩn trong Shared Memory của văn phòng.`,
+      assignedProvider: pArch,
+      role: 'Kiến trúc & Logic lõi',
+      taskId: null,
+    },
+    {
+      id: randomUUID(),
+      title: `[Giao diện & Tương tác] ${shortGoal}`,
+      message: `Trưởng phòng giao việc (Vai trò: Giao diện & Trải nghiệm):\nMục tiêu chung của dự án: "${cleanGoal}"\n\nNhiệm vụ của bạn:\n1. Xây dựng hoặc cập nhật giao diện người dùng và luồng tương tác trực quan.\n2. Tuân thủ quy chuẩn thiết kế Warm Cozy Tech và đồng bộ với tầng lõi.`,
+      assignedProvider: pUi,
+      role: 'Giao diện & Tương tác',
+      taskId: null,
+    },
+    {
+      id: randomUUID(),
+      title: `[Kiểm thử & Đánh giá] ${shortGoal}`,
+      message: `Trưởng phòng giao việc (Vai trò: Kiểm thử & Đảm bảo chất lượng):\nMục tiêu chung của dự án: "${cleanGoal}"\n\nNhiệm vụ của bạn:\n1. Rà soát các trường hợp biên, viết bổ sung unit/integration test và kiểm tra chất lượng.\n2. Báo cáo phát hiện quan trọng để lưu vào Shared Memory.`,
+      assignedProvider: pQa,
+      role: 'Kiểm thử & Review',
+      taskId: null,
+    },
+  ];
+}
 
 const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
@@ -106,6 +190,16 @@ export function createOrchestrator(d: {
       updatedAt: now(),
       ...patch,
     });
+  }
+
+  /** Danh sách nền tảng đã được cài đặt trên máy theo đúng thứ tự ưu tiên. */
+  function getInstalledPriority(): ProviderId[] {
+    const byId = new Map(store.listProviders().map((p) => [p.id, p]));
+    const installed = config.priority.filter((id) => {
+      const p = byId.get(id);
+      return p ? p.installed : adapters.has(id);
+    });
+    return installed.length > 0 ? installed : config.priority;
   }
 
   // -------------------------------------------------------------- providers
@@ -316,10 +410,11 @@ export function createOrchestrator(d: {
     store.updateTurn(turnId, { runId: run.id });
     emit(taskId, run.id, 'RUN_STARTED', { provider, sessionId: run.sessionId, turnId });
 
-    // 5. prompt
+    // 5. prompt & Shared Memory của Văn phòng Dự án
     const prompt = handoff !== null
       ? `${handoff}\n\n## Tin nhắn hiện tại của người dùng\n${turn.message}`
       : turn.message;
+    const memories = store.listMemories(task.repoPath);
 
     // 6. chạy
     const signal = inflight.get(taskId)?.abort.signal;
@@ -329,10 +424,11 @@ export function createOrchestrator(d: {
       adapter,
       {
         prompt,
-        systemPrompt: SYSTEM_PROMPT(ws.path),
+        systemPrompt: SYSTEM_PROMPT(ws.path, memories, task.role, task.id),
         sessionId: run.sessionId,
         cwd: ws.path,
         network: config.network,
+        model: task.model ?? config.models?.[provider] ?? null,
       },
       {
         timeoutMs: config.turnTimeoutMs,
@@ -358,6 +454,69 @@ export function createOrchestrator(d: {
       await commitAll(ws, message);
     } catch (err) {
       emit(taskId, runId, 'RUN_ERROR', { error: `Commit thất bại: ${errMsg(err)}` });
+    }
+  }
+
+  /**
+   * Trưởng phòng tự động giám sát tiến độ Sub-agents:
+   * - Khi một lượt (turn) của Sub-agent vừa xong (`awaiting_user`), ghi tóm tắt báo cáo vào Shared Memory của dự án.
+   * - Khi tất cả Sub-tasks của một kế hoạch đã đóng (`closed`), tự động cập nhật kế hoạch sang `completed`.
+   */
+  function syncManagerOnTaskUpdate(task: Task, latestAnswer?: string): void {
+    try {
+      const plans = store.listManagerPlans(task.repoPath);
+      const linkedPlan = plans.find((p) => p.subtasks.some((s) => s.taskId === task.id));
+
+      if (latestAnswer && latestAnswer.trim() !== '') {
+        const cleanSnippet = latestAnswer.trim().replace(/\s+/g, ' ').slice(0, 260);
+        const runner = (task.currentProvider ?? 'sub-agent').toUpperCase();
+        store.upsertMemory({
+          id: `report-task-${task.id}`,
+          repoPath: task.repoPath,
+          category: 'finding',
+          title: `Báo cáo từ ${runner} (#${task.seq} ${task.title.slice(0, 38)})`,
+          content: cleanSnippet,
+          author: task.currentProvider ?? 'manager',
+          pinned: false,
+        });
+        try {
+          bus.publish({
+            id: 0,
+            taskId: task.id,
+            runId: null,
+            ts: now(),
+            source: 'managed',
+            type: 'MEMORY_UPDATED',
+            data: { repoPath: task.repoPath },
+          });
+        } catch { /* ignore */ }
+      }
+
+      if (linkedPlan && linkedPlan.status === 'dispatched') {
+        const allTasks = store.listTasks();
+        const byId = new Map(allTasks.map((t) => [t.id, t]));
+        const allClosed = linkedPlan.subtasks.every((s) => {
+          if (!s.taskId) return false;
+          const st = byId.get(s.taskId);
+          return st?.status === 'closed';
+        });
+        if (allClosed) {
+          const updatedPlan = store.updateManagerPlan(linkedPlan.id, { status: 'completed' });
+          try {
+            bus.publish({
+              id: 0,
+              taskId: task.id,
+              runId: null,
+              ts: now(),
+              source: 'managed',
+              type: 'MANAGER_PLAN_UPDATED',
+              data: { repoPath: task.repoPath, plan: updatedPlan },
+            });
+          } catch { /* ignore */ }
+        }
+      }
+    } catch {
+      // Không chặn luồng chính nếu đồng bộ báo cáo gặp lỗi
     }
   }
 
@@ -398,7 +557,8 @@ export function createOrchestrator(d: {
       store.updateTurn(turn.id, { status: 'done', answer: result.text });
       emit(taskId, run.id, 'RUN_FINISHED', { status: 'completed', provider });
       emit(taskId, run.id, 'TURN_FINISHED', { turnId: turn.id, index: turn.index, status: 'done' });
-      setStatus(taskId, 'awaiting_user');
+      const updatedTask = setStatus(taskId, 'awaiting_user');
+      syncManagerOnTaskUpdate(updatedTask, result.text);
       return;
     }
 
@@ -408,7 +568,81 @@ export function createOrchestrator(d: {
       const exhausted = result.quota !== null && result.quota.usedPercent >= 1;
       const resetsAt = result.resetsAt ?? (exhausted ? result.quota!.resetsAt : null);
       const cooldownUntil = resetsAt !== null && resetsAt > t ? resetsAt : t + config.defaultCooldownMs;
-      putProvider(provider, { cooldownUntil });
+      const currentModel = task.model ?? config.models?.[provider] ?? null;
+      if (provider === 'antigravity') {
+        if (currentModel) {
+          store.upsertModelQuota({
+            provider,
+            model: currentModel,
+            cooldownUntil,
+            usedPercent: 1.0,
+            updatedAt: t,
+            lastError: result.error ?? 'RESOURCE_EXHAUSTED',
+          });
+        }
+        const allModels = PROVIDER_MODELS[provider] ?? [];
+        const availableModel = allModels.find((m) => {
+          if (m.id === currentModel) return false;
+          const q = store.getModelQuota(provider, m.id);
+          return q === null || q.cooldownUntil === null || q.cooldownUntil <= t;
+        });
+
+        const policy = config.modelFallbackPolicy ?? 'auto';
+
+        if (availableModel && policy === 'auto') {
+          // CHẾ ĐỘ 1: TỰ ĐỘNG CHUYỂN SANG MODEL CÒN QUOTA
+          store.updateTask(taskId, { model: availableModel.id });
+          emit(taskId, run.id, 'STATE_CHANGED', {
+            status: 'queued',
+            fallbackModel: availableModel.id,
+            reason: `Model ${currentModel} hết quota. Đã tự động chuyển sang ${availableModel.name} để tiếp tục.`,
+          });
+          putProvider(provider, { cooldownUntil: null });
+          if (commitMode) {
+            await safeCommit(taskId, run.id, ws, `voragent: tự động chuyển sang ${availableModel.name} (${provider})`);
+          }
+          store.updateRun(run.id, { status: 'quota_exhausted', sessionId, endedAt: now() });
+          emit(taskId, run.id, 'RUN_FINISHED', { status: 'quota_exhausted', provider });
+          emit(taskId, run.id, 'QUOTA_EXHAUSTED', {
+            provider, resetsAt, model: currentModel,
+            switchedTo: availableModel.id, policy: 'auto',
+          });
+          store.updateTurn(turn.id, { status: 'queued' });
+          setStatus(taskId, 'queued', { currentProvider: null });
+          return;
+        }
+
+        if (availableModel && policy === 'ask') {
+          // CHẾ ĐỘ 2: DỪNG & HỎI Ý KIẾN NGƯỜI DÙNG
+          putProvider(provider, { cooldownUntil: null });
+          if (commitMode) {
+            await safeCommit(taskId, run.id, ws, `voragent: tạm dừng chờ chọn chuyển model`);
+          }
+          store.updateRun(run.id, { status: 'quota_exhausted', sessionId, endedAt: now() });
+          emit(taskId, run.id, 'RUN_FINISHED', { status: 'quota_exhausted', provider });
+          emit(taskId, run.id, 'QUOTA_EXHAUSTED', {
+            provider,
+            resetsAt,
+            model: currentModel,
+            suggestedModel: availableModel.id,
+            suggestedModelName: availableModel.name,
+            policy: 'ask',
+          });
+          setStatus(taskId, 'awaiting_user');
+          return;
+        }
+
+        const activeCooldowns = store.listModelQuotas(provider)
+          .filter((m) => m.cooldownUntil !== null && m.cooldownUntil > t);
+
+        if (allModels.length > 0 && activeCooldowns.length >= allModels.length) {
+          putProvider(provider, { cooldownUntil });
+        } else {
+          putProvider(provider, { cooldownUntil: null });
+        }
+      } else {
+        putProvider(provider, { cooldownUntil });
+      }
       if (commitMode) {
         await safeCommit(taskId, run.id, ws, `voragent: lượt ${turn.index} dở dang (${provider})`);
       }
@@ -438,7 +672,14 @@ export function createOrchestrator(d: {
   // ------------------------------------------------------------- public API
 
   async function submitTask(i: {
-    repoPath: string; message: string; title?: string; mode?: WorkspaceMode; priority?: ProviderId[];
+    repoPath: string;
+    message: string;
+    title?: string;
+    mode?: WorkspaceMode;
+    priority?: ProviderId[];
+    parentTaskId?: string | null;
+    role?: string | null;
+    model?: string | null;
   }): Promise<Task> {
     const title = i.title ?? (i.message.split('\n')[0] ?? '').trim().slice(0, TITLE_MAX) ?? '';
     const mode = i.mode ?? config.defaultMode;
@@ -448,6 +689,9 @@ export function createOrchestrator(d: {
       mode,
       priority: i.priority ?? null,
       message: i.message,
+      parentTaskId: i.parentTaskId ?? null,
+      role: i.role ?? null,
+      model: i.model ?? null,
     });
     emit(task.id, null, 'TASK_CREATED', { title: task.title, mode, turnId: turn.id });
     return task;
@@ -456,9 +700,17 @@ export function createOrchestrator(d: {
   function sendMessage(taskId: string, message: string): Turn {
     const task = store.getTask(taskId);
     if (!task) throw new Error(`Không tìm thấy task ${taskId}`);
+    if (task.status === 'waiting_quota' || task.status === 'queued') {
+      const pending = store.turnsOf(taskId).filter((t) => t.status === 'queued').at(-1);
+      if (pending) {
+        const updatedTurn = store.updateTurn(pending.id, { message, attempts: 0 });
+        setStatus(taskId, 'queued');
+        return updatedTurn;
+      }
+    }
     if (task.status !== 'awaiting_user' && task.status !== 'failed') {
       throw new Error(
-        `Chỉ gửi được tin nhắn khi task đang chờ bạn hoặc bị lỗi (hiện tại: ${task.status}).`,
+        `Chỉ gửi được tin nhắn khi task đang chờ bạn, chờ hạn mức hoặc bị lỗi (hiện tại: ${task.status}).`,
       );
     }
     const turn = store.addTurn(taskId, message);
@@ -470,19 +722,59 @@ export function createOrchestrator(d: {
     const task = store.getTask(taskId);
     if (!task) throw new Error(`Không tìm thấy task ${taskId}`);
     if (task.status === 'closed') return;
-    store.updateTask(taskId, { status: 'closed' });
+    const updated = store.updateTask(taskId, { status: 'closed' });
     emit(taskId, null, 'STATE_CHANGED', { status: 'closed' });
+    syncManagerOnTaskUpdate(updated);
+  }
+
+  function updateTask(taskId: string, patch: Partial<Task>): Task {
+    const updated = store.updateTask(taskId, patch);
+    emit(taskId, null, 'STATE_CHANGED', { ...patch });
+    return updated;
+  }
+
+  function deleteTask(taskId: string): boolean {
+    const task = store.getTask(taskId);
+    if (!task) return false;
+    const active = inflight.get(taskId);
+    if (active) {
+      active.abort.abort();
+      inflight.delete(taskId);
+    }
+    avoid.delete(taskId);
+    const deleted = store.deleteTask(taskId);
+    if (deleted) {
+      try {
+        bus.publish({
+          id: 0,
+          taskId,
+          runId: null,
+          ts: now(),
+          source: 'managed',
+          type: 'STATE_CHANGED',
+          data: { deleted: true },
+        });
+      } catch {
+        // ignore
+      }
+    }
+    return deleted;
   }
 
   function retry(taskId: string, o: { switchProvider?: boolean } = {}): void {
     const task = store.getTask(taskId);
     if (!task) throw new Error(`Không tìm thấy task ${taskId}`);
-    if (task.status !== 'failed') {
-      throw new Error(`Chỉ thử lại được task đang bị lỗi (hiện tại: ${task.status}).`);
+    if (task.status !== 'failed' && task.status !== 'waiting_quota' && task.status !== 'awaiting_user') {
+      throw new Error(`Chỉ thử lại được task đang bị lỗi hoặc đang chờ hạn mức (hiện tại: ${task.status}).`);
     }
-    const failed = store.turnsOf(taskId).filter((t) => t.status === 'failed').at(-1);
-    if (!failed) throw new Error('Task không có lượt lỗi nào để thử lại.');
-    store.updateTurn(failed.id, { status: 'queued', attempts: 0 });
+    const turns = store.turnsOf(taskId);
+    const targetTurn =
+      turns.filter((t) => t.status === 'failed').at(-1) ??
+      turns.filter((t) => t.status === 'queued').at(-1) ??
+      turns.at(-1);
+    if (!targetTurn) throw new Error('Task không có lượt nào để thử lại.');
+    store.updateTurn(targetTurn.id, { status: 'queued', attempts: 0 });
+
     if (o.switchProvider) {
       const current = task.currentProvider ?? store.runsOf(taskId).at(-1)?.provider ?? null;
       if (current !== null) {
@@ -491,10 +783,197 @@ export function createOrchestrator(d: {
         });
         avoid.set(taskId, current);
       }
-      setStatus(taskId, 'queued', { currentProvider: null });
+      const installedPool = getInstalledPriority();
+      const nextPrio = current ? installedPool.filter((p) => p !== current) : installedPool;
+      const effectivePrio = nextPrio.length > 0 ? [...nextPrio, ...(current ? [current] : [])] : installedPool;
+      setStatus(taskId, 'queued', { currentProvider: null, priority: effectivePrio });
     } else {
+      // Force retry: xóa cooldown của nền tảng mục tiêu (hoặc tất cả nền tảng đã cài đặt trong priority) để có thể thử chạy ngay
+      const candidates = task.currentProvider
+        ? [task.currentProvider]
+        : (task.priority && task.priority.length > 0 ? task.priority : getInstalledPriority());
+      for (const pid of candidates) {
+        const pState = store.getProvider(pid);
+        if (pState && pState.installed && pState.cooldownUntil !== null) {
+          putProvider(pid, { cooldownUntil: null });
+        }
+      }
+      avoid.delete(taskId);
       setStatus(taskId, 'queued');
     }
+  }
+
+  function assignTask(taskId: string, provider: ProviderId): Task {
+    const task = store.getTask(taskId);
+    if (!task) throw new Error(`Không tìm thấy task ${taskId}`);
+    if (task.status === 'closed') throw new Error('Không thể chuyển giao task đã đóng.');
+
+    const provState = store.getProvider(provider);
+    if (provState && !provState.installed) {
+      throw new Error(`Nền tảng "${provider}" chưa được cài đặt trên máy này.`);
+    }
+    // Khi người dùng chủ động chỉ định nền tảng này, xóa cooldown tạm thời (nếu có) để thử chạy ngay
+    if (provState && provState.cooldownUntil !== null) {
+      putProvider(provider, { cooldownUntil: null });
+    }
+    avoid.delete(taskId);
+
+    const installedPool = getInstalledPriority();
+    const rest = installedPool.filter((p) => p !== provider);
+    const nextPriority = [provider, ...rest];
+
+    // Nếu đang chạy trên agent khác thì hủy lượt hiện tại để bàn giao sang agent mới
+    const active = inflight.get(taskId);
+    if (active && active.provider !== provider) {
+      store.updateTask(taskId, { priority: nextPriority, currentProvider: provider });
+      active.abort.abort();
+      return store.getTask(taskId)!;
+    }
+
+    const prevProvider = task.currentProvider;
+    const updated = store.updateTask(taskId, {
+      priority: nextPriority,
+      currentProvider: provider,
+    });
+    if (prevProvider && prevProvider !== provider) {
+      emit(taskId, null, 'HANDOFF', { from: prevProvider, to: provider, manual: true });
+    }
+    // Nếu task đang bị lỗi hoặc đang chờ hạn mức thì tự xếp lại lượt để agent mới tiếp quản ngay
+    if (task.status === 'failed' || task.status === 'waiting_quota' || task.status === 'queued') {
+      const turns = store.turnsOf(taskId);
+      const target =
+        turns.filter((t) => t.status === 'failed').at(-1) ??
+        turns.filter((t) => t.status === 'queued').at(-1);
+      if (target) {
+        store.updateTurn(target.id, { status: 'queued', attempts: 0 });
+      }
+      return setStatus(taskId, 'queued', { priority: nextPriority, currentProvider: provider });
+    }
+    return updated;
+  }
+
+  async function createManagerPlan(i: {
+    repoPath: string;
+    goal: string;
+    mode?: ManagerMode;
+    subtasks?: Array<{ title: string; message: string; assignedProvider: ProviderId; role: string }>;
+  }): Promise<ManagerPlan> {
+    await ensureProviders();
+    const installedPool = getInstalledPriority();
+    const fallbackProvider = installedPool[0] ?? 'claude';
+    const isInstalled = (id: ProviderId): boolean => {
+      const p = store.getProvider(id);
+      return p ? p.installed : installedPool.includes(id);
+    };
+
+    const mode = i.mode ?? 'semi-auto';
+    const subtasks: ManagerSubtask[] = i.subtasks && i.subtasks.length > 0
+      ? i.subtasks.map((s) => ({
+          id: randomUUID(),
+          title: s.title,
+          message: s.message,
+          assignedProvider: isInstalled(s.assignedProvider) ? s.assignedProvider : fallbackProvider,
+          role: s.role,
+          taskId: null,
+        }))
+      : buildDefaultSubtasks(i.goal, installedPool);
+
+    const plan = store.createManagerPlan({
+      repoPath: i.repoPath,
+      goal: i.goal,
+      mode,
+      subtasks,
+    });
+
+    // Ghi mục tiêu của Trưởng phòng vào Shared Memory của văn phòng dự án
+    store.upsertMemory({
+      repoPath: i.repoPath,
+      category: 'context',
+      title: `Kế hoạch Trưởng phòng: ${(i.goal.split('\n')[0] ?? i.goal).slice(0, 50)}`,
+      content: `Mục tiêu: ${i.goal} — Chia thành ${subtasks.length} nhiệm vụ cho các nhân viên đã cài đặt: ${subtasks.map((s) => `${s.assignedProvider} (${s.role})`).join(', ')}.`,
+      author: 'manager',
+      pinned: true,
+    });
+
+    if (mode === 'auto') {
+      return dispatchManagerPlan(plan.id);
+    }
+    return plan;
+  }
+
+  async function dispatchManagerPlan(planId: string, subtasksOverride?: ManagerSubtask[]): Promise<ManagerPlan> {
+    await ensureProviders();
+    const plan = store.getManagerPlan(planId);
+    if (!plan) throw new Error(`Không tìm thấy kế hoạch Trưởng phòng: ${planId}`);
+    if (plan.status === 'dispatched' || plan.status === 'completed') {
+      return plan;
+    }
+
+    const installedPool = getInstalledPriority();
+    const fallbackProvider = installedPool[0] ?? 'claude';
+    const isInstalled = (id: ProviderId): boolean => {
+      const p = store.getProvider(id);
+      return p ? p.installed : installedPool.includes(id);
+    };
+
+    const list = subtasksOverride ?? plan.subtasks;
+    const dispatchedSubtasks: ManagerSubtask[] = [];
+
+    for (const sub of list) {
+      const effectiveProvider = isInstalled(sub.assignedProvider) ? sub.assignedProvider : fallbackProvider;
+      const rest = installedPool.filter((p) => p !== effectiveProvider);
+      const priority = [effectiveProvider, ...rest];
+      const created = await submitTask({
+        repoPath: plan.repoPath,
+        title: sub.title,
+        message: sub.message,
+        priority,
+        role: sub.role,
+      });
+      dispatchedSubtasks.push({ ...sub, assignedProvider: effectiveProvider, taskId: created.id });
+    }
+
+    const updated = store.updateManagerPlan(plan.id, {
+      status: 'dispatched',
+      subtasks: dispatchedSubtasks,
+    });
+    return updated;
+  }
+
+  function deleteManagerPlan(planId: string): boolean {
+    const plan = store.getManagerPlan(planId);
+    if (!plan) return false;
+    const deleted = store.deleteManagerPlan(planId);
+    if (deleted) {
+      try {
+        bus.publish({
+          id: 0,
+          taskId: '',
+          runId: null,
+          ts: now(),
+          source: 'managed',
+          type: 'MANAGER_PLAN_UPDATED',
+          data: { repoPath: plan.repoPath, planId, deleted: true },
+        });
+      } catch { /* ignore */ }
+    }
+    return deleted;
+  }
+
+  function updateManagerPlan(planId: string, patch: Partial<ManagerPlan>): ManagerPlan {
+    const updated = store.updateManagerPlan(planId, patch);
+    try {
+      bus.publish({
+        id: 0,
+        taskId: '',
+        runId: null,
+        ts: now(),
+        source: 'managed',
+        type: 'MANAGER_PLAN_UPDATED',
+        data: { repoPath: updated.repoPath, plan: updated },
+      });
+    } catch { /* ignore */ }
+    return updated;
   }
 
   /**
@@ -563,7 +1042,8 @@ export function createOrchestrator(d: {
   }
 
   return {
-    submitTask, sendMessage, closeTask, retry, tick, idle, recover, refreshProviders, start, stop,
+    submitTask, sendMessage, updateTask, closeTask, deleteTask, retry, assignTask, createManagerPlan, dispatchManagerPlan, deleteManagerPlan, updateManagerPlan,
+    tick, idle, recover, refreshProviders, start, stop,
     pendingCount: () => tracked.size,
   };
 }

@@ -1,12 +1,14 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
+import { ProviderIcon } from '../components/ProviderIcon';
 import type { AgentAccessory, OfficeAgentData } from './types';
 
 interface SnakeMeshProps {
   agent: OfficeAgentData;
   targetPosition: [number, number, number];
+  isSelected?: boolean;
   onClick?: () => void;
 }
 
@@ -42,11 +44,12 @@ function updateCoiledSpine(pts: THREE.Vector3[], headPos: THREE.Vector3) {
   });
 }
 
-export function SnakeMesh({ agent, targetPosition, onClick }: SnakeMeshProps) {
+export function SnakeMesh({ agent, targetPosition, isSelected = false, onClick }: SnakeMeshProps) {
   const groupRef = useRef<THREE.Group>(null);
   const headRef = useRef<THREE.Group>(null);
   const bodyMeshRef = useRef<THREE.Mesh>(null);
   const tailRef = useRef<THREE.Mesh>(null);
+  const [hovered, setHovered] = useState(false);
 
   // Vị trí hiện tại của toàn bộ con rắn
   const currentRootPos = useRef<THREE.Vector3>(new THREE.Vector3(...targetPosition));
@@ -241,14 +244,14 @@ export function SnakeMesh({ agent, targetPosition, onClick }: SnakeMeshProps) {
       py = -0.035;
     }
     if (leftPupilRef.current) {
-      leftPupilRef.current.position.set(-0.15 + px, 0.1 + py, 0.37);
-      const pupilScale = isPleading ? 1.35 : isSurprised ? 0.6 : 1.0;
-      leftPupilRef.current.scale.setScalar(pupilScale);
+      leftPupilRef.current.position.set(px, py, 0.08);
+      const pupilScale = isPleading ? 1.25 : isSurprised ? 0.6 : 1.0;
+      leftPupilRef.current.scale.set(pupilScale, pupilScale, pupilScale * 0.4);
     }
     if (rightPupilRef.current) {
-      rightPupilRef.current.position.set(0.15 + px, 0.1 + py, 0.37);
-      const pupilScale = isPleading ? 1.35 : isSurprised ? 0.6 : 1.0;
-      rightPupilRef.current.scale.setScalar(pupilScale);
+      rightPupilRef.current.position.set(px, py, 0.08);
+      const pupilScale = isPleading ? 1.25 : isSurprised ? 0.6 : 1.0;
+      rightPupilRef.current.scale.set(pupilScale, pupilScale, pupilScale * 0.4);
     }
 
     const browAngle = isWorking ? -0.3 : isPleading ? 0.4 : isSad ? 0.5 : 0;
@@ -313,8 +316,42 @@ export function SnakeMesh({ agent, targetPosition, onClick }: SnakeMeshProps) {
     }
   });
 
+  // Chỉ hiện nhãn nổi khi Agent đang làm việc, chờ duyệt, là Trưởng phòng, hoặc đang được hover/chọn
+  // (Tránh để nhãn của các Agent đang nghỉ ở góc phòng trôi lơ lửng che giao diện)
+  const showFloatingBadge =
+    isSelected || hovered || agent.isManager || (agent.isOnline && agent.state !== 'idle');
+
   return (
-    <group ref={groupRef} position={targetPosition} onClick={onClick}>
+    <group
+      ref={groupRef}
+      position={targetPosition}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        setHovered(true);
+        document.body.style.cursor = 'pointer';
+      }}
+      onPointerOut={() => {
+        setHovered(false);
+        document.body.style.cursor = 'auto';
+      }}
+    >
+      {/* Vòng sáng tương tác dưới chân khi hover hoặc đang được chọn */}
+      {(isSelected || hovered) && (
+        <mesh position={[0, 0.02, -0.15]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.92, 1.08, 36]} />
+          <meshBasicMaterial
+            color={isSelected ? agent.baseColor : '#F59E0B'}
+            transparent
+            opacity={isSelected ? 0.85 : 0.55}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      )}
+
       {/* Thân rắn hình ống có vân màu */}
       <mesh ref={bodyMeshRef} castShadow receiveShadow>
         <bufferGeometry />
@@ -472,11 +509,11 @@ export function SnakeMesh({ agent, targetPosition, onClick }: SnakeMeshProps) {
           ))}
         </group>
 
-        {/* Chữ Zzz bay lên khi ngủ */}
+        {/* Chữ Zzz bay lên khi ngủ (Giới hạn zIndexRange={[4, 0]}) */}
         <group ref={zzzGroupRef} visible={false}>
           {['z', 'Z', 'z'].map((letter, i) => (
-            <Html key={`zzz-${i}`} center distanceFactor={8} style={{ pointerEvents: 'none' }}>
-              <span style={{ fontSize: '18px', fontWeight: 700, color: '#93C5FD', textShadow: '0 0 4px rgba(147, 197, 253, 0.8)' }}>
+            <Html key={`zzz-${i}`} center zIndexRange={[4, 0]} distanceFactor={8} style={{ pointerEvents: 'none' }}>
+              <span style={{ fontSize: '16px', fontWeight: 700, color: '#93C5FD', textShadow: '0 0 4px rgba(147, 197, 253, 0.8)' }}>
                 {letter}
               </span>
             </Html>
@@ -486,49 +523,59 @@ export function SnakeMesh({ agent, targetPosition, onClick }: SnakeMeshProps) {
         {/* Phụ kiện đặc trưng cho từng Agent */}
         <Accessory kind={agent.accessory} />
 
-        {/* Bong bóng HTML thông tin nổi trên đầu chú rắn */}
-        <Html
-          position={[0, 0.85, 0]}
-          center
-          distanceFactor={7}
-          style={{
-            pointerEvents: 'none',
-            whiteSpace: 'nowrap',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '4px',
-            userSelect: 'none',
-          }}
-        >
-          <div
+        {/* Nhãn thông tin 1 dòng gọn gàng trên đầu Agent (Giới hạn zIndexRange={[5, 0]}) */}
+        {showFloatingBadge && (
+          <Html
+            position={[0, 0.78, 0]}
+            center
+            zIndexRange={[5, 0]}
+            distanceFactor={7.5}
             style={{
-              padding: '4px 10px',
-              borderRadius: '12px',
-              backgroundColor: '#FFFFFF',
-              color: '#1E293B',
-              fontSize: '12px',
-              fontWeight: 500,
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-              border: `1.5px solid ${agent.baseColor}`,
+              pointerEvents: 'auto',
+              whiteSpace: 'nowrap',
+              userSelect: 'none',
+              cursor: 'pointer',
             }}
           >
-            {agent.actionTag}
-          </div>
-
-          <div
-            style={{
-              padding: '2px 8px',
-              borderRadius: '6px',
-              backgroundColor: 'rgba(30, 41, 59, 0.85)',
-              color: '#F8FAFC',
-              fontSize: '11px',
-              fontWeight: 600,
-            }}
-          >
-            {agent.name}
-          </div>
-        </Html>
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                onClick?.();
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '3px 9px',
+                borderRadius: '999px',
+                backgroundColor: isSelected ? '#FFFBEB' : 'rgba(255, 255, 255, 0.95)',
+                color: '#1F1B18',
+                fontSize: '11.5px',
+                fontWeight: 600,
+                boxShadow: isSelected
+                  ? `0 0 0 2px ${agent.baseColor}, 0 4px 12px rgba(0, 0, 0, 0.18)`
+                  : '0 2px 8px rgba(0, 0, 0, 0.14)',
+                border: `1.5px solid ${agent.baseColor}`,
+              }}
+            >
+              <ProviderIcon provider={agent.provider} size={12} />
+              <span>{agent.name}</span>
+              {agent.currentTask && (
+                <span
+                  style={{
+                    fontSize: '10.5px',
+                    padding: '1px 5px',
+                    borderRadius: '999px',
+                    backgroundColor: agent.state === 'waiting' ? '#FEF3C7' : '#EFF6FF',
+                    color: agent.state === 'waiting' ? '#92400E' : '#1D4ED8',
+                  }}
+                >
+                  #{agent.currentTask.seq}
+                </span>
+              )}
+            </div>
+          </Html>
+        )}
       </group>
     </group>
   );
@@ -536,6 +583,44 @@ export function SnakeMesh({ agent, targetPosition, onClick }: SnakeMeshProps) {
 
 /** Phụ kiện đặc trưng riêng cho từng agent */
 function Accessory({ kind }: { kind: AgentAccessory }) {
+  if (kind === 'crown') {
+    return (
+      <group>
+        {/* Vương miện vàng ấm của Trưởng phòng */}
+        <group position={[0, 0.34, 0]}>
+          <mesh>
+            <cylinderGeometry args={[0.18, 0.15, 0.12, 16]} />
+            <meshStandardMaterial color="#F59E0B" metalness={0.4} roughness={0.3} />
+          </mesh>
+          <mesh position={[0, 0.08, 0.14]}>
+            <coneGeometry args={[0.05, 0.1, 8]} />
+            <meshStandardMaterial color="#FBBF24" metalness={0.4} roughness={0.3} />
+          </mesh>
+          <mesh position={[-0.12, 0.08, 0.06]}>
+            <coneGeometry args={[0.045, 0.09, 8]} />
+            <meshStandardMaterial color="#FBBF24" metalness={0.4} roughness={0.3} />
+          </mesh>
+          <mesh position={[0.12, 0.08, 0.06]}>
+            <coneGeometry args={[0.045, 0.09, 8]} />
+            <meshStandardMaterial color="#FBBF24" metalness={0.4} roughness={0.3} />
+          </mesh>
+          {/* Ngọc đỏ giữa vương miện */}
+          <mesh position={[0, 0.01, 0.16]}>
+            <sphereGeometry args={[0.03, 10, 10]} />
+            <meshStandardMaterial color="#EF4444" emissive="#DC2626" emissiveIntensity={0.3} />
+          </mesh>
+        </group>
+        {/* Cà vạt đỏ lịch lãm của Trưởng phòng */}
+        <group position={[0, -0.26, 0.25]} rotation={[0.25, 0, 0]}>
+          <mesh>
+            <boxGeometry args={[0.07, 0.18, 0.02]} />
+            <meshStandardMaterial color="#DC2626" roughness={0.4} />
+          </mesh>
+        </group>
+      </group>
+    );
+  }
+
   if (kind === 'glasses') {
     return (
       <group position={[0, 0.1, 0.38]}>

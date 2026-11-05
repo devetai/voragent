@@ -3,19 +3,23 @@ import type { FormEvent } from 'react';
 import {
   AlertCircle,
   AlertTriangle,
-  Folder,
+  ChevronDown,
+  Cpu,
   FolderGit2,
   FolderPlus,
   GitBranch,
   GitCommit,
   GitFork,
   Play,
+  SlidersHorizontal,
   X,
 } from 'lucide-react';
 import type { Project, ProviderId, ProviderState, WorkspaceMode } from '@voragent/shared';
+import { PROVIDER_MODELS } from '@voragent/shared';
 import { api, errText } from './api';
 import { CustomSelect, type SelectOption } from './components/CustomSelect';
 import { AgentPriorityMultiSelect } from './components/AgentPriorityMultiSelect';
+import { isProviderInstalledById, projectKeyOf } from './state';
 
 const OTHER = '__other__';
 
@@ -31,12 +35,14 @@ export function NewTaskForm({
   initialPath,
   onCreated,
   onCancel,
+  onRefreshProjects,
 }: {
   providers: ProviderState[];
   projects: Project[];
   initialPath: string | null;
   onCreated: (id: string) => void;
   onCancel: () => void;
+  onRefreshProjects?: () => void;
 }) {
   const [picked, setPicked] = useState<string | null>(null);
   const [customPath, setCustomPath] = useState(initialPath ?? '');
@@ -47,18 +53,36 @@ export function NewTaskForm({
   const [message, setMessage] = useState('');
   const [mode, setMode] = useState<WorkspaceMode>('head-dirty-commit');
   const [priorities, setPriorities] = useState<ProviderId[] | null>(null);
+  const [model, setModel] = useState<string>('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [initGitBusy, setInitGitBusy] = useState(false);
 
-  // Tạo options cho CustomSelect Dự án
+  const selectedProject = choice === OTHER
+    ? undefined
+    : projects.find((p) => projectKeyOf(p.path) === projectKeyOf(choice));
+  const isGitRepo = selectedProject ? selectedProject.isGit : true;
+
+  // Tạo options cho CustomSelect Dự án (chỉ hiển thị nguồn từ các CLI đã cài đặt, kèm cảnh báo nếu chưa có Git)
   const projectOptions: SelectOption[] = [
-    ...projects.map((p) => ({
-      value: p.path,
-      label: p.name,
-      sublabel: p.path,
-      icon: <FolderGit2 size={16} color="var(--primary)" />,
-      badge: p.sources.length > 0 ? p.sources.map((s) => s.source).join(', ') : undefined,
-    })),
+    ...projects.map((p) => {
+      const installedSources = p.sources
+        .map((s) => s.source)
+        .filter((src) => isProviderInstalledById(providers, src));
+      return {
+        value: p.path,
+        label: p.name,
+        sublabel: p.path,
+        icon: <FolderGit2 size={16} color={p.isGit ? 'var(--primary)' : 'var(--amber-base)'} />,
+        badge: !p.isGit
+          ? 'Chưa có Git'
+          : installedSources.length > 0
+          ? installedSources.join(', ')
+          : undefined,
+        badgeType: !p.isGit ? ('warn' as const) : ('default' as const),
+      };
+    }),
     {
       value: OTHER,
       label: 'Thư mục khác…',
@@ -67,29 +91,50 @@ export function NewTaskForm({
     },
   ];
 
-  // Tạo options cho CustomSelect Chế độ Git Worktree
+  // Tạo options cho CustomSelect Chế độ Git Worktree (nếu dự án chưa có Git thì khóa các chế độ cần HEAD commit)
   const modeOptions: SelectOption<WorkspaceMode>[] = [
     {
       value: 'head-dirty-commit',
       label: 'Từ HEAD, mang việc dở (Khuyến nghị)',
       sublabel: 'Tạo commit ban đầu từ HEAD và mang toàn bộ file sửa dở sang worktree cách ly',
-      badge: 'Khuyến nghị',
-      badgeType: 'success',
+      badge: isGitRepo ? 'Khuyến nghị' : 'Cần Git',
+      badgeType: isGitRepo ? 'success' : 'warn',
       icon: <GitBranch size={16} color="var(--green-base)" />,
+      disabled: !isGitRepo,
     },
     {
       value: 'head-commit',
       label: 'Chỉ từ HEAD (Sạch sẽ)',
       sublabel: 'Khởi tạo từ commit HEAD mới nhất, bỏ qua thay đổi dở dang ở repo chính',
+      badge: !isGitRepo ? 'Cần Git' : undefined,
+      badgeType: 'warn',
       icon: <GitCommit size={16} color="var(--blue-base)" />,
+      disabled: !isGitRepo,
     },
     {
       value: 'dirty-nocommit',
       label: 'Mang việc dở, không commit',
       sublabel: 'Chép việc sửa dở sang worktree nhưng không tạo commit ban đầu',
+      badge: !isGitRepo ? 'Cần Git' : undefined,
+      badgeType: 'warn',
       icon: <GitFork size={16} color="var(--amber-base)" />,
+      disabled: !isGitRepo,
     },
   ];
+
+  const handleInitGitForSelected = async () => {
+    if (!selectedProject || initGitBusy) return;
+    setInitGitBusy(true);
+    setError(null);
+    try {
+      await api.initGit(selectedProject.path);
+      onRefreshProjects?.();
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setInitGitBusy(false);
+    }
+  };
 
   const submit = (ev: FormEvent): void => {
     ev.preventDefault();
@@ -100,11 +145,16 @@ export function NewTaskForm({
     setBusy(true);
     setError(null);
 
+    const validPriorities = priorities
+      ? priorities.filter((id) => isProviderInstalledById(providers, id))
+      : null;
+
     const body = {
       repoPath: repoPath.trim(),
       message: message.trim(),
       mode,
-      ...(priorities !== null && priorities.length > 0 ? { priority: priorities } : {}),
+      ...(validPriorities !== null && validPriorities.length > 0 ? { priority: validPriorities } : {}),
+      ...(model ? { model } : {}),
     };
 
     api.createTask(body).then(
@@ -120,15 +170,21 @@ export function NewTaskForm({
   };
 
   return (
-    <form className="panel form" onSubmit={submit} style={{ maxWidth: '720px', margin: '0 auto' }}>
+    <form className="panel form" onSubmit={submit} style={{ maxWidth: '680px', margin: '0 auto' }}>
       <div className="task-nav">
         <h2>Tạo Task Mới</h2>
-        <button type="button" onClick={onCancel} title="Hủy bỏ (Phím tắt: Esc)">
-          <X size={15} /> Đóng <kbd>Esc</kbd>
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={onCancel}
+          title="Đóng (Phím tắt: Esc)"
+          aria-label="Đóng"
+        >
+          <X size={16} />
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1.25rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem', marginTop: '1rem' }}>
         {/* 1. Chọn Dự án bằng CustomSelect */}
         <div className="form-group">
           <label className="form-label">
@@ -142,6 +198,24 @@ export function NewTaskForm({
             searchPlaceholder="Gõ tên hoặc đường dẫn dự án..."
             searchable={projects.length >= 4}
           />
+          {selectedProject && !selectedProject.isGit && (
+            <div className="form-hint warn" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <AlertTriangle size={13} style={{ flexShrink: 0 }} />
+                <span>Thư mục này chưa có Git (sẽ chạy trực tiếp không có worktree cách ly).</span>
+              </span>
+              <button
+                type="button"
+                className="office-mini-btn"
+                disabled={initGitBusy}
+                onClick={() => { void handleInitGitForSelected(); }}
+                style={{ borderColor: '#F59E0B', background: '#FEF3C7', color: '#92400E', fontWeight: 600 }}
+              >
+                <GitBranch size={11} />
+                <span>{initGitBusy ? 'Đang khởi tạo Git…' : '+ Khởi tạo Git ngay'}</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Nhập đường dẫn thủ công nếu chọn Thư mục khác */}
@@ -179,30 +253,103 @@ export function NewTaskForm({
           />
         </div>
 
-        {/* 3. Chế độ Git Worktree bằng CustomSelect */}
-        <div className="form-group">
-          <label className="form-label">
-            Chế độ cách ly Git Worktree
-          </label>
-          <CustomSelect
-            options={modeOptions}
-            value={mode}
-            onChange={(val) => setMode(val as WorkspaceMode)}
-            searchable={false}
-          />
-        </div>
+        {/* 3. Progressive Disclosure (Hick's Law & Rule 11): Ẩn cấu hình nâng cao sau nút bấm gọn gàng */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((v) => !v)}
+            style={{
+              width: '100%',
+              justifyContent: 'space-between',
+              background: 'var(--bg-canvas)',
+              borderStyle: 'dashed',
+              fontSize: '0.825rem',
+              color: 'var(--text-secondary)',
+            }}
+          >
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+              <SlidersHorizontal size={14} />
+              <span>Tùy chọn nâng cao: Git Worktree & Thứ tự ưu tiên Agent</span>
+              <span className="badge neutral" style={{ fontSize: '11px' }}>
+                {priorities === null ? 'Tự động tối ưu' : `Tùy chỉnh (${priorities.length})`}
+              </span>
+            </span>
+            <ChevronDown
+              size={15}
+              style={{
+                transform: showAdvanced ? 'rotate(180deg)' : 'none',
+                transition: 'transform 0.15s ease',
+              }}
+            />
+          </button>
 
-        {/* 4. Điều phối Agent & Quota Handoff bằng AgentPriorityMultiSelect */}
-        <div className="form-group">
-          <label className="form-label">
-            Điều phối Agent & Thứ tự ưu tiên Quota Handoff
-          </label>
-          <AgentPriorityMultiSelect
-            providers={providers}
-            value={priorities}
-            onChange={setPriorities}
-            disabled={busy}
-          />
+          {showAdvanced && (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem',
+                marginTop: '0.75rem',
+                padding: '1rem',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--bg-canvas)',
+                border: '1px solid var(--border-subtle)',
+              }}
+            >
+              <div className="form-group">
+                <label className="form-label">
+                  Chế độ cách ly Git Worktree {!isGitRepo && <span className="badge warn">Cần khởi tạo Git</span>}
+                </label>
+                <CustomSelect
+                  options={modeOptions}
+                  value={mode}
+                  onChange={(val) => setMode(val as WorkspaceMode)}
+                  searchable={false}
+                  disabled={!isGitRepo}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">
+                  Điều phối Agent & Thứ tự ưu tiên Quota Handoff
+                </label>
+                <AgentPriorityMultiSelect
+                  providers={providers}
+                  value={priorities}
+                  onChange={setPriorities}
+                  disabled={busy}
+                />
+              </div>
+
+              {(() => {
+                const primary = (priorities?.[0] ?? providers.find((p) => p.installed)?.id ?? 'claude').toLowerCase();
+                const models = PROVIDER_MODELS[primary] ?? [];
+                if (models.length === 0) return null;
+                const defaultModel = models.find((m) => m.default)?.id || models[0]?.id;
+                const modelOpts: SelectOption[] = models.map((m) => ({
+                  value: m.id,
+                  label: m.name,
+                  sublabel: m.description,
+                  badge: m.default ? 'Mặc định' : undefined,
+                  badgeType: m.default ? 'info' : undefined,
+                }));
+                return (
+                  <div className="form-group">
+                    <label className="form-label">
+                      Mô hình AI thực thi ({primary.toUpperCase()})
+                    </label>
+                    <CustomSelect
+                      options={modelOpts}
+                      value={model || defaultModel || ''}
+                      onChange={setModel}
+                      searchable={false}
+                      icon={<Cpu size={14} style={{ color: 'var(--amber-base)' }} />}
+                    />
+                  </div>
+                );
+              })()}
+            </div>
+          )}
         </div>
       </div>
 
@@ -213,7 +360,7 @@ export function NewTaskForm({
         </div>
       )}
 
-      <div className="row" style={{ marginTop: '1.75rem', justifyContent: 'flex-end', gap: '0.75rem' }}>
+      <div className="row" style={{ marginTop: '1.5rem', justifyContent: 'flex-end', gap: '0.75rem' }}>
         <button type="button" onClick={onCancel} disabled={busy}>
           Hủy bỏ <kbd>Esc</kbd>
         </button>

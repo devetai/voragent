@@ -1,7 +1,8 @@
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 import type {
-  ProviderId, ProviderState, Run, Task, Turn, VEvent, WorkspaceMode,
+  ManagerMode, ManagerPlan, ManagerPlanStatus, ManagerSubtask,
+  MemoryCategory, MemoryItem, ModelQuotaState, ProviderId, ProviderState, Run, Task, Turn, VEvent, WorkspaceMode,
 } from '@voragent/shared';
 
 export interface NewTask {
@@ -10,6 +11,26 @@ export interface NewTask {
   mode: WorkspaceMode;
   priority: ProviderId[] | null;
   message: string;
+  parentTaskId?: string | null;
+  role?: string | null;
+  model?: string | null;
+}
+
+export interface UpsertMemoryInput {
+  id?: string;
+  repoPath: string;
+  category: MemoryCategory;
+  title: string;
+  content: string;
+  author: string;
+  pinned?: boolean;
+}
+
+export interface CreateManagerPlanInput {
+  repoPath: string;
+  goal: string;
+  mode: ManagerMode;
+  subtasks: ManagerSubtask[];
 }
 
 export interface Store {
@@ -17,6 +38,7 @@ export interface Store {
   getTask(id: string): Task | null;
   listTasks(): Task[];
   updateTask(id: string, patch: Partial<Omit<Task, 'id' | 'seq' | 'createdAt'>>): Task;
+  deleteTask(id: string): boolean;
   addTurn(taskId: string, message: string): Turn;
   turnsOf(taskId: string): Turn[];
   queuedTurns(): Turn[];
@@ -30,6 +52,20 @@ export interface Store {
   getProvider(id: ProviderId): ProviderState | null;
   upsertProvider(p: ProviderState): void;
   listProviders(): ProviderState[];
+  getModelQuota(provider: string, model: string): ModelQuotaState | null;
+  upsertModelQuota(q: ModelQuotaState): void;
+  listModelQuotas(provider?: string): ModelQuotaState[];
+  resetModelQuota(provider: string, model?: string): void;
+  // Shared Memory (Văn phòng dự án)
+  listMemories(repoPath?: string): MemoryItem[];
+  upsertMemory(m: UpsertMemoryInput): MemoryItem;
+  deleteMemory(id: string): boolean;
+  // Trưởng phòng điều phối (Manager Plans)
+  listManagerPlans(repoPath?: string): ManagerPlan[];
+  getManagerPlan(id: string): ManagerPlan | null;
+  createManagerPlan(p: CreateManagerPlanInput): ManagerPlan;
+  updateManagerPlan(id: string, patch: Partial<Omit<ManagerPlan, 'id' | 'repoPath' | 'createdAt'>>): ManagerPlan;
+  deleteManagerPlan(id: string): boolean;
   close(): void;
 }
 
@@ -49,6 +85,9 @@ CREATE TABLE IF NOT EXISTS tasks (
   priority TEXT,
   status TEXT NOT NULL,
   current_provider TEXT,
+  parent_task_id TEXT,
+  role TEXT,
+  model TEXT,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
@@ -93,12 +132,43 @@ CREATE TABLE IF NOT EXISTS providers (
   version TEXT,
   updated_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS model_quotas (
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  cooldown_until INTEGER,
+  used_percent REAL,
+  updated_at INTEGER NOT NULL,
+  last_error TEXT,
+  PRIMARY KEY (provider, model)
+);
+CREATE TABLE IF NOT EXISTS project_memories (
+  id TEXT PRIMARY KEY,
+  repo_path TEXT NOT NULL,
+  category TEXT NOT NULL,
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  author TEXT NOT NULL,
+  pinned INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS project_memories_repo ON project_memories(repo_path, updated_at DESC);
+CREATE TABLE IF NOT EXISTS manager_plans (
+  id TEXT PRIMARY KEY,
+  repo_path TEXT NOT NULL,
+  goal TEXT NOT NULL,
+  mode TEXT NOT NULL,
+  status TEXT NOT NULL,
+  subtasks_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS manager_plans_repo ON manager_plans(repo_path, created_at DESC);
 `;
 
 const TASK_COLS: Record<string, string> = {
   title: 'title', repoPath: 'repo_path', workspacePath: 'workspace_path', branch: 'branch',
   baseCommit: 'base_commit', mode: 'mode', priority: 'priority', status: 'status',
-  currentProvider: 'current_provider', updatedAt: 'updated_at',
+  currentProvider: 'current_provider', parentTaskId: 'parent_task_id', role: 'role', model: 'model', updatedAt: 'updated_at',
 };
 const TURN_COLS: Record<string, string> = {
   message: 'message', status: 'status', runId: 'run_id', answer: 'answer', attempts: 'attempts',
@@ -108,8 +178,12 @@ const RUN_COLS: Record<string, string> = {
   startedAt: 'started_at', endedAt: 'ended_at',
 };
 
+function normRepoKey(p: string): string {
+  return p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+}
+
 function toTask(r: Row): Task {
-  return {
+  const base: Task = {
     id: r.id as string,
     seq: r.seq as number,
     title: r.title as string,
@@ -117,13 +191,23 @@ function toTask(r: Row): Task {
     workspacePath: r.workspace_path as string | null,
     branch: r.branch as string | null,
     baseCommit: r.base_commit as string | null,
-    mode: r.mode as WorkspaceMode,
-    priority: r.priority === null ? null : (JSON.parse(r.priority as string) as ProviderId[]),
+    mode: r.mode as Task['mode'],
+    priority: r.priority === null ? null : (JSON.parse(r.priority as string) as string[]),
     status: r.status as Task['status'],
     currentProvider: r.current_provider as string | null,
     createdAt: r.created_at as number,
     updatedAt: r.updated_at as number,
   };
+  if (r.parent_task_id !== undefined && r.parent_task_id !== null) {
+    base.parentTaskId = r.parent_task_id as string;
+  }
+  if (r.role !== undefined && r.role !== null) {
+    base.role = r.role as string;
+  }
+  if (r.model !== undefined && r.model !== null) {
+    base.model = r.model as string;
+  }
+  return base;
 }
 
 function toTurn(r: Row): Turn {
@@ -175,18 +259,66 @@ function toProvider(r: Row): ProviderState {
   };
 }
 
+function toModelQuota(r: Row): ModelQuotaState {
+  return {
+    provider: r.provider as string,
+    model: r.model as string,
+    cooldownUntil: r.cooldown_until as number | null,
+    usedPercent: r.used_percent as number | null,
+    updatedAt: r.updated_at as number,
+    lastError: (r.last_error as string | null) ?? null,
+  };
+}
+
+function toMemory(r: Row): MemoryItem {
+  return {
+    id: r.id as string,
+    repoPath: r.repo_path as string,
+    category: r.category as MemoryCategory,
+    title: r.title as string,
+    content: r.content as string,
+    author: r.author as string,
+    pinned: r.pinned === 1,
+    updatedAt: r.updated_at as number,
+  };
+}
+
+function toManagerPlan(r: Row): ManagerPlan {
+  return {
+    id: r.id as string,
+    repoPath: r.repo_path as string,
+    goal: r.goal as string,
+    mode: r.mode as ManagerMode,
+    status: r.status as ManagerPlanStatus,
+    subtasks: JSON.parse(r.subtasks_json as string) as ManagerSubtask[],
+    createdAt: r.created_at as number,
+    updatedAt: r.updated_at as number,
+  };
+}
+
 export function openStore(file: string): Store {
   const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode=WAL');
   db.exec(SCHEMA);
 
-  const all = (sql: string, ...p: SqlValue[]): Row[] => db.prepare(sql).all(...p) as Row[];
+  // Nâng cấp lược đồ cho DB cũ nếu thiếu cột parent_task_id, role, model
+  try { db.exec('ALTER TABLE tasks ADD COLUMN parent_task_id TEXT'); } catch { /* đã có */ }
+  try { db.exec('ALTER TABLE tasks ADD COLUMN role TEXT'); } catch { /* đã có */ }
+  try { db.exec('ALTER TABLE tasks ADD COLUMN model TEXT'); } catch { /* đã có */ }
+
+  const all = (sql: string, ...p: SqlValue[]): Row[] =>
+    db.prepare(sql).all(...p) as Row[];
   const one = (sql: string, ...p: SqlValue[]): Row | null =>
     (db.prepare(sql).get(...p) as Row | undefined) ?? null;
-  const exec = (sql: string, ...p: SqlValue[]): void => { db.prepare(sql).run(...p); };
+  const exec = (sql: string, ...p: SqlValue[]): void => {
+    db.prepare(sql).run(...p);
+  };
 
   function update(
-    table: string, cols: Record<string, string>, id: string, patch: Record<string, unknown>,
+    table: string,
+    cols: Record<string, string>,
+    id: string,
+    patch: Record<string, unknown>,
     encode?: (k: string, v: unknown) => SqlValue,
   ): void {
     const sets: string[] = [];
@@ -213,11 +345,13 @@ export function openStore(file: string): Store {
       const now = Date.now();
       db.exec('BEGIN IMMEDIATE');
       try {
-        const seq = one('SELECT COALESCE(MAX(seq), 0) + 1 AS n FROM tasks')!.n as number;
+        const seq = (one('SELECT COALESCE(MAX(seq), 0) + 1 AS n FROM tasks')!.n as number);
         exec(
-          `INSERT INTO tasks (id, seq, title, repo_path, mode, priority, status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, ?)`,
-          id, seq, t.title, t.repoPath, t.mode, t.priority === null ? null : JSON.stringify(t.priority), now, now,
+          `INSERT INTO tasks (id, seq, title, repo_path, mode, priority, status, parent_task_id, role, model, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?)`,
+          id, seq, t.title, t.repoPath, t.mode,
+          t.priority === null ? null : JSON.stringify(t.priority),
+          t.parentTaskId ?? null, t.role ?? null, t.model ?? null, now, now,
         );
         const turn = store.addTurn(id, t.message);
         db.exec('COMMIT');
@@ -227,18 +361,52 @@ export function openStore(file: string): Store {
         throw err;
       }
     },
+
     getTask(id) {
       const r = one('SELECT * FROM tasks WHERE id = ?', id);
       return r ? toTask(r) : null;
     },
+
     listTasks() {
       return all('SELECT * FROM tasks ORDER BY seq DESC').map(toTask);
     },
+
     updateTask(id, patch) {
       update('tasks', TASK_COLS, id, { updatedAt: Date.now(), ...patch }, (k, v) =>
-        k === 'priority' ? (v === null ? null : JSON.stringify(v)) : (v as SqlValue));
+        k === 'priority' ? (v === null ? null : JSON.stringify(v)) : (v as SqlValue),
+      );
       return need(store.getTask(id), 'Task', id);
     },
+
+    deleteTask(id) {
+      const existing = store.getTask(id);
+      if (!existing) return false;
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        exec('DELETE FROM events WHERE task_id = ?', id);
+        exec('DELETE FROM runs WHERE task_id = ?', id);
+        exec('DELETE FROM turns WHERE task_id = ?', id);
+        exec('UPDATE tasks SET parent_task_id = NULL WHERE parent_task_id = ?', id);
+        exec('DELETE FROM tasks WHERE id = ?', id);
+
+        const plans = store.listManagerPlans();
+        for (const p of plans) {
+          if (p.subtasks.some((s) => s.taskId === id)) {
+            const nextSubtasks = p.subtasks.map((s) =>
+              s.taskId === id ? { ...s, taskId: null } : s,
+            );
+            store.updateManagerPlan(p.id, { subtasks: nextSubtasks });
+          }
+        }
+
+        db.exec('COMMIT');
+        return true;
+      } catch (err) {
+        db.exec('ROLLBACK');
+        throw err;
+      }
+    },
+
     addTurn(taskId, message) {
       const id = randomUUID();
       const index = one('SELECT COUNT(*) AS n FROM turns WHERE task_id = ?', taskId)!.n as number;
@@ -249,16 +417,20 @@ export function openStore(file: string): Store {
       );
       return toTurn(one('SELECT * FROM turns WHERE id = ?', id)!);
     },
+
     turnsOf(taskId) {
       return all('SELECT * FROM turns WHERE task_id = ? ORDER BY idx', taskId).map(toTurn);
     },
+
     queuedTurns() {
       return all("SELECT * FROM turns WHERE status = 'queued' ORDER BY created_at, rowid").map(toTurn);
     },
+
     updateTurn(id, patch) {
       update('turns', TURN_COLS, id, patch);
       return toTurn(need(one('SELECT * FROM turns WHERE id = ?', id), 'Turn', id));
     },
+
     createRun(r) {
       const id = randomUUID();
       exec(
@@ -268,16 +440,20 @@ export function openStore(file: string): Store {
       );
       return toRun(one('SELECT * FROM runs WHERE id = ?', id)!);
     },
+
     runsOf(taskId) {
       return all('SELECT * FROM runs WHERE task_id = ? ORDER BY started_at, rowid', taskId).map(toRun);
     },
+
     runningRuns() {
       return all("SELECT * FROM runs WHERE status = 'running' ORDER BY started_at, rowid").map(toRun);
     },
+
     updateRun(id, patch) {
       update('runs', RUN_COLS, id, patch);
       return toRun(need(one('SELECT * FROM runs WHERE id = ?', id), 'Run', id));
     },
+
     appendEvent(e) {
       const ts = e.ts ?? Date.now();
       exec(
@@ -287,13 +463,16 @@ export function openStore(file: string): Store {
       const id = one('SELECT last_insert_rowid() AS id')!.id as number;
       return { id, taskId: e.taskId, runId: e.runId, ts, source: e.source, type: e.type, data: e.data };
     },
+
     eventsOf(taskId, afterId = 0) {
       return all('SELECT * FROM events WHERE task_id = ? AND id > ? ORDER BY id', taskId, afterId).map(toEvent);
     },
+
     getProvider(id) {
       const r = one('SELECT * FROM providers WHERE id = ?', id);
       return r ? toProvider(r) : null;
     },
+
     upsertProvider(p) {
       exec(
         `INSERT INTO providers (id, cooldown_until, used_percent, installed, version, updated_at)
@@ -304,12 +483,130 @@ export function openStore(file: string): Store {
         p.id, p.cooldownUntil, p.usedPercent, p.installed ? 1 : 0, p.version, p.updatedAt,
       );
     },
+
     listProviders() {
       return all('SELECT * FROM providers ORDER BY id').map(toProvider);
     },
+
+    getModelQuota(provider, model) {
+      const r = one('SELECT * FROM model_quotas WHERE provider = ? AND model = ?', provider, model);
+      return r ? toModelQuota(r) : null;
+    },
+
+    upsertModelQuota(q) {
+      exec(
+        `INSERT INTO model_quotas (provider, model, cooldown_until, used_percent, updated_at, last_error)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(provider, model) DO UPDATE SET
+           cooldown_until = excluded.cooldown_until,
+           used_percent = excluded.used_percent,
+           updated_at = excluded.updated_at,
+           last_error = excluded.last_error`,
+        q.provider, q.model, q.cooldownUntil, q.usedPercent, q.updatedAt, q.lastError ?? null,
+      );
+    },
+
+    listModelQuotas(provider) {
+      if (provider) {
+        return all('SELECT * FROM model_quotas WHERE provider = ? ORDER BY model', provider).map(toModelQuota);
+      }
+      return all('SELECT * FROM model_quotas ORDER BY provider, model').map(toModelQuota);
+    },
+
+    resetModelQuota(provider, model) {
+      if (model) {
+        exec('UPDATE model_quotas SET cooldown_until = NULL, used_percent = NULL, last_error = NULL WHERE provider = ? AND model = ?', provider, model);
+      } else {
+        exec('UPDATE model_quotas SET cooldown_until = NULL, used_percent = NULL, last_error = NULL WHERE provider = ?', provider);
+      }
+    },
+
+    // Shared Memory (Văn phòng dự án)
+    listMemories(repoPath) {
+      const items = all('SELECT * FROM project_memories ORDER BY pinned DESC, updated_at DESC').map(toMemory);
+      if (repoPath === undefined || repoPath.trim() === '') return items;
+      const targetKey = normRepoKey(repoPath);
+      return items.filter((m) => normRepoKey(m.repoPath) === targetKey);
+    },
+
+    upsertMemory(m) {
+      const id = m.id ?? randomUUID();
+      const now = Date.now();
+      const pinned = m.pinned ? 1 : 0;
+      exec(
+        `INSERT INTO project_memories (id, repo_path, category, title, content, author, pinned, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           repo_path = excluded.repo_path,
+           category = excluded.category,
+           title = excluded.title,
+           content = excluded.content,
+           author = excluded.author,
+           pinned = excluded.pinned,
+           updated_at = excluded.updated_at`,
+        id, m.repoPath, m.category, m.title, m.content, m.author, pinned, now,
+      );
+      return toMemory(one('SELECT * FROM project_memories WHERE id = ?', id)!);
+    },
+
+    deleteMemory(id) {
+      const before = one('SELECT id FROM project_memories WHERE id = ?', id);
+      if (!before) return false;
+      exec('DELETE FROM project_memories WHERE id = ?', id);
+      return true;
+    },
+
+    // Trưởng phòng điều phối (Manager Plans)
+    listManagerPlans(repoPath) {
+      const items = all('SELECT * FROM manager_plans ORDER BY created_at DESC').map(toManagerPlan);
+      if (repoPath === undefined || repoPath.trim() === '') return items;
+      const targetKey = normRepoKey(repoPath);
+      return items.filter((p) => normRepoKey(p.repoPath) === targetKey);
+    },
+
+    getManagerPlan(id) {
+      const r = one('SELECT * FROM manager_plans WHERE id = ?', id);
+      return r ? toManagerPlan(r) : null;
+    },
+
+    createManagerPlan(p) {
+      const id = randomUUID();
+      const now = Date.now();
+      exec(
+        `INSERT INTO manager_plans (id, repo_path, goal, mode, status, subtasks_json, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'draft', ?, ?, ?)`,
+        id, p.repoPath, p.goal, p.mode, JSON.stringify(p.subtasks), now, now,
+      );
+      return toManagerPlan(one('SELECT * FROM manager_plans WHERE id = ?', id)!);
+    },
+
+    updateManagerPlan(id, patch) {
+      const cur = store.getManagerPlan(id);
+      if (!cur) throw new Error(`ManagerPlan not found: ${id}`);
+      const nextStatus = patch.status ?? cur.status;
+      const nextMode = patch.mode ?? cur.mode;
+      const nextGoal = patch.goal ?? cur.goal;
+      const nextSubtasks = patch.subtasks ?? cur.subtasks;
+      exec(
+        `UPDATE manager_plans
+         SET goal = ?, mode = ?, status = ?, subtasks_json = ?, updated_at = ?
+         WHERE id = ?`,
+        nextGoal, nextMode, nextStatus, JSON.stringify(nextSubtasks), Date.now(), id,
+      );
+      return store.getManagerPlan(id)!;
+    },
+
+    deleteManagerPlan(id) {
+      const before = one('SELECT id FROM manager_plans WHERE id = ?', id);
+      if (!before) return false;
+      exec('DELETE FROM manager_plans WHERE id = ?', id);
+      return true;
+    },
+
     close() {
       db.close();
     },
   };
+
   return store;
 }

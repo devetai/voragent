@@ -18,7 +18,7 @@ test('empty dir gives defaults and returns dataDir', () => {
   withDir((dir) => {
     const c = loadConfig(dir);
     expect(c.dataDir).toBe(dir);
-    expect(c.priority).toEqual(['claude', 'codex']);
+    expect(c.priority).toEqual(['claude', 'antigravity', 'codex']);
     expect(c.quotaThreshold).toBe(0.9);
     expect(c.port).toBe(4717);
     expect(c.defaultCooldownMs).toBe(3_600_000);

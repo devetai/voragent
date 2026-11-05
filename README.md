@@ -110,7 +110,7 @@ Màn hình đầu tiên của giao diện web là danh sách các dự án bạn
 
 ## Chế Độ Workspace & Git Worktree
 
-Với mỗi thư mục là kho lưu trữ Git, voragent tự động tạo một git worktree riêng biệt đặt tại `~/.voragent/worktrees/task-N`:
+Với mỗi thư mục là kho lưu trữ Git, voragent tự động phân cấp theo dự án và tạo git worktree cách ly đặt tại `~/.voragent/worktrees/<project-slug>/task-N`:
 
 | Chế độ (`--mode`) | Cách thức hoạt động |
 | :--- | :--- |
@@ -197,3 +197,34 @@ Tất cả lập trình viên và AI Agent khi tham gia phát triển dự án n
    - Thay đổi lõi (core, daemon, scheduler, handoff, workspace): chạy test toàn diện trước khi merge.
 4. **Đồng bộ hóa tài liệu và `README.md`:** Khi có bất kỳ thay đổi nào về tính năng mới, lệnh CLI, cấu trúc gói, UI/UX hoặc quy trình vận hành, AI agent **bắt buộc** phải cập nhật lại [`README.md`](README.md) đồng bộ.
 5. **Quy ước Commit:** Không thêm bất kỳ dòng ghi công AI nào (`Co-Authored-By...`). Khi merge worktree vào `main`, luôn squash thành đúng 1 commit duy nhất cho mỗi task (`git merge --squash`).
+
+
+---
+
+## Mô Hình Văn Phòng Dự Án: Trưởng Phòng, Shared Memory & Tương Tác 3 Tầng
+
+1. **1 Dự Án = 1 Văn Phòng Tự Chủ & Shared Memory (`project_memories`):**
+   - Trong một dự án, Claude Code, Antigravity và Codex có thể cùng làm các nhiệm vụ khác nhau và dùng chung **Bộ Nhớ Văn Phòng (Shared Memory)** gồm 4 ngăn: `🏛 Kiến trúc & Quy ước`, `⚖️ Quyết định chung`, `📌 Ngữ cảnh đang làm`, `💡 Nhật ký phát hiện`.
+   - Daemon tự động tiêm Shared Memory của dự án vào ngữ cảnh hệ thống của mọi lượt chạy. Trên tường Văn phòng 3D có **Bảng Trắng Shared Memory** hiển thị trực tiếp các mục được ghim.
+2. **Trưởng Phòng (Manager Agent) & Điều Phối Nhân Viên (Sub-agents):**
+   - Mỗi Văn phòng Dự án có **Trưởng phòng (`manager`)** ngồi tại bàn chỉ huy trung tâm. Khi bạn giao một mục tiêu lớn, Trưởng phòng phân rã thành các sub-task chuyên môn cho Claude (Kiến trúc & Lõi), Antigravity (Giao diện & Tương tác) và Codex (Kiểm thử & Review), hỗ trợ cả chế độ **Bán tự động** (duyệt trước khi chạy) và **Tự động**, kèm khả năng chỉnh sửa toàn diện (sửa mục tiêu, gán lại Agent, thêm/xóa nhiệm vụ con) và hủy/xóa kế hoạch bất cứ lúc nào.
+3. **Tương Tác Trực Quan Trong Chế Độ 3D & 2D:**
+   - Bấm vào bất kỳ chú rắn nào (Trưởng phòng, Claude, Codex, Antigravity) hoặc các vật thể trong phòng (Bàn Trưởng phòng, Bảng Trắng Shared Memory, TV Hàng đợi, Tủ Server) sẽ mở **Menu Tùy Chọn Agent** và **Ngăn kéo Chi tiết (Side Drawer)** ngay tại chỗ để giao việc, nhắn tin, bàn giao (`Handoff`) hoặc ghi nhớ mà không bị văng khỏi không gian 3D.
+4. **Luồng Trải Nghiệm Tổng Quan → Chi Tiết (3 Tầng):**
+   - **Tầng 1 — Đại sảnh Dự án:** Xem toàn cảnh mọi Văn phòng Dự án, KPI hoạt động, trạng thái nhân sự và bộ nhớ chung.
+   - **Tầng 2 — Văn phòng Dự án:** Không gian làm việc riêng của từng dự án (`Văn phòng 3D`, `Trưởng phòng & Sub-agents`, `Shared Memory`, `Bảng Kanban`, `Đồ thị`).
+   - **Tầng 3 — Ngăn kéo Chi tiết tại chỗ (Contextual Side Drawer):** Mở chi tiết Task, Kế hoạch Trưởng phòng hoặc Shared Memory song song với màn hình chính.
+
+5. **Live Preview Giao Diện Tĩnh (Zero External Server):**
+   - Tích hợp endpoint tĩnh an toàn `GET /api/tasks/:id/preview/*` ngay trên máy chủ daemon voragent.
+   - Nút `[🌐 Live Preview]` nổi bật trên thanh tiêu đề của Task, mở tệp `index.html` và tài nguyên tĩnh (JS, CSS, hình ảnh) chỉ với 1 click, giải quyết triệt để sự bất tiện khi phải gõ lệnh chạy `npx serve` hay `python -m http.server`.
+6. **Markdown Thông Minh & Chip Lệnh Terminal 1-Click:**
+   - Tự động nhận diện đường dẫn `http://`, `https://` và `file:///` với icon mở tab mới và nút sao chép nhanh.
+   - Nhận diện các câu lệnh dòng lệnh inline (`npm`, `pnpm`, `python`, `node`, `git`, `agy`, v.v.) và hiển thị dưới dạng interactive chip kèm nút copy 1-click có phản hồi "Đã chép!".
+7. **Tùy Biến Mô Hình AI 2 Tầng (2-Tier Model Customization):**
+   - **Tầng 1 - Toàn cục (Global Presets):** Cấu hình mô hình mặc định cho từng CLI (Claude Code, Codex, Antigravity) trong `config.json` và điều chỉnh 1-click ngay trên thanh Quota Bar (`PATCH /api/config`).
+   - **Tầng 2 - Theo từng Task (Task-level Override):** Tùy chọn mô hình chuyên biệt khi tạo Task (`NewTaskForm`), chuyển đổi mô hình linh hoạt khi đang xem Task (`TaskView`), hoặc đổi nhanh sang mô hình tiết kiệm hạn mức (Flash, Haiku, Mini) khi tài khoản chạm trần quota.
+8. **Quản Lý Hạn Mức Tinh Tế Theo Từng Mô Hình & Đo Quota Trực Tiếp (Per-Model Quotas & Live Probe):**
+   - **Phân biệt cơ chế Quota:** Claude Code và Codex áp dụng cơ chế quota dùng chung theo tài khoản (`shared`); trong khi Antigravity áp dụng quota độc lập theo từng model (`per_model`).
+   - **Cách ly Cooldown cho Antigravity:** Khi `Gemini 4 Argon` chạm giới hạn `429/RESOURCE_EXHAUSTED`, chỉ riêng model đó bị tạm nghỉ. Model `Gemini 3.8 Flash` vẫn hoàn toàn sẵn sàng, chuyển model là tiếp tục làm việc tức thì mà không bị chặn toàn bộ Agent.
+   - **Badge Trực Quan & Nút [⚡ Đo quota]:** Trong menu chọn model hiển thị rõ ràng nhãn `🟢 Còn quota`, `⏳ Tạm nghỉ đến...`, hoặc `Dùng chung xx%`. Kèm nút `[⚡ Đo quota]` kiểm tra tình trạng khả dụng trực tiếp cho từng model.

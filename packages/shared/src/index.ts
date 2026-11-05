@@ -8,7 +8,8 @@ export type EventType =
   | 'RUN_STARTED' | 'RUN_FINISHED' | 'RUN_ERROR'
   | 'TEXT_MESSAGE_START' | 'TEXT_MESSAGE_CONTENT' | 'TEXT_MESSAGE_END'
   | 'TOOL_CALL_START' | 'TOOL_CALL_ARGS' | 'TOOL_CALL_END' | 'TOOL_CALL_RESULT'
-  | 'QUOTA_UPDATED' | 'QUOTA_EXHAUSTED' | 'HANDOFF' | 'FILE_CHANGED' | 'USAGE';
+  | 'QUOTA_UPDATED' | 'QUOTA_EXHAUSTED' | 'HANDOFF' | 'FILE_CHANGED' | 'USAGE'
+  | 'MEMORY_UPDATED' | 'MANAGER_PLAN_UPDATED';
 
 export interface VEvent {
   id: number;
@@ -32,6 +33,9 @@ export interface Task {
   priority: ProviderId[] | null;
   status: TaskStatus;
   currentProvider: ProviderId | null;
+  parentTaskId?: string | null;
+  role?: string | null;
+  model?: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -67,6 +71,8 @@ export interface ProviderState {
   updatedAt: number;
 }
 
+export type QuotaFallbackPolicy = 'auto' | 'ask';
+
 export interface Config {
   dataDir: string;
   port: number;
@@ -78,6 +84,8 @@ export interface Config {
   network: boolean;
   defaultMode: WorkspaceMode;
   handoffMaxChars: number;
+  models?: Record<ProviderId, string>;
+  modelFallbackPolicy?: QuotaFallbackPolicy;
 }
 
 export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
@@ -112,4 +120,106 @@ export interface Project {
   branch: string | null;
   dirtyCount: number | null;
   taskCount: number;
+}
+
+// =========================================================================
+// VĂN PHÒNG DỰ ÁN: SHARED MEMORY & TRƯỞNG PHÒNG ĐIỀU PHỐI SUB-AGENT
+// =========================================================================
+
+export type MemoryCategory = 'architecture' | 'decision' | 'context' | 'finding';
+
+export const MEMORY_CATEGORY_LABEL: Record<MemoryCategory, string> = {
+  architecture: '🏛 Kiến trúc & Quy ước',
+  decision: '⚖️ Quyết định chung',
+  context: '📌 Ngữ cảnh đang làm',
+  finding: '💡 Nhật ký phát hiện',
+};
+
+export interface MemoryItem {
+  id: string;
+  repoPath: string;
+  category: MemoryCategory;
+  title: string;
+  content: string;
+  author: string; // 'user' | 'manager' | 'claude' | 'codex' | 'antigravity'
+  pinned: boolean;
+  updatedAt: number;
+}
+
+export type ManagerMode = 'semi-auto' | 'auto';
+export type ManagerPlanStatus = 'draft' | 'dispatched' | 'completed';
+
+export interface ManagerSubtask {
+  id: string;
+  title: string;
+  message: string;
+  assignedProvider: ProviderId;
+  role: string;
+  taskId: string | null;
+}
+
+export interface ManagerPlan {
+  id: string;
+  repoPath: string;
+  goal: string;
+  mode: ManagerMode;
+  status: ManagerPlanStatus;
+  subtasks: ManagerSubtask[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ModelOption {
+  id: string;
+  name: string;
+  description: string;
+  default?: boolean;
+}
+
+export const PROVIDER_MODELS: Record<string, ModelOption[]> = {
+  claude: [
+    { id: 'sonnet-5.5', name: 'Sonnet 5.5', description: 'Mô hình thông minh cân bằng (Mặc định)', default: true },
+    { id: 'opus-5.5', name: 'Opus 5.5', description: 'Mô hình mạnh mẽ, tư duy chuyên sâu' },
+    { id: 'haiku-5.5', name: 'Haiku 5.5', description: 'Tốc độ cực nhanh, tiết kiệm hạn mức' },
+  ],
+  codex: [
+    { id: 'gpt-5.6-luna', name: 'GPT-5.6-Luna', description: 'Older fast and efficient model (Mặc định)', default: true },
+    { id: 'gpt-6-luna', name: 'GPT-6-Luna', description: 'Fast and affordable model for easier tasks.' },
+    { id: 'gpt-5.6-terra', name: 'GPT-5.6-Terra', description: 'Older balanced model for straightforward work.' },
+  ],
+  antigravity: [
+    { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', description: 'Phản hồi cực nhanh, tối ưu hạn mức (Mặc định)', default: true },
+    { id: 'gemini-4-argon', name: 'Gemini 4 Argon', description: 'Mô hình thế hệ mới tư duy kỹ thuật' },
+  ],
+};
+
+
+export type QuotaSharingType = 'shared' | 'per_model';
+
+export const PROVIDER_QUOTA_TYPE: Record<string, QuotaSharingType> = {
+  claude: 'shared',
+  codex: 'shared',
+  antigravity: 'per_model',
+};
+
+export interface ModelQuotaState {
+  provider: string;
+  model: string;
+  cooldownUntil: number | null;
+  usedPercent: number | null;
+  updatedAt: number;
+  lastError?: string | null;
+}
+
+export interface ModelQuotaInfo {
+  provider: string;
+  model: string;
+  name: string;
+  description: string;
+  default?: boolean;
+  quotaType: QuotaSharingType;
+  status: 'ready' | 'cooldown' | 'exhausted';
+  cooldownUntil: number | null;
+  usedPercent: number | null;
+  note?: string;
 }

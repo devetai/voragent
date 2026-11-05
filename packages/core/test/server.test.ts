@@ -176,6 +176,10 @@ describe('createServer (không cần socket)', () => {
     expect(p.map((x) => x.id)).toEqual(['fake-a']);
     const cfg = (await (await a.request('/api/config', { headers: h })).json()) as { port: number };
     expect(cfg.port).toBe(DEFAULT_CONFIG.port);
+    const patched = await a.request('/api/config', { method: 'PATCH', headers: { ...h, 'content-type': 'application/json' }, body: JSON.stringify({ models: { claude: 'opus-5.5' } }) });
+    expect(patched.status).toBe(200);
+    const updatedCfg = (await patched.json()) as { models?: Record<string, string> };
+    expect(updatedCfg.models?.claude).toBe('opus-5.5');
   });
 
   it('close, retry và diff trên task có sẵn', async () => {
@@ -667,6 +671,37 @@ describe('startDaemon: cô lập thư mục người dùng', () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'workspace.json'), JSON.stringify({ folder: pathToFileURL(folderPath).href }));
   }
+
+  
+  it('preview static endpoint phục vụ tệp trong workspace và PATCH cập nhật model', async () => {
+    writeFileSync(join(repo, 'index.html'), '<h1>Xin chao</h1>');
+    const d = await withFreePort((port) =>
+      startDaemon({ dataDir, port, adapters: fakeAdapters(), projectTmpDirs: [] }),
+    );
+    daemons.push(d);
+    const taskRes = await fetch(`${base(d)}/api/tasks`, {
+      ...authed(d),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repoPath: repo, message: 'test preview', mode: 'dirty-nocommit' }),
+    });
+    const task = (await taskRes.json()) as Task;
+    const prevRes = await fetch(`${base(d)}/api/tasks/${task.id}/preview/index.html`, authed(d));
+    expect(prevRes.status).toBe(200);
+    expect(await prevRes.text()).toBe('<h1>Xin chao</h1>');
+    expect(prevRes.headers.get('content-type')).toContain('text/html');
+
+    // Cập nhật model bằng PATCH
+    const patchRes = await fetch(`${base(d)}/api/tasks/${task.id}`, {
+      ...authed(d),
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-3-5-haiku' }),
+    });
+    expect(patchRes.status).toBe(200);
+    const updatedTask = (await patchRes.json()) as Task;
+    expect(updatedTask.model).toBe('claude-3-5-haiku');
+  });
 
   it('userHome được ghi đè thì không đọc APPDATA thật', async () => {
     const mine = join(root, 'mine');

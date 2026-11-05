@@ -1,4 +1,7 @@
-import type { Config, Project, ProviderState, Run, Task, Turn, VEvent, WorkspaceMode } from '@voragent/shared';
+import type {
+  Config, ManagerMode, ManagerPlan, ManagerSubtask, MemoryCategory, MemoryItem, ModelQuotaInfo,
+  Project, ProviderState, Run, Task, Turn, VEvent, WorkspaceMode,
+} from '@voragent/shared';
 
 /** Lỗi API: `message` là chuỗi tiếng Việt trong trường `error` của JSON trả về. */
 export class ApiError extends Error {
@@ -45,15 +48,87 @@ export const api = {
   task: (id: string) => call<TaskDetail>('GET', `/api/tasks/${encodeURIComponent(id)}`),
   diff: (id: string) => call<Diff>('GET', `/api/tasks/${encodeURIComponent(id)}/diff`),
   providers: () => call<ProviderState[]>('GET', '/api/providers'),
+  refreshProviders: () => call<ProviderState[]>('POST', '/api/providers/refresh'),
+  resetProviderCooldown: (id: string) => call<ProviderState>('POST', `/api/providers/${encodeURIComponent(id)}/reset-cooldown`),
+  modelQuotas: () => call<Record<string, ModelQuotaInfo[]>>('GET', '/api/models/quotas'),
+  probeModelQuota: (provider: string, model: string) =>
+    call<{ ok: boolean; provider: string; model: string; status: string; cooldownUntil: number | null; note: string }>(
+      'POST',
+      '/api/models/probe',
+      { provider, model },
+    ),
+  resetModelCooldown: (provider: string, model?: string) =>
+    call<{ ok: boolean }>('POST', '/api/models/reset-cooldown', { provider, model }),
+  installProvider: (provider: string) =>
+    call<{ ok: boolean; provider: string; package: string; output: string; providers: ProviderState[] }>(
+      'POST',
+      '/api/providers/install',
+      { provider },
+    ),
   projects: (refresh = false) => call<Project[]>('GET', refresh ? '/api/projects?refresh=1' : '/api/projects'),
+  initGit: (repoPath: string) =>
+    call<{ ok: boolean; branch: string; commit: string; projects: Project[] }>('POST', '/api/projects/git-init', { repoPath }),
   config: () => call<Config>('GET', '/api/config'),
-  createTask: (b: { repoPath: string; message: string; mode: WorkspaceMode; priority?: string[] }) =>
-    call<Task>('POST', '/api/tasks', b),
+  updateConfig: (patch: { models?: Record<string, string>; modelFallbackPolicy?: 'auto' | 'ask' }) =>
+    call<Config>('PATCH', '/api/config', patch),
+  createTask: (b: {
+    repoPath: string;
+    message: string;
+    title?: string;
+    mode: WorkspaceMode;
+    priority?: string[];
+    role?: string;
+    model?: string | null;
+  }) => call<Task>('POST', '/api/tasks', b),
+  updateTaskModel: (id: string, model: string | null) =>
+    call<Task>('PATCH', `/api/tasks/${encodeURIComponent(id)}`, { model }),
   send: (id: string, message: string) =>
     call<Turn>('POST', `/api/tasks/${encodeURIComponent(id)}/messages`, { message }),
   close: (id: string) => call<void>('POST', `/api/tasks/${encodeURIComponent(id)}/close`),
+  deleteTask: (id: string) => call<void>('DELETE', `/api/tasks/${encodeURIComponent(id)}`),
   retry: (id: string, switchProvider: boolean) =>
     call<void>('POST', `/api/tasks/${encodeURIComponent(id)}/retry`, { switchProvider }),
+  assignTask: (id: string, provider: string) =>
+    call<Task>('POST', `/api/tasks/${encodeURIComponent(id)}/assign`, { provider }),
+  // Shared Memory của Văn phòng Dự án
+  memories: (repoPath?: string) =>
+    call<MemoryItem[]>(
+      'GET',
+      repoPath ? `/api/memories?repoPath=${encodeURIComponent(repoPath)}` : '/api/memories',
+    ),
+  saveMemory: (b: {
+    id?: string;
+    repoPath: string;
+    category: MemoryCategory;
+    title: string;
+    content: string;
+    author?: string;
+    pinned?: boolean;
+  }) => call<MemoryItem>('POST', '/api/memories', b),
+  deleteMemory: (id: string) =>
+    call<void>('DELETE', `/api/memories/${encodeURIComponent(id)}`),
+  // Trưởng phòng điều phối (Manager Plans)
+  managerPlans: (repoPath?: string) =>
+    call<ManagerPlan[]>(
+      'GET',
+      repoPath ? `/api/manager/plans?repoPath=${encodeURIComponent(repoPath)}` : '/api/manager/plans',
+    ),
+  createManagerPlan: (b: {
+    repoPath: string;
+    goal: string;
+    mode: ManagerMode;
+    subtasks?: Array<{ title: string; message: string; assignedProvider: string; role: string }>;
+  }) => call<ManagerPlan>('POST', '/api/manager/plans', b),
+  dispatchManagerPlan: (planId: string, subtasks?: ManagerSubtask[]) =>
+    call<ManagerPlan>(
+      'POST',
+      `/api/manager/plans/${encodeURIComponent(planId)}/dispatch`,
+      subtasks ? { subtasks } : {},
+    ),
+  deleteManagerPlan: (id: string) =>
+    call<void>('DELETE', `/api/manager/plans/${encodeURIComponent(id)}`),
+  updateManagerPlan: (id: string, patch: Partial<ManagerPlan>) =>
+    call<ManagerPlan>('PATCH', `/api/manager/plans/${encodeURIComponent(id)}`, patch),
 };
 
 export const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));

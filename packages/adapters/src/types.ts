@@ -6,6 +6,7 @@ export interface TurnInput {
   sessionId: string | null;
   cwd: string;
   network: boolean;
+  model?: string | null;
 }
 export interface Invocation {
   bin: string;

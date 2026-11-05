@@ -26,6 +26,14 @@ export function parseResetTime(text: string, now: number): number | null {
     const unit = dur[2]!.toLowerCase().replace(/s$/, '');
     return now + Number(dur[1]) * UNIT_MS[unit]!;
   }
+    // Khớp định dạng cô đọng như agy: "Resets in 43h58m9s" hoặc "in 2h30m"
+  const compactDur = /\b(?:resets?\s+in\s+|in\s+)(?:(\d+)\s*h)?(?:(\d+)\s*m)?(?:(\d+)\s*s)?\b/i.exec(text);
+  if (compactDur && (compactDur[1] || compactDur[2] || compactDur[3])) {
+    const h = compactDur[1] ? Number(compactDur[1]) * 3_600_000 : 0;
+    const m = compactDur[2] ? Number(compactDur[2]) * 60_000 : 0;
+    const s = compactDur[3] ? Number(compactDur[3]) * 1000 : 0;
+    return now + h + m + s;
+  }
   return null;
 }
 

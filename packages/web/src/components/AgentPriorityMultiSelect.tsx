@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { ArrowDown, ArrowUp, Bot, Check, CheckCircle2, ChevronRight, Sparkles, Zap } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, Sparkles, Zap } from 'lucide-react';
 import type { ProviderId, ProviderState } from '@voragent/shared';
+import { ProviderIcon } from './ProviderIcon';
+import { getProviderUnavailableReason, isProviderAvailable } from '../state';
 
 export interface AgentPriorityMultiSelectProps {
   providers: ProviderState[];
@@ -23,7 +24,7 @@ const PROVIDER_METAS: Record<string, { name: string; color: string; bg: string; 
     border: '#A7F3D0',
   },
   antigravity: {
-    name: 'Antigravity IDE',
+    name: 'Antigravity CLI',
     color: '#2563EB',
     bg: '#EFF6FF',
     border: '#BFDBFE',
@@ -36,36 +37,34 @@ export function AgentPriorityMultiSelect({
   onChange,
   disabled = false,
 }: AgentPriorityMultiSelectProps) {
-  // Mode: 'auto' (tự động điều phối toàn bộ) hoặc 'custom' (chọn thứ tự ưu tiên)
   const isAuto = value === null || value.length === 0;
+  // Chỉ những provider ĐÃ CÀI ĐẶT và KHẢ DỤNG mới được đưa vào danh sách điều phối
+  const availableProviders = providers.filter((p) => isProviderAvailable(providers, p.id));
+  const installedProviders = providers.filter((p) => p.installed);
+  const selectableIds = (availableProviders.length > 0 ? availableProviders : installedProviders).map((p) => p.id);
 
-  // Lấy danh sách ID khả dụng
-  const allProviderIds = providers.map((p) => p.id);
-
-  // Danh sách đang được sắp xếp ưu tiên
-  const currentPriority: ProviderId[] = !isAuto && value ? value : allProviderIds;
+  const currentPriority: ProviderId[] = !isAuto && value
+    ? value.filter((id) => selectableIds.includes(id))
+    : selectableIds;
 
   const handleToggleAuto = (auto: boolean) => {
     if (disabled) return;
     if (auto) {
-      onChange(null); // null nghĩa là auto handoff toàn bộ
+      onChange(null);
     } else {
-      // Chuyển sang custom: khởi tạo danh sách các agent đang cài đặt
-      const installed = providers.filter((p) => p.installed).map((p) => p.id);
-      onChange(installed.length > 0 ? installed : allProviderIds);
+      onChange(selectableIds);
     }
   };
 
   const handleToggleAgent = (id: ProviderId) => {
     if (disabled || isAuto) return;
+    if (!selectableIds.includes(id)) return;
     const exists = currentPriority.includes(id);
     let next: ProviderId[];
     if (exists) {
-      // Bỏ chọn (nhưng giữ ít nhất 1 agent nếu có thể)
       next = currentPriority.filter((p) => p !== id);
-      if (next.length === 0) return; // Không cho bỏ hết
+      if (next.length === 0) return;
     } else {
-      // Thêm vào cuối danh sách ưu tiên
       next = [...currentPriority, id];
     }
     onChange(next);
@@ -85,9 +84,11 @@ export function AgentPriorityMultiSelect({
     }
   };
 
+  // Chỉ hiển thị các Agent đã cài đặt trong danh sách chọn ưu tiên (ẩn hoàn toàn các CLI chưa cài như Codex)
+  const visibleProviders = installedProviders.length > 0 ? installedProviders : providers;
+
   return (
     <div className={`agent-priority-container ${disabled ? 'disabled' : ''}`}>
-      {/* Switcher giữa Tự động và Tùy chỉnh */}
       <div className="agent-priority-tabs">
         <button
           type="button"
@@ -111,22 +112,20 @@ export function AgentPriorityMultiSelect({
         </button>
       </div>
 
-      {/* Chú thích hướng dẫn */}
       <div className="agent-priority-hint">
         {isAuto ? (
           <span>
-            Hệ thống tự động chạy với Agent khả dụng đầu tiên; khi cạn hạn ngạch (quota) sẽ tự động commit và bàn giao sang Agent tiếp theo.
+            Hệ thống chỉ điều phối các Agent khả dụng đã cài trên máy; khi cạn hạn ngạch (quota) sẽ tự động commit và bàn giao sang Agent khả dụng kế tiếp.
           </span>
         ) : (
           <span>
-            Nhấp để chọn/bỏ chọn các Agent, dùng nút mũi tên để xác định Agent nào thực thi trước và Agent nào sẽ tiếp quản khi hết Quota.
+            Nhấp để chọn/bỏ chọn các Agent khả dụng, dùng nút mũi tên để xác định Agent nào thực thi trước và Agent nào tiếp quản khi hết Quota.
           </span>
         )}
       </div>
 
-      {/* Danh sách các Cards Agent */}
       <div className="agent-priority-list">
-        {providers.map((p) => {
+        {visibleProviders.map((p) => {
           const meta = PROVIDER_METAS[p.id] || {
             name: p.id,
             color: 'var(--text-primary)',
@@ -134,24 +133,27 @@ export function AgentPriorityMultiSelect({
             border: 'var(--border-subtle)',
           };
 
-          const isSelected = isAuto ? p.installed : currentPriority.includes(p.id);
+          const unavailReason = getProviderUnavailableReason(providers, p.id);
+          const isSelectable = selectableIds.includes(p.id);
+          const isSelected = isSelectable && (isAuto ? true : currentPriority.includes(p.id));
           const priorityIndex = currentPriority.indexOf(p.id);
-          const hasQuota = p.quota !== null;
-          const quotaPercent = hasQuota ? Math.round(p.quota.usedRatio * 100) : 0;
+          const hasQuota = p.usedPercent !== null && p.usedPercent !== undefined;
+          const quotaPercent = hasQuota ? Math.round((p.usedPercent ?? 0) * 100) : 0;
 
           return (
             <div
               key={p.id}
-              className={`agent-priority-card ${isSelected ? 'selected' : 'unselected'} ${!p.installed ? 'not-installed' : ''}`}
-              onClick={() => !isAuto && handleToggleAgent(p.id)}
+              className={`agent-priority-card ${isSelected ? 'selected' : 'unselected'} ${!isSelectable ? 'not-installed' : ''}`}
+              onClick={() => !isAuto && isSelectable && handleToggleAgent(p.id)}
+              aria-disabled={!isSelectable ? true : undefined}
               style={{
                 borderColor: isSelected ? meta.border : undefined,
                 backgroundColor: isSelected ? meta.bg : undefined,
-                cursor: isAuto ? 'default' : 'pointer',
+                cursor: isAuto || !isSelectable ? 'not-allowed' : 'pointer',
+                pointerEvents: !isSelectable ? 'none' : undefined,
               }}
             >
               <div className="agent-priority-card-left">
-                {/* Thứ tự ưu tiên hoặc Checkbox */}
                 <div
                   className="agent-priority-rank"
                   style={{
@@ -159,7 +161,7 @@ export function AgentPriorityMultiSelect({
                     color: isSelected ? '#FFFFFF' : 'var(--text-muted)',
                   }}
                 >
-                  {isAuto ? (
+                  {isAuto && isSelectable ? (
                     <Check size={12} strokeWidth={3} />
                   ) : isSelected ? (
                     <span>{priorityIndex + 1}</span>
@@ -170,12 +172,13 @@ export function AgentPriorityMultiSelect({
 
                 <div className="agent-priority-info">
                   <div className="agent-priority-title-row">
+                    <ProviderIcon provider={p.id} size={14} />
                     <span className="agent-priority-name" style={{ color: isSelected ? meta.color : undefined }}>
                       {meta.name}
                     </span>
                     {p.version && <span className="agent-priority-version">v{p.version}</span>}
-                    {!p.installed && (
-                      <span className="agent-priority-badge-disabled">Chưa cài đặt</span>
+                    {unavailReason && (
+                      <span className="agent-priority-badge-disabled">{unavailReason}</span>
                     )}
                   </div>
 
@@ -195,16 +198,15 @@ export function AgentPriorityMultiSelect({
                           </div>
                         </div>
                       ) : (
-                        <span className="agent-quota-text">Sẵn sàng (Không giới hạn)</span>
+                        <span className="agent-quota-text">Sẵn sàng hoạt động</span>
                       )
                     ) : (
-                      <span className="agent-quota-text text-muted">Cần cài CLI để kích hoạt</span>
+                      <span className="agent-quota-text text-muted">Chưa cài đặt CLI</span>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Nút điều hướng thứ tự (Move Up / Move Down) trong chế độ tùy chỉnh */}
               {!isAuto && isSelected && (
                 <div className="agent-priority-actions" onClick={(e) => e.stopPropagation()}>
                   <button

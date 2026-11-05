@@ -83,3 +83,12 @@ describe('Văn phòng 3D - Quy chuẩn thiết kế & Tính toán hình học', 
     expect(arcDegrees).toBeLessThan(360);
   });
 });
+
+
+describe('Văn phòng Dự án - Trưởng phòng (Manager Agent)', () => {
+  it('cấu hình Trưởng phòng có màu tím hoàng gia ấm và phụ kiện vương miện (crown)', () => {
+    expect(PROVIDER_THEMES.manager?.base).toBe('#8B5CF6');
+    expect(PROVIDER_THEMES.manager?.accessory).toBe('crown');
+    expect(PROVIDER_THEMES.manager?.name).toContain('Trưởng Phòng');
+  });
+});

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ProviderState, Task, VEvent } from '@voragent/shared';
+import { drawProviderBrandOnCanvas } from '../components/ProviderIcon';
 import { ForceSimulation } from './forceSimulation';
 import { extractGraphData } from './graphModel';
 import { NodeDetailDrawer } from './NodeDetailDrawer';
@@ -23,15 +24,12 @@ export function GraphCanvas({
 }: GraphCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Bộ lọc
   const [filter, setFilter] = useState<GraphFilterState>(DEFAULT_GRAPH_FILTER);
 
-  // Trích xuất dữ liệu thô
   const rawData = useMemo(() => {
     return extractGraphData(tasks, providers, events);
   }, [tasks, providers, events]);
 
-  // Lọc dữ liệu hiển thị theo filter
   const visibleData = useMemo(() => {
     const query = filter.searchQuery.trim().toLowerCase();
 
@@ -53,28 +51,23 @@ export function GraphCanvas({
     return { nodes, edges, query };
   }, [rawData, filter]);
 
-  // Bộ mô phỏng lực vật lý
   const simRef = useRef<ForceSimulation>(new ForceSimulation(visibleData.nodes, visibleData.edges));
   const [isPhysicsActive, setIsPhysicsActive] = useState(true);
 
-  // Cập nhật dữ liệu cho simulation khi dữ liệu lọc thay đổi
   useEffect(() => {
     simRef.current.updateData(visibleData.nodes, visibleData.edges);
   }, [visibleData]);
 
-  // Tọa độ camera (Pan & Zoom)
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const transformRef = useRef(transform);
   transformRef.current = transform;
 
-  // Trạng thái tương tác chuột
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const draggingNodeRef = useRef<GraphNode | null>(null);
   const isPanningRef = useRef(false);
   const startPanRef = useRef({ x: 0, y: 0 });
 
-  // Tìm node dưới con trỏ chuột
   const getNodeAtPoint = useCallback((screenX: number, screenY: number): GraphNode | null => {
     const { x: panX, y: panY, scale } = transformRef.current;
     const worldX = (screenX - panX) / scale;
@@ -93,7 +86,6 @@ export function GraphCanvas({
     return null;
   }, []);
 
-  // Căn toàn cảnh (Fit to screen)
   const fitView = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -129,13 +121,11 @@ export function GraphCanvas({
     });
   }, []);
 
-  // Khởi tạo căn giữa lần đầu
   useEffect(() => {
     const timer = setTimeout(fitView, 350);
     return () => clearTimeout(timer);
   }, [fitView]);
 
-  // Vòng lặp Render Canvas chính (60fps)
   useEffect(() => {
     let animId: number;
 
@@ -145,7 +135,6 @@ export function GraphCanvas({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // Kích thước thực theo màn hình retina
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
       if (canvas.width !== width || canvas.height !== height) {
@@ -153,7 +142,6 @@ export function GraphCanvas({
         canvas.height = height;
       }
 
-      // Bước tính toán vật lý
       if (isPhysicsActive) {
         simRef.current.tick();
       }
@@ -163,11 +151,9 @@ export function GraphCanvas({
       const edges = simRef.current.getEdges();
       const nodeMap = new Map(nodes.map((n) => [n.id, n]));
 
-      // 1. Nền ấm Warm Tech (#FAF8F5)
       ctx.fillStyle = '#FAF8F5';
       ctx.fillRect(0, 0, width, height);
 
-      // 2. Lưới ma trận chấm tròn ấm áp (Dot Matrix Pattern)
       ctx.save();
       ctx.fillStyle = '#E6DFD5';
       const dotSpacing = 28 * scale;
@@ -184,12 +170,10 @@ export function GraphCanvas({
       }
       ctx.restore();
 
-      // Áp dụng ma trận biến đổi camera (Pan & Zoom)
       ctx.save();
       ctx.translate(panX, panY);
       ctx.scale(scale, scale);
 
-      // Xác định tập các nút liên quan đến nút đang được chọn hoặc hover
       const activeId = hoveredNodeId || selectedNodeId;
       const connectedEdges = new Set<string>();
       const connectedNodes = new Set<string>();
@@ -204,7 +188,6 @@ export function GraphCanvas({
         });
       }
 
-      // 3. Vẽ các Cạnh liên kết (Edges)
       edges.forEach((edge) => {
         const s = nodeMap.get(edge.source);
         const t = nodeMap.get(edge.target);
@@ -222,13 +205,11 @@ export function GraphCanvas({
           ctx.setLineDash([5, 4]);
         }
 
-        // Vẽ đường nối
         ctx.beginPath();
         ctx.moveTo(s.x, s.y);
         ctx.lineTo(t.x, t.y);
         ctx.stroke();
 
-        // Vẽ mũi tên ở phía đích
         const dx = t.x - s.x;
         const dy = t.y - s.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -255,7 +236,6 @@ export function GraphCanvas({
           ctx.fill();
         }
 
-        // Nhãn quan hệ (vẽ nếu được zoom vào đủ gần)
         if (scale > 0.65 && edge.label) {
           const midX = (s.x + t.x) / 2;
           const midY = (s.y + t.y) / 2;
@@ -273,14 +253,12 @@ export function GraphCanvas({
         ctx.restore();
       });
 
-      // 4. Vẽ các Nút (Nodes)
       nodes.forEach((node) => {
         const isSelected = selectedNodeId === node.id;
         const isHovered = hoveredNodeId === node.id;
         const isConnected = connectedNodes.has(node.id);
         const isDimmed = activeId && !isConnected;
 
-        // Kiểm tra khớp từ khóa tìm kiếm
         const query = visibleData.query;
         const isSearchMatch = query && (
           node.label.toLowerCase().includes(query) ||
@@ -290,7 +268,6 @@ export function GraphCanvas({
         ctx.save();
         ctx.globalAlpha = isDimmed ? 0.2 : 1.0;
 
-        // Hào quang tìm kiếm (Search Glow Ring)
         if (isSearchMatch) {
           ctx.beginPath();
           ctx.arc(node.x, node.y, node.radius + 8, 0, Math.PI * 2);
@@ -299,7 +276,6 @@ export function GraphCanvas({
           ctx.stroke();
         }
 
-        // Hào quang khi chọn hoặc hover
         if (isSelected || isHovered) {
           ctx.beginPath();
           ctx.arc(node.x, node.y, node.radius + 5, 0, Math.PI * 2);
@@ -307,7 +283,6 @@ export function GraphCanvas({
           ctx.fill();
         }
 
-        // Thân nút hình tròn có đổ bóng nhẹ
         ctx.shadowColor = 'rgba(43, 38, 34, 0.12)';
         ctx.shadowBlur = isHovered ? 12 : 6;
         ctx.shadowOffsetY = 2;
@@ -323,20 +298,22 @@ export function GraphCanvas({
         ctx.lineWidth = isSelected ? 3 : 2;
         ctx.stroke();
 
-        // Biểu tượng icon ở tâm
-        ctx.font = `${Math.round(node.radius * 0.9)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(node.icon, node.x, node.y - (node.type === 'task' ? 2 : 0));
+        // Vẽ Logo thương hiệu chính thức cho Provider Node (Claude, Codex, Antigravity) thay vì con rắn
+        if (node.type === 'provider') {
+          drawProviderBrandOnCanvas(ctx, node.label, node.x, node.y, node.radius);
+        } else {
+          ctx.font = `${Math.round(node.radius * 0.9)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(node.icon, node.x, node.y - (node.type === 'task' ? 2 : 0));
+        }
 
-        // Nhãn tên nút (Label)
         ctx.font = '600 12px system-ui, sans-serif';
         ctx.fillStyle = '#1E293B';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         ctx.fillText(node.label, node.x, node.y + node.radius + 6);
 
-        // Nhãn phụ (SubLabel)
         if (node.subLabel && scale > 0.55) {
           ctx.font = '500 10px monospace';
           ctx.fillStyle = '#64748B';
@@ -355,7 +332,6 @@ export function GraphCanvas({
     return () => cancelAnimationFrame(animId);
   }, [visibleData, isPhysicsActive, hoveredNodeId, selectedNodeId]);
 
-  // ================= XỬ LÝ SỰ KIỆN CHUỘT (INTERACTIONS) =================
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const screenX = e.clientX - rect.left;
@@ -375,6 +351,9 @@ export function GraphCanvas({
       setSelectedNodeId(null);
       onSelectNode?.(null);
     }
+    if (canvasRef.current) {
+      canvasRef.current.style.cursor = 'grabbing';
+    }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -383,26 +362,29 @@ export function GraphCanvas({
     const screenY = e.clientY - rect.top;
 
     if (draggingNodeRef.current) {
-      // Kéo thả node
       const { x: panX, y: panY, scale } = transformRef.current;
       draggingNodeRef.current.x = (screenX - panX) / scale;
       draggingNodeRef.current.y = (screenY - panY) / scale;
       draggingNodeRef.current.vx = 0;
       draggingNodeRef.current.vy = 0;
-      simRef.current.isStable = false; // Đánh thức physics
+      simRef.current.isStable = false;
+      if (canvasRef.current) {
+        canvasRef.current.style.cursor = 'grabbing';
+      }
     } else if (isPanningRef.current) {
-      // Kéo rê toàn cảnh (Pan)
       setTransform((prev) => ({
         ...prev,
         x: screenX - startPanRef.current.x,
         y: screenY - startPanRef.current.y,
       }));
+      if (canvasRef.current) {
+        canvasRef.current.style.cursor = 'grabbing';
+      }
     } else {
-      // Hover node
       const node = getNodeAtPoint(screenX, screenY);
       setHoveredNodeId(node ? node.id : null);
       if (canvasRef.current) {
-        canvasRef.current.style.cursor = node ? 'pointer' : 'default';
+        canvasRef.current.style.cursor = node ? 'pointer' : 'grab';
       }
     }
   };
@@ -410,9 +392,11 @@ export function GraphCanvas({
   const handleMouseUp = () => {
     draggingNodeRef.current = null;
     isPanningRef.current = false;
+    if (canvasRef.current) {
+      canvasRef.current.style.cursor = hoveredNodeId ? 'pointer' : 'grab';
+    }
   };
 
-  // Cuộn chuột để Thu phóng (Zoom)
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
@@ -428,7 +412,6 @@ export function GraphCanvas({
     });
   };
 
-  // Double click vào task node để mở chi tiết task
   const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const node = getNodeAtPoint(e.clientX - rect.left, e.clientY - rect.top);
@@ -440,7 +423,7 @@ export function GraphCanvas({
   const selectedNode = visibleData.nodes.find((n) => n.id === selectedNodeId) ?? null;
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: 'calc(100vh - 170px)', overflow: 'hidden' }}>
+    <div style={{ position: 'relative', width: '100%', height: 'calc(100vh - 68px)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)', overflow: 'hidden' }}>
       <GraphToolbar
         filter={filter}
         onFilterChange={setFilter}
@@ -461,7 +444,7 @@ export function GraphCanvas({
         onMouseLeave={handleMouseUp}
         onWheel={handleWheel}
         onDoubleClick={handleDoubleClick}
-        style={{ width: '100%', height: '100%', display: 'block' }}
+        style={{ width: '100%', height: '100%', display: 'block', cursor: 'grab' }}
       />
 
       <NodeDetailDrawer

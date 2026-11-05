@@ -1,25 +1,39 @@
+import { execFile } from 'node:child_process';
 import { timingSafeEqual } from 'node:crypto';
-import { statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, Server } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
 import type { Duplex } from 'node:stream';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+
+const PROVIDER_NPM_PACKAGES: Record<string, string> = {
+  codex: '@openai/codex',
+  claude: '@anthropic-ai/claude-code',
+};
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { WebSocketServer } from 'ws';
 import type { WebSocket } from 'ws';
-import type { Config, ProviderId, WorkspaceMode } from '@voragent/shared';
+import type {
+  Config, ManagerMode, ManagerPlan, ManagerSubtask, MemoryCategory, ModelQuotaInfo, ProviderId, WorkspaceMode,
+} from '@voragent/shared';
+import { PROVIDER_MODELS, PROVIDER_QUOTA_TYPE } from '@voragent/shared';
 import type { EventBus } from './bus.js';
-import { DEFAULT_CONFIG } from './config.js';
+import { DEFAULT_CONFIG, saveConfig } from './config.js';
 import type { Orchestrator } from './orchestrator.js';
 import type { ProjectCatalog } from './projects.js';
 import type { Store } from './store.js';
-import { workspaceSummary } from './workspace.js';
+import { initGitRepository, workspaceSummary } from './workspace.js';
 
 export const KEY_COOKIE = 'voragent_key';
 export const KEY_HEADER = 'x-voragent-key';
 
 const MODES: WorkspaceMode[] = ['head-dirty-commit', 'head-commit', 'dirty-nocommit'];
+const MEMORY_CATEGORIES: MemoryCategory[] = ['architecture', 'decision', 'context', 'finding'];
+const MANAGER_MODES: ManagerMode[] = ['semi-auto', 'auto'];
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 const MIME: Record<string, string> = {
@@ -125,7 +139,7 @@ export function createServer(d: {
   /** Danh mục dự án cho GET /api/projects. Thiếu thì route trả []. */
   projects?: ProjectCatalog;
 }): Hono {
-  const { orchestrator, store, key } = d;
+  const { orchestrator, store, bus, key } = d;
   const app = new Hono();
 
   const kick = (): void => {
@@ -199,6 +213,8 @@ export function createServer(d: {
     if (!isDir) throw new BadRequest(`repoPath không phải thư mục tồn tại: ${repoPath}`);
     const input: Parameters<Orchestrator['submitTask']>[0] = { repoPath, message };
     if (b.title !== undefined) input.title = reqString(b, 'title');
+    if (b.role !== undefined && typeof b.role === 'string') input.role = b.role.trim();
+    if (b.parentTaskId !== undefined && typeof b.parentTaskId === 'string') input.parentTaskId = b.parentTaskId.trim();
     if (b.mode !== undefined) {
       if (!MODES.includes(b.mode as WorkspaceMode)) {
         throw new BadRequest(`"mode" phải là một trong: ${MODES.join(', ')}.`);
@@ -237,7 +253,12 @@ export function createServer(d: {
     if (!task) return err(c, 404, NO_TASK);
     const b = await readJson(c);
     const message = reqString(b, 'message');
-    if (task.status !== 'awaiting_user' && task.status !== 'failed') {
+    if (
+      task.status !== 'awaiting_user' &&
+      task.status !== 'failed' &&
+      task.status !== 'waiting_quota' &&
+      task.status !== 'queued'
+    ) {
       return err(c, 409, `Task không nhận tin nhắn lúc này (trạng thái: ${task.status}).`);
     }
     let turn;
@@ -257,6 +278,13 @@ export function createServer(d: {
     return c.body(null, 204);
   });
 
+  app.delete('/api/tasks/:id', (c) => {
+    const task = taskOr404(c);
+    if (!task) return err(c, 404, NO_TASK);
+    orchestrator.deleteTask(task.id);
+    return c.body(null, 204);
+  });
+
   app.post('/api/tasks/:id/retry', async (c) => {
     const task = taskOr404(c);
     if (!task) return err(c, 404, NO_TASK);
@@ -271,6 +299,102 @@ export function createServer(d: {
     }
     kick();
     return c.body(null, 204);
+  });
+
+  app.post('/api/tasks/:id/assign', async (c) => {
+    const task = taskOr404(c);
+    if (!task) return err(c, 404, NO_TASK);
+    const b = await readJson(c);
+    const provider = reqString(b, 'provider');
+    try {
+      const updated = orchestrator.assignTask(task.id, provider);
+      kick();
+      return c.json(updated);
+    } catch (e) {
+      return err(c, 409, e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  
+  app.patch('/api/tasks/:id', async (c) => {
+    const task = taskOr404(c);
+    if (!task) return err(c, 404, NO_TASK);
+    const b = await readJson(c);
+    const patch: Record<string, unknown> = {};
+    if (b.model !== undefined) {
+      patch.model = typeof b.model === 'string' && b.model.trim() ? b.model.trim() : null;
+    }
+    if (typeof b.title === 'string' && b.title.trim()) {
+      patch.title = b.title.trim();
+    }
+    const updated = orchestrator.updateTask(task.id, patch);
+    return c.json(updated);
+  });
+
+  app.get('/api/tasks/:id/preview/*', async (c) => {
+    const task = taskOr404(c);
+    if (!task) return err(c, 404, NO_TASK);
+    const root = task.workspacePath ?? task.repoPath;
+    if (!root || !existsSync(root)) return err(c, 404, 'Thư mục làm việc của task không tồn tại');
+
+    const prefix = `/api/tasks/${task.id}/preview`;
+    let subPath = c.req.path.slice(prefix.length);
+    if (subPath.startsWith('/')) subPath = subPath.slice(1);
+    if (!subPath) subPath = 'index.html';
+
+    const fullPath = resolve(root, subPath);
+    const rootResolved = resolve(root);
+    const fullNorm = fullPath.toLowerCase();
+    const rootNorm = rootResolved.toLowerCase();
+    if (!fullNorm.startsWith(rootNorm + sep) && fullNorm !== rootNorm) {
+      return err(c, 403, 'Truy cập ngoài thư mục workspace bị cấm.');
+    }
+
+    let stat;
+    try {
+      stat = statSync(fullPath);
+    } catch {
+      return err(c, 404, `Không tìm thấy tệp: ${subPath}`);
+    }
+
+    let filePath = fullPath;
+    if (stat.isDirectory()) {
+      filePath = join(fullPath, 'index.html');
+      if (!existsSync(filePath)) {
+        return err(c, 404, 'Thư mục không có tệp index.html để xem thử.');
+      }
+    }
+
+    const ext = extname(filePath).toLowerCase();
+    const MIME_TYPES: Record<string, string> = {
+      '.html': 'text/html; charset=utf-8',
+      '.htm': 'text/html; charset=utf-8',
+      '.css': 'text/css; charset=utf-8',
+      '.js': 'application/javascript; charset=utf-8',
+      '.mjs': 'application/javascript; charset=utf-8',
+      '.json': 'application/json; charset=utf-8',
+      '.svg': 'image/svg+xml',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.ico': 'image/x-icon',
+      '.txt': 'text/plain; charset=utf-8',
+      '.md': 'text/markdown; charset=utf-8',
+      '.woff': 'font/woff',
+      '.woff2': 'font/woff2',
+      '.ttf': 'font/ttf',
+    };
+    const contentType = MIME_TYPES[ext] ?? 'application/octet-stream';
+    const content = readFileSync(filePath);
+    return new Response(content, {
+      status: 200,
+      headers: {
+        'Content-Type': contentType,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      },
+    });
   });
 
   app.get('/api/tasks/:id/diff', async (c) => {
@@ -289,14 +413,426 @@ export function createServer(d: {
     }
   });
 
+  // ------------------------------------------------ Shared Memory (Văn phòng dự án)
+
+  app.get('/api/memories', (c) => {
+    const repoPath = c.req.query('repoPath');
+    return c.json(store.listMemories(repoPath));
+  });
+
+  app.post('/api/memories', async (c) => {
+    const b = await readJson(c);
+    const repoPath = reqString(b, 'repoPath');
+    const title = reqString(b, 'title');
+    const content = reqString(b, 'content');
+    const category = (typeof b.category === 'string' && MEMORY_CATEGORIES.includes(b.category as MemoryCategory))
+      ? (b.category as MemoryCategory)
+      : 'context';
+    const author = typeof b.author === 'string' && b.author.trim() !== '' ? b.author.trim() : 'user';
+    const pinned = b.pinned === true;
+    const id = typeof b.id === 'string' && b.id.trim() !== '' ? b.id.trim() : undefined;
+
+    const item = store.upsertMemory({
+      ...(id ? { id } : {}),
+      repoPath,
+      category,
+      title,
+      content,
+      author,
+      pinned,
+    });
+    try {
+      bus.publish({
+        id: 0,
+        taskId: '',
+        runId: null,
+        ts: Date.now(),
+        source: 'managed',
+        type: 'MEMORY_UPDATED',
+        data: { repoPath, item },
+      });
+    } catch { /* ignore */ }
+    return c.json(item, 201);
+  });
+
+  app.delete('/api/memories/:id', (c) => {
+    const id = c.req.param('id') ?? '';
+    const deleted = store.deleteMemory(id);
+    if (!deleted) return err(c, 404, 'Không tìm thấy mục bộ nhớ.');
+    try {
+      bus.publish({
+        id: 0,
+        taskId: '',
+        runId: null,
+        ts: Date.now(),
+        source: 'managed',
+        type: 'MEMORY_UPDATED',
+        data: { deletedId: id },
+      });
+    } catch { /* ignore */ }
+    return c.body(null, 204);
+  });
+
+  // ------------------------------------------------ Trưởng phòng điều phối (Manager Plans)
+
+  app.get('/api/manager/plans', (c) => {
+    const repoPath = c.req.query('repoPath');
+    return c.json(store.listManagerPlans(repoPath));
+  });
+
+  app.post('/api/manager/plans', async (c) => {
+    const b = await readJson(c);
+    const repoPath = reqString(b, 'repoPath');
+    const goal = reqString(b, 'goal');
+    let isDir = false;
+    try {
+      isDir = statSync(repoPath).isDirectory();
+    } catch {
+      isDir = false;
+    }
+    if (!isDir) throw new BadRequest(`repoPath không phải thư mục tồn tại: ${repoPath}`);
+
+    const mode: ManagerMode = (typeof b.mode === 'string' && MANAGER_MODES.includes(b.mode as ManagerMode))
+      ? (b.mode as ManagerMode)
+      : 'semi-auto';
+
+    let customSubtasks: Array<{ title: string; message: string; assignedProvider: ProviderId; role: string }> | undefined;
+    if (Array.isArray(b.subtasks) && b.subtasks.length > 0) {
+      customSubtasks = b.subtasks.map((raw) => {
+        const s = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+        return {
+          title: reqString(s, 'title'),
+          message: reqString(s, 'message'),
+          assignedProvider: reqString(s, 'assignedProvider'),
+          role: typeof s.role === 'string' && s.role.trim() !== '' ? s.role.trim() : 'Nhân viên',
+        };
+      });
+    }
+
+    const plan = await orchestrator.createManagerPlan({
+      repoPath,
+      goal,
+      mode,
+      ...(customSubtasks ? { subtasks: customSubtasks } : {}),
+    });
+    if (mode === 'auto') kick();
+    try {
+      bus.publish({
+        id: 0,
+        taskId: '',
+        runId: null,
+        ts: Date.now(),
+        source: 'managed',
+        type: 'MANAGER_PLAN_UPDATED',
+        data: { repoPath, plan },
+      });
+    } catch { /* ignore */ }
+    return c.json(plan, 201);
+  });
+
+  app.post('/api/manager/plans/:id/dispatch', async (c) => {
+    const planId = c.req.param('id') ?? '';
+    const b = await readJson(c, true);
+    let subtasksOverride: ManagerSubtask[] | undefined;
+    if (Array.isArray(b.subtasks) && b.subtasks.length > 0) {
+      subtasksOverride = b.subtasks as ManagerSubtask[];
+    }
+    try {
+      const updated = await orchestrator.dispatchManagerPlan(planId, subtasksOverride);
+      kick();
+      try {
+        bus.publish({
+          id: 0,
+          taskId: '',
+          runId: null,
+          ts: Date.now(),
+          source: 'managed',
+          type: 'MANAGER_PLAN_UPDATED',
+          data: { repoPath: updated.repoPath, plan: updated },
+        });
+      } catch { /* ignore */ }
+      return c.json(updated);
+    } catch (e) {
+      return err(c, 404, e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  app.delete('/api/manager/plans/:id', (c) => {
+    const planId = c.req.param('id') ?? '';
+    const deleted = orchestrator.deleteManagerPlan(planId);
+    if (!deleted) return err(c, 404, 'Không tìm thấy kế hoạch');
+    return c.body(null, 204);
+  });
+
+  app.patch('/api/manager/plans/:id', async (c) => {
+    const planId = c.req.param('id') ?? '';
+    const b = await readJson(c);
+    const patch: Partial<ManagerPlan> = {};
+    if (typeof b.goal === 'string') patch.goal = b.goal.trim();
+    if (Array.isArray(b.subtasks)) patch.subtasks = b.subtasks as ManagerSubtask[];
+    try {
+      const updated = orchestrator.updateManagerPlan(planId, patch);
+      return c.json(updated);
+    } catch (e) {
+      return err(c, 404, e instanceof Error ? e.message : String(e));
+    }
+  });
+
+
   app.get('/api/providers', (c) => c.json(store.listProviders()));
+
+  app.get('/api/models/quotas', (c) => {
+    const now = Date.now();
+    const result: Record<string, ModelQuotaInfo[]> = {};
+    for (const [provider, models] of Object.entries(PROVIDER_MODELS)) {
+      const quotaType = PROVIDER_QUOTA_TYPE[provider] ?? 'shared';
+      const p = store.getProvider(provider);
+      result[provider] = models.map((m) => {
+        if (quotaType === 'shared') {
+          const isCooldown = p?.cooldownUntil !== null && p?.cooldownUntil !== undefined && p.cooldownUntil > now;
+          const pct = p?.usedPercent !== null && p?.usedPercent !== undefined ? Math.round(p.usedPercent * 100) : null;
+          return {
+            provider,
+            model: m.id,
+            name: m.name,
+            description: m.description,
+            default: m.default,
+            quotaType,
+            status: isCooldown ? 'cooldown' : 'ready',
+            cooldownUntil: p?.cooldownUntil ?? null,
+            usedPercent: p?.usedPercent ?? null,
+            note: isCooldown
+              ? 'Tạm nghỉ cả tài khoản (Dùng chung quota)'
+              : pct !== null
+                ? `Đã dùng ${pct}% (Dùng chung quota)`
+                : 'Sẵn sàng (Dùng chung quota)',
+          };
+        }
+        // per_model (Antigravity)
+        const mq = store.getModelQuota(provider, m.id);
+        const isCooldown = mq?.cooldownUntil !== null && mq?.cooldownUntil !== undefined && mq.cooldownUntil > now;
+        return {
+          provider,
+          model: m.id,
+          name: m.name,
+          description: m.description,
+          default: m.default,
+          quotaType,
+          status: isCooldown ? 'cooldown' : 'ready',
+          cooldownUntil: mq?.cooldownUntil ?? null,
+          usedPercent: mq?.usedPercent ?? null,
+          note: isCooldown
+            ? 'Hết quota • Tạm nghỉ'
+            : 'Hạn mức độc lập • Sẵn sàng',
+        };
+      });
+    }
+    return c.json(result);
+  });
+
+  app.post('/api/models/probe', async (c) => {
+    const b = await readJson(c);
+    const provider = reqString(b, 'provider');
+    const model = reqString(b, 'model');
+    const now = Date.now();
+    const quotaType = PROVIDER_QUOTA_TYPE[provider] ?? 'shared';
+
+    if (quotaType === 'per_model') {
+      const mq = store.getModelQuota(provider, model);
+      if (mq?.cooldownUntil && mq.cooldownUntil > now) {
+        return c.json({
+          ok: false,
+          provider,
+          model,
+          status: 'cooldown',
+          cooldownUntil: mq.cooldownUntil,
+          note: `Model ${model} đang hết hạn mức (tạm nghỉ đến ${new Date(mq.cooldownUntil).toLocaleTimeString()}).`,
+        });
+      }
+      return c.json({
+        ok: true,
+        provider,
+        model,
+        status: 'ready',
+        cooldownUntil: null,
+        note: `Model ${model} có hạn mức độc lập và đang SẴN SÀNG!`,
+      });
+    }
+
+    // shared (Claude, Codex)
+    const p = store.getProvider(provider);
+    const isCooldown = p?.cooldownUntil !== null && p?.cooldownUntil !== undefined && p.cooldownUntil > now;
+    if (isCooldown) {
+      return c.json({
+        ok: false,
+        provider,
+        model,
+        status: 'cooldown',
+        cooldownUntil: p!.cooldownUntil,
+        note: `${provider.toUpperCase()} dùng chung quota tài khoản và đang tạm nghỉ đến ${new Date(p!.cooldownUntil!).toLocaleTimeString()}.`,
+      });
+    }
+    const pct = p?.usedPercent !== null && p?.usedPercent !== undefined ? Math.round(p.usedPercent * 100) : null;
+    return c.json({
+      ok: true,
+      provider,
+      model,
+      status: 'ready',
+      cooldownUntil: null,
+      note: pct !== null
+        ? `${provider.toUpperCase()} dùng chung quota, đã dùng ${pct}%.`
+        : `${provider.toUpperCase()} dùng chung quota, đang sẵn sàng.`,
+    });
+  });
+
+  app.post('/api/models/reset-cooldown', async (c) => {
+    const b = await readJson(c);
+    const provider = reqString(b, 'provider');
+    const model = typeof b.model === 'string' ? b.model : undefined;
+    store.resetModelQuota(provider, model);
+    if (provider === 'antigravity') {
+      const now = Date.now();
+      const allModels = PROVIDER_MODELS[provider] ?? [];
+      const activeCooldowns = store.listModelQuotas(provider)
+        .filter((m) => m.cooldownUntil !== null && m.cooldownUntil > now);
+      if (activeCooldowns.length < allModels.length) {
+        const p = store.getProvider(provider);
+        if (p) store.upsertProvider({ ...p, cooldownUntil: null, updatedAt: now });
+      }
+    }
+    void orchestrator.tick();
+    return c.json({ ok: true });
+  });
+
+  app.post('/api/providers/:id/reset-cooldown', (c) => {
+    const id = c.req.param('id') as ProviderId;
+    const p = store.getProvider(id);
+    if (!p) return c.json({ error: 'Không tìm thấy provider' }, 404);
+    store.upsertProvider({ ...p, cooldownUntil: null, usedPercent: null, updatedAt: Date.now() });
+    try {
+      bus.publish({
+        id: 0,
+        taskId: '',
+        runId: null,
+        ts: Date.now(),
+        source: 'managed',
+        type: 'QUOTA_UPDATED',
+        data: { provider: id, cooldownUntil: null },
+      });
+    } catch { /* ignore */ }
+    void orchestrator.tick();
+    return c.json(store.getProvider(id));
+  });
+
+  app.post('/api/providers/refresh', async (c) => {
+    try {
+      await orchestrator.refreshProviders();
+      const list = store.listProviders();
+      try {
+        bus.publish({
+          id: 0,
+          taskId: '',
+          runId: null,
+          ts: Date.now(),
+          source: 'managed',
+          type: 'QUOTA_UPDATED',
+          data: { refreshed: true },
+        });
+      } catch { /* ignore */ }
+      return c.json(list);
+    } catch (e) {
+      return err(c, 500, `Không thể làm mới trạng thái CLI: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  });
+
+  app.post('/api/providers/install', async (c) => {
+    const b = await readJson(c);
+    const provider = reqString(b, 'provider').toLowerCase();
+    const pkg = PROVIDER_NPM_PACKAGES[provider];
+    if (!pkg) {
+      throw new BadRequest(`Nền tảng "${provider}" không hỗ trợ cài đặt tự động qua npm. Vui lòng xem hướng dẫn cài đặt thủ công.`);
+    }
+    try {
+      const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+      const { stdout, stderr } = await execFileAsync(npmBin, ['install', '-g', pkg], {
+        shell: process.platform === 'win32',
+        timeout: 120_000,
+        windowsHide: true,
+      });
+      await orchestrator.refreshProviders();
+      const providers = store.listProviders();
+      try {
+        bus.publish({
+          id: 0,
+          taskId: '',
+          runId: null,
+          ts: Date.now(),
+          source: 'managed',
+          type: 'QUOTA_UPDATED',
+          data: { installed: provider },
+        });
+      } catch { /* ignore */ }
+      return c.json({
+        ok: true,
+        provider,
+        package: pkg,
+        output: [stdout, stderr].filter(Boolean).join('\n').trim(),
+        providers,
+      });
+    } catch (e) {
+      return err(
+        c,
+        500,
+        `Không thể cài đặt tự động ${pkg}: ${e instanceof Error ? e.message : String(e)}. Bạn có thể chạy lệnh "npm install -g ${pkg}" trực tiếp trong Terminal.`,
+      );
+    }
+  });
 
   app.get('/api/projects', async (c) => {
     if (!d.projects) return c.json([]);
     return c.json(await d.projects.list({ refresh: c.req.query('refresh') === '1' }));
   });
 
-  app.get("/api/config", (c) => c.json(d.config ?? { ...DEFAULT_CONFIG, dataDir: "" }));
+  app.post('/api/projects/git-init', async (c) => {
+    const b = await readJson(c);
+    const repoPath = reqString(b, 'repoPath');
+    let isDir = false;
+    try {
+      isDir = statSync(repoPath).isDirectory();
+    } catch {
+      isDir = false;
+    }
+    if (!isDir) throw new BadRequest(`Thư mục không tồn tại: ${repoPath}`);
+    try {
+      const info = await initGitRepository(repoPath);
+      const projects = d.projects ? await d.projects.list({ refresh: true }) : [];
+      return c.json({ ok: true, ...info, projects }, 201);
+    } catch (e) {
+      return err(c, 500, `Không thể khởi tạo Git: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  });
+
+  app.get('/api/config', (c) => c.json(d.config ?? { ...DEFAULT_CONFIG, dataDir: '' }));
+
+  app.patch('/api/config', async (c) => {
+    const b = await readJson(c);
+    if (!d.config) {
+      d.config = { ...DEFAULT_CONFIG, dataDir: '' };
+    }
+    if (b.models && typeof b.models === 'object') {
+      d.config.models = { ...d.config.models, ...(b.models as Record<string, string>) };
+      if (d.config.dataDir) {
+        saveConfig(d.config.dataDir, { models: d.config.models });
+      }
+    }
+    if (b.modelFallbackPolicy === 'auto' || b.modelFallbackPolicy === 'ask') {
+      d.config.modelFallbackPolicy = b.modelFallbackPolicy;
+      if (d.config.dataDir) {
+        saveConfig(d.config.dataDir, { modelFallbackPolicy: d.config.modelFallbackPolicy });
+      }
+    }
+    return c.json(d.config);
+  });
 
   app.post('/api/shutdown', async (c) => {
     if (!d.onShutdown) return err(c, 501, 'Daemon này không hỗ trợ tắt từ xa.');

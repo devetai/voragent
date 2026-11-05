@@ -78,7 +78,7 @@ Các thành phần:
 | Provider (nền tảng) | Claude, Codex… cùng trạng thái quota của nó | Claude: tạm nghỉ đến 15:00 |
 | Session (phiên) | Phiên phía CLI, dùng để tiếp tục trong cùng một nền tảng | session id của Claude Code |
 | Event (sự kiện) | Đơn vị nhỏ nhất, được tất cả các chế độ xem dùng chung | `TOOL_CALL_START Read src/auth.ts` |
-| Workspace | Thư mục, thường là git worktree, nơi một task chạy | `.voragent/worktrees/task-42` |
+| Workspace | Thư mục, thường là git worktree, nơi một task chạy | `.voragent/worktrees/<project-slug>/task-42` |
 
 **Dạng sự kiện chung:** dựa trên các loại sự kiện AG-UI giống tiptask runner (`RUN_STARTED`, `TEXT_MESSAGE_*`, `TOOL_CALL_*`, `RUN_FINISHED`, `RUN_ERROR`), bổ sung các sự kiện voragent cần:
 
@@ -300,3 +300,23 @@ Quy tắc chung: chỉ đọc đường dẫn và thời gian. Không đọc n�
 ### 14.5 Không phải mục tiêu của phần này
 
 Xem hay nối tiếp phiên cũ, ẩn hoặc ghim dự án, nguồn Codex và `agy`, lưu chữ đã gõ vào ô lọc. Có thể thêm sau.
+
+
+## 15. Mô hình Văn phòng Dự án, Shared Memory, Trưởng phòng & Tương tác 3 tầng (bổ sung 2026-11-05)
+
+1. **1 Dự án = 1 Văn phòng tự chủ (Project Office) & Shared Memory:**
+   - Mỗi dự án hoạt động như một văn phòng riêng, trong đó Claude Code, Antigravity và Codex cùng thực hiện các nhiệm vụ khác nhau và chia sẻ chung một kho **Shared Memory** (`project_memories` trong SQLite, phân thành 4 nhóm: `architecture`, `decision`, `context`, `finding`).
+   - Khi bất kỳ nhân viên nào bắt đầu lượt chạy, hệ thống tự động tiêm các mục Shared Memory của dự án đó vào `systemPrompt` để mọi agent nắm được quy ước kiến trúc, quyết định chung và tiến độ của nhau.
+   - Trên tường Văn phòng 3D có **Bảng Trắng Shared Memory** hiển thị trực tiếp các mục đã ghim; bấm vào bảng mở ngăn kéo quản lý bộ nhớ chung ngay tại chỗ.
+
+2. **Trưởng phòng (Manager / Lead Agent) & Điều phối Sub-agents:**
+   - Trong mỗi văn phòng dự án có 1 **Trưởng phòng (`manager`)** ngồi tại bàn chỉ huy trung tâm (đội vương miện vàng ấm, đeo cà vạt đỏ).
+   - Người dùng giao mục tiêu lớn cho Trưởng phòng theo 2 chế độ: **Bán tự động** (Trưởng phòng tách mục tiêu thành các sub-task chuyên môn cho Claude, Antigravity, Codex; người dùng xem/sửa rồi bấm "Duyệt & Giao việc") hoặc **Tự động hoàn toàn** (tách việc và chạy ngay).
+
+3. **Tương tác trực quan tại chỗ (3D & 2D Contextual Menu):**
+   - Bấm vào bất kỳ chú rắn nào (Trưởng phòng, Claude, Codex, Antigravity) trong Văn phòng 3D sẽ lia camera tới gần và mở **Menu Tùy Chọn Agent** nổi ngay tại chỗ (giao việc nhanh cho agent đó, mở chat/timeline, bàn giao sang nhân viên khác qua `POST /api/tasks/:id/assign`, ghi chú vào Shared Memory, thử biểu cảm) mà không làm người dùng bị văng khỏi không gian 3D.
+
+4. **Phân cấp trải nghiệm 3 tầng (Tổng quan → Chi tiết):**
+   - **Tầng 1 (Đại sảnh Dự án):** Nhìn tổng quan tất cả các Văn phòng Dự án kèm thanh KPI hệ thống, đội ngũ nhân sự trong từng phòng và số mục Shared Memory.
+   - **Tầng 2 (Không gian Văn phòng Dự án):** Chọn 1 dự án để xem Văn phòng 3D, Bảng điều phối Trưởng phòng, Shared Memory và Bảng Kanban của riêng dự án đó.
+   - **Tầng 3 (Ngăn kéo Chi tiết tại chỗ - Side Inspector Drawer):** Xem chi tiết Task, Kế hoạch Trưởng phòng hoặc Shared Memory ở ngăn kéo bên phải trong khi vẫn giữ góc nhìn tổng quan bên trái.

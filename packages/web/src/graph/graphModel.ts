@@ -31,12 +31,19 @@ export function extractGraphData(
   const nodesMap = new Map<string, GraphNode>();
   const edgesMap = new Map<string, GraphEdge>();
 
-  // 1. Tạo Provider Nodes
-  providers.forEach((p, idx) => {
+  // 1. Tạo Provider Nodes — Chỉ hiển thị các Provider ĐÃ CÀI ĐẶT hoặc có Task thực thi thực tế
+  const usedProviderIds = new Set(
+    tasks.map((t) => t.currentProvider?.toLowerCase()).filter((x): x is string => Boolean(x))
+  );
+  const activeProviders = providers.filter(
+    (p) => p.installed || usedProviderIds.has(p.id.toLowerCase())
+  );
+
+  activeProviders.forEach((p, idx) => {
     const id = `provider-${p.id}`;
     const nameLower = p.id.toLowerCase();
     let color = '#8B5CF6';
-    let icon = '🐍';
+    const icon = '⚡';
     let label = p.id;
 
     if (nameLower.includes('claude')) {
@@ -51,14 +58,20 @@ export function extractGraphData(
     }
 
     // Tọa độ khởi tạo vòng cung phía trên
-    const angle = (idx / Math.max(1, providers.length)) * Math.PI - Math.PI / 2;
+    const angle = (idx / Math.max(1, activeProviders.length)) * Math.PI - Math.PI / 2;
     const r = 240;
+
+    const subLabel = !p.installed
+      ? 'Chưa cài CLI'
+      : p.cooldownUntil && p.cooldownUntil > Date.now()
+      ? 'Tạm nghỉ (Quota)'
+      : 'Sẵn sàng';
 
     nodesMap.set(id, {
       id,
       type: 'provider',
       label,
-      subLabel: p.cooldownUntil && p.cooldownUntil > Date.now() ? 'Tạm nghỉ (Quota)' : 'Sẵn sàng',
+      subLabel,
       color,
       icon,
       radius: 32,
