@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 36" fill="none">
+  <mask id="eye-hole-logo" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36">
+    <rect width="36" height="36" fill="#FFFFFF" />
+    <circle cx="23.42" cy="8.58" r="1.15" fill="#000000" />
+  </mask>
+  <g transform="translate(2, 2)">
+    <!-- Ouroboros Master Icon -->
+    <g mask="url(#eye-hole-logo)">
+      <path
+        d="M 23.42 8.58 A 10.5 10.5 0 1 0 26.14 18.72"
+        stroke="#1F1B18"
+        stroke-width="5"
+        stroke-linecap="round"
+        fill="none"
+      />
+    </g>
+  </g>
+  <!-- Wordmark "voragent" -->
+  <text x="42" y="24" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="#1F1B18" letter-spacing="-0.03em">voragent</text>
+</svg>

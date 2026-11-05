@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Voragent · Brand Identity & Motion Showcase</title>
+  <style>
+    :root {
+      --bg: #FAF8F5;
+      --card: #FFFFFF;
+      --border: #E8E2D8;
+      --text: #1F1B18;
+      --text-muted: #6E655C;
+      --primary: #1F1B18;
+      --cream: #F3EDE2;
+      --blush: #FCA5A5;
+      --claude: #D97757;
+      --codex: #10A37F;
+      --agy: #4285F4;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 2.5rem 1.5rem;
+      line-height: 1.5;
+    }
+    .container { max-width: 1040px; margin: 0 auto; }
+
+    header.doc-header {
+      margin-bottom: 2.5rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.5rem;
+    }
+    .doc-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--primary);
+      color: var(--bg);
+      margin-bottom: 0.75rem;
+    }
+    h1 { font-size: 2.2rem; margin-bottom: 0.5rem; font-weight: 700; letter-spacing: -0.02em; }
+    p.subtitle { color: var(--text-muted); font-size: 1.05rem; max-width: 780px; }
+
+    h2 {
+      font-size: 1.35rem;
+      margin: 2.5rem 0 1.25rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    h2::before {
+      content: "";
+      display: inline-block;
+      width: 4px;
+      height: 20px;
+      background: var(--primary);
+      border-radius: 2px;
+    }
+
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+      position: relative;
+    }
+    .card.recommended {
+      border: 2px solid var(--primary);
+    }
+    .badge-star {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      background: #1F1B18;
+      color: #FAF8F5;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 12px;
+      letter-spacing: 0.04em;
+    }
+
+    .preview-stage {
+      background: var(--bg);
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      padding: 2rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.25rem;
+      margin: 1rem 0;
+      min-height: 150px;
+    }
+
+    /* ==========================================================================
+       DISPATCH THEATER (RẮN MẸ GIAO VIỆC CHO ĐÀN RẮN CON)
+       ========================================================================== */
+    .dispatch-theater {
+      position: relative;
+      width: 100%;
+      max-width: 580px;
+      height: 160px;
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+    }
+
+    /* Rắn Mẹ (Bên trái) */
+    .boss-snake-wrap {
+      position: absolute;
+      left: 18px;
+      bottom: 18px;
+      width: 76px;
+      height: 68px;
+      animation: boss-nod 2.2s infinite ease-in-out;
+      transform-origin: bottom center;
+    }
+    @keyframes boss-nod {
+      0%, 100% { transform: translateY(0) scale(1, 1); }
+      50% { transform: translateY(-4px) scale(1.02, 0.98); }
+    }
+
+    /* Gói Task (Rắn Mẹ nhả ra và trao tại điểm hẹn) */
+    .task-parcel {
+      position: absolute;
+      left: 82px;
+      bottom: 52px;
+      width: 28px;
+      height: 28px;
+      background: var(--primary);
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #FAF8F5;
+      font-size: 10px;
+      font-weight: 700;
+      font-family: monospace;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+      animation: boss-task-dispatch 1.5s infinite cubic-bezier(0.25, 0.1, 0.25, 1);
+      z-index: 5;
+    }
+    .task-parcel span.tag {
+      font-size: 6px;
+      color: #FCA5A5;
+      font-family: sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      line-height: 1;
+    }
+
+    @keyframes boss-task-dispatch {
+      0% {
+        transform: translate(0, 0) scale(0.2) rotate(-20deg);
+        opacity: 0;
+      }
+      22% {
+        transform: translate(16px, -16px) scale(1.1) rotate(5deg);
+        opacity: 1;
+      }
+      72% {
+        /* Đỉnh giao thoa - chờ Rắn Con đón */
+        transform: translate(55px, -24px) scale(1) rotate(-5deg);
+        opacity: 1;
+      }
+      78%, 100% {
+        /* Rắn Con đã ngậm lấy task -> task của Rắn Mẹ biến mất */
+        transform: translate(57px, -24px) scale(0.2);
+        opacity: 0;
+      }
+    }
+
+    /* Đàn Rắn Con di chuyển theo hình tam giác */
+    .baby-stream {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .baby-snake {
+      position: absolute;
+      width: 56px;
+      height: 46px;
+      opacity: 0;
+      animation: baby-triangle-slither 4.5s infinite linear;
+      animation-fill-mode: both;
+    }
+    /* Negative delay triệt tiêu 100% độ trễ: tất cả rắn con đều trườn liên tục không con nào bị đơ đứng im */
+    .baby-1 { animation-delay: 0s; }
+    .baby-2 { animation-delay: -1.5s; }
+    .baby-3 { animation-delay: -3.0s; }
+
+    /* Thẻ Task ngậm trước mồm và ĐI CÙNG Rắn Con 100% */
+    .baby-carried-task {
+      position: absolute;
+      left: -10px;
+      top: 10px;
+      width: 24px;
+      height: 24px;
+      background: var(--primary, #1F1B18);
+      border-radius: 5px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #FAF8F5;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.22);
+      pointer-events: none;
+      z-index: 6;
+      animation: baby-task-carry-preview 4.5s infinite linear;
+      animation-fill-mode: both;
+    }
+    .baby-carried-task span.tag {
+      font-size: 5.5px;
+      color: #FCA5A5;
+      font-family: sans-serif;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      line-height: 1;
+    }
+    .baby-carried-task span.code {
+      font-size: 9px;
+      font-weight: 700;
+      font-family: monospace;
+      line-height: 1;
+    }
+
+    .baby-1 .baby-carried-task { animation-delay: 0s; }
+    .baby-2 .baby-carried-task { animation-delay: -1.5s; }
+    .baby-3 .baby-carried-task { animation-delay: -3.0s; }
+
+    @keyframes baby-task-carry-preview {
+      0%, 36% {
+        transform: scale(0) rotate(-10deg);
+        opacity: 0;
+      }
+      38% {
+        /* Vừa chạm đỉnh gặp gỡ: đớp lấy task */
+        transform: scale(1.18) rotate(8deg);
+        opacity: 1;
+      }
+      44% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+      }
+      88% {
+        /* Mang task theo suốt quãng đường trượt dốc xuống đáy và chạy sang phải */
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+      }
+      96%, 100% {
+        /* Chạy vào worktree giao task an toàn */
+        transform: scale(0.3);
+        opacity: 0;
+      }
+    }
+
+    /* Rắn trực trạm (Worktree Station Worker) */
+    .station-worker {
+      position: absolute;
+      right: 48px;
+      bottom: 20px;
+      width: 56px;
+      height: 46px;
+      animation: worker-idle 2s infinite ease-in-out;
+      transform-origin: bottom center;
+    }
+    @keyframes worker-idle {
+      0%, 100% { transform: translateY(0) scale(1, 1); }
+      50% { transform: translateY(-3px) scale(1.02, 0.98); }
+    }
+
+    /* Rắn con thoi chạy đưa việc (Shuttle Runner) */
+    .shuttle-runner {
+      position: absolute;
+      width: 56px;
+      height: 46px;
+      opacity: 0;
+      animation: shuttle-slither 3.4s infinite linear;
+      animation-fill-mode: both;
+    }
+    .shuttle-runner .shuttle-task {
+      animation: shuttle-task-carry 3.4s infinite linear;
+    }
+    @keyframes shuttle-task-carry {
+      0%, 40% { transform: scale(0); opacity: 0; }
+      42% { transform: scale(1.15) rotate(6deg); opacity: 1; }
+      46% { transform: scale(1) rotate(0deg); opacity: 1; }
+      82% { transform: scale(1) rotate(0deg); opacity: 1; }
+      92%, 100% { transform: scale(0.3); opacity: 0; }
+    }
+    @keyframes shuttle-slither {
+      0% {
+        transform: translate(380px, 95px) rotate(-14deg);
+        opacity: 0;
+      }
+      8% { opacity: 1; }
+      42% {
+        transform: translate(145px, 26px) rotate(0deg) scale(1.08);
+        opacity: 1;
+      }
+      48% {
+        transform: translate(135px, 28px) rotate(8deg) scale(1.1);
+      }
+      78% {
+        transform: translate(360px, 95px) rotate(10deg) scale(1);
+        opacity: 1;
+      }
+      92%, 100% {
+        transform: translate(380px, 95px) rotate(0deg);
+        opacity: 0;
+      }
+    }
+
+    /* Quỹ đạo tam giác:
+       - Cạnh 1: Từ góc dưới phải (440, 95) trườn dốc LÊN đỉnh (145, 26) đón task
+       - Cạnh 2: Từ đỉnh (145, 26) trượt dốc XUỐNG đáy (280, 95) mang task về
+       - Cạnh 3: Trườn ngang đáy từ (280, 95) -> (440, 95) khép vòng lặp
+    */
+    @keyframes baby-triangle-slither {
+      0% {
+        transform: translate(440px, 95px) rotate(-14deg);
+        opacity: 0;
+      }
+      8% {
+        opacity: 1;
+      }
+      38% {
+        /* Đỉnh tam giác - đớp task từ Rắn Mẹ */
+        transform: translate(145px, 26px) rotate(0deg) scale(1.08);
+        opacity: 1;
+      }
+      44% {
+        transform: translate(135px, 28px) rotate(8deg) scale(1.12);
+      }
+      68% {
+        /* Trượt dốc xuống đáy */
+        transform: translate(280px, 95px) rotate(16deg) scale(1);
+        opacity: 1;
+      }
+      88% {
+        /* Trườn ngang đáy */
+        transform: translate(420px, 95px) rotate(0deg);
+        opacity: 0.8;
+      }
+      100% {
+        transform: translate(440px, 95px) rotate(0deg);
+        opacity: 0;
+      }
+    }
+
+    /* Đuôi rắn con vẫy phía sau bên phải */
+    .baby-tail {
+      transform-origin: 53px 36px;
+      animation: tail-wag 0.22s infinite ease-in-out alternate;
+    }
+    @keyframes tail-wag {
+      0% { transform: rotate(-8deg); }
+      100% { transform: rotate(14deg); }
+    }
+
+    /* ==========================================================================
+       OUROBOROS LOGO LOADER (RẮN DÀI DẦN RA THEO LOGO - KHÔNG XOAY CẢ LOGO)
+       ========================================================================== */
+    .snake-loader-ouroboros {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .snake-loader-ouroboros.size-sm {
+      width: 20px;
+      height: 20px;
+    }
+    .snake-loader-ouroboros.size-md {
+      width: 38px;
+      height: 38px;
+    }
+    .snake-loader-ouroboros.size-lg {
+      width: 68px;
+      height: 68px;
+    }
+
+    /* SVG giữ nguyên phương hướng chuẩn của Logo voragent, KHÔNG XOAY */
+    .ouro-grow-svg {
+      width: 100%;
+      height: 100%;
+      transform: none;
+    }
+
+    /* 1. Mặc định (Grow & Slither Loop): Rắn dài dần ra từ đuôi tới đầu */
+    .ouro-grow-body {
+      stroke-dasharray: 55;
+      stroke-dashoffset: 55;
+      animation: ouro-snake-grow 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    @keyframes ouro-snake-grow {
+      0% {
+        stroke-dashoffset: 55;
+        opacity: 0.2;
+      }
+      6% {
+        opacity: 1;
+      }
+      48% {
+        /* Đạt chiều dài cực đại: hình thành trọn vẹn Logo Ouroboros */
+        stroke-dashoffset: 0;
+      }
+      68% {
+        /* Giữ nguyên hình dạng logo chuẩn để nhận diện thương hiệu rõ nét */
+        stroke-dashoffset: 0;
+      }
+      92% {
+        /* Đuôi thu gọn lại, lướt về phía trước mở ra chu trình tiếp theo */
+        stroke-dashoffset: -55;
+      }
+      100% {
+        stroke-dashoffset: -55;
+      }
+    }
+
+    .ouro-grow-eye-mask {
+      transform-origin: 23.42px 8.58px;
+      animation: ouro-grow-eye-mask-anim 2.2s ease-in-out infinite;
+    }
+    .ouro-grow-eye-dot {
+      fill: #D97757;
+      transform-origin: 23.42px 8.58px;
+      animation: ouro-grow-dot-anim 2.2s ease-in-out infinite;
+    }
+
+    @keyframes ouro-grow-eye-mask-anim {
+      0%, 42% {
+        opacity: 0;
+        transform: scale(0);
+      }
+      48% {
+        opacity: 1;
+        transform: scale(1.2);
+      }
+      68% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      88%, 100% {
+        opacity: 0;
+        transform: scale(0.3);
+      }
+    }
+
+    @keyframes ouro-grow-dot-anim {
+      0%, 44% {
+        opacity: 0;
+        transform: scale(0);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.3);
+      }
+      65% {
+        opacity: 0.85;
+        transform: scale(1);
+      }
+      85%, 100% {
+        opacity: 0;
+        transform: scale(0.2);
+      }
+    }
+
+    /* 2. Biến thể Fade: Rắn dài dần ra -> Đủ Logo -> Mờ dần reset */
+    .ouro-fade-body {
+      stroke-dasharray: 55;
+      stroke-dashoffset: 55;
+      animation: ouro-snake-fade-anim 2.4s ease-in-out infinite;
+    }
+
+    @keyframes ouro-snake-fade-anim {
+      0% {
+        stroke-dashoffset: 55;
+        opacity: 0;
+      }
+      10% {
+        opacity: 1;
+      }
+      55% {
+        stroke-dashoffset: 0;
+        opacity: 1;
+      }
+      75% {
+        stroke-dashoffset: 0;
+        opacity: 1;
+      }
+      95%, 100% {
+        stroke-dashoffset: 0;
+        opacity: 0;
+      }
+    }
+
+    .ouro-fade-eye-mask {
+      transform-origin: 23.42px 8.58px;
+      animation: ouro-fade-eye-mask-anim 2.4s ease-in-out infinite;
+    }
+    .ouro-fade-eye-dot {
+      fill: #D97757;
+      transform-origin: 23.42px 8.58px;
+      animation: ouro-fade-dot-anim 2.4s ease-in-out infinite;
+    }
+
+    @keyframes ouro-fade-eye-mask-anim {
+      0%, 50% {
+        opacity: 0;
+        transform: scale(0);
+      }
+      55% {
+        opacity: 1;
+        transform: scale(1.15);
+      }
+      75% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      95%, 100% {
+        opacity: 0;
+        transform: scale(0.5);
+      }
+    }
+
+    @keyframes ouro-fade-dot-anim {
+      0%, 52% {
+        opacity: 0;
+        transform: scale(0);
+      }
+      58% {
+        opacity: 1;
+        transform: scale(1.25);
+      }
+      75% {
+        opacity: 0.9;
+        transform: scale(1);
+      }
+      95%, 100% {
+        opacity: 0;
+        transform: scale(0.3);
+      }
+    }
+
+    /* 3. Biến thể Pulse: Co dãn nhịp thở tại chỗ (không biến mất hoàn toàn) */
+    .ouro-pulse-body {
+      stroke-dasharray: 55;
+      stroke-dashoffset: 20;
+      animation: ouro-snake-pulse-anim 1.8s ease-in-out infinite alternate;
+    }
+
+    @keyframes ouro-snake-pulse-anim {
+      0% {
+        stroke-dashoffset: 28;
+      }
+      100% {
+        stroke-dashoffset: 0;
+      }
+    }
+
+    .ouro-pulse-eye-mask {
+      transform-origin: 23.42px 8.58px;
+      animation: ouro-pulse-eye-anim 1.8s ease-in-out infinite alternate;
+    }
+    .ouro-pulse-eye-dot {
+      fill: #D97757;
+      transform-origin: 23.42px 8.58px;
+      animation: ouro-pulse-dot-anim 1.8s ease-in-out infinite alternate;
+    }
+
+    @keyframes ouro-pulse-eye-anim {
+      0% { transform: scale(0.85); opacity: 0.5; }
+      100% { transform: scale(1.15); opacity: 1; }
+    }
+
+    @keyframes ouro-pulse-dot-anim {
+      0% { transform: scale(0.7); opacity: 0.3; }
+      100% { transform: scale(1.25); opacity: 1; }
+    }
+
+    /* Orbit Particle */
+    .ouro-orbit-particle {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: #D97757;
+      border-radius: 50%;
+      box-shadow: 0 0 8px rgba(217, 119, 87, 0.6);
+      animation: ouro-particle-orbit 2.4s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .snake-loader-ouroboros.size-sm .ouro-orbit-particle { width: 3px; height: 3px; }
+    .snake-loader-ouroboros.size-lg .ouro-orbit-particle { width: 9px; height: 9px; }
+
+    @keyframes ouro-particle-orbit {
+      0% { transform: rotate(0deg) translateX(18px) scale(0.8); opacity: 0.4; }
+      35% { transform: rotate(140deg) translateX(12px) scale(1.2); opacity: 1; }
+      70% { transform: rotate(260deg) translateX(4px) scale(0.9); opacity: 0.8; }
+      100% { transform: rotate(360deg) translateX(18px) scale(0.8); opacity: 0.4; }
+    }
+
+    /* Ripple Rings */
+    .ouro-ripple-ring {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 1.5px solid currentColor;
+      transform: translate(-50%, -50%) scale(0.8);
+      opacity: 0;
+      pointer-events: none;
+      animation: ouro-ripple-pulse 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+    }
+    .ouro-ripple-ring:nth-child(2) {
+      animation-delay: 1s;
+    }
+    @keyframes ouro-ripple-pulse {
+      0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.45; }
+      100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+    }
+
+    /* Bite Mode (Nuốt Đuôi & Tái Sinh) */
+    .ouroboros-bite-svg {
+      width: 100%;
+      height: 100%;
+      transform-origin: 16px 16px;
+      animation: ouro-bite-spin 2s linear infinite;
+    }
+    .ouro-bite-circle {
+      stroke-dasharray: 52 66;
+      stroke-dashoffset: 0;
+      animation: ouro-bite-dash 2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+    }
+    @keyframes ouro-bite-spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes ouro-bite-dash {
+      0% {
+        stroke-dasharray: 52 66;
+        stroke-dashoffset: 0;
+      }
+      45% {
+        stroke-dasharray: 63 66;
+        stroke-dashoffset: -4;
+      }
+      75% {
+        stroke-dasharray: 48 66;
+        stroke-dashoffset: -18;
+      }
+      100% {
+        stroke-dasharray: 52 66;
+        stroke-dashoffset: -66;
+      }
+    }
+    .ouro-bite-eye {
+      animation: ouro-bite-eye-anim 2s linear infinite;
+    }
+    @keyframes ouro-bite-eye-anim {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    /* Button Demo */
+    .btn-mock {
+      background: var(--primary);
+      color: #FAF8F5;
+      border: none;
+      border-radius: 8px;
+      padding: 0.6rem 1.2rem;
+      font-size: 0.9rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="doc-header">
+      <div class="doc-badge">voragent · Brand & Motion Identity</div>
+      <h1>Nhận Diện Thương Hiệu & Hoạt Cảnh Loading 🐍✨</h1>
+      <p class="subtitle">
+        Tổng hợp trọn bộ: Logo & Favicon chuẩn hình học (Ouroboros Pure Ring), Tạo hình linh vật Chú Rắn Chibi phúng phính đáng yêu, và Các hiệu ứng Loading chuyển động Ouroboros sống động dựa trực tiếp trên Logo.
+      </p>
+    </header>
+
+    <!-- PHẦN 1: LOGO & FAVICON -->
+    <section>
+      <h2><span>1. Logo & Favicon Chính Thức (Ouroboros Pure Ring)</span></h2>
+      <div class="grid-2">
+        <div class="card recommended">
+          <span class="badge-star">★ CHÍNH THỨC</span>
+          <h3>Logo Voragent (56px & 28px)</h3>
+          <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.25rem;">
+            Vòng tròn khép kín Ouroboros bo góc hoàn hảo $45^\circ$, mắt cutout âm bản xuyên thấu (SVG mask).
+          </p>
+          <div class="preview-stage">
+            <div style="display: flex; gap: 2rem; align-items: center;">
+              <!-- 56px -->
+              <svg width="56" height="56" viewBox="0 0 32 32" fill="none">
+                <mask id="preview-logo-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+                  <rect width="32" height="32" fill="#FFFFFF" />
+                  <circle cx="23.42" cy="8.58" r="1.15" fill="#000000" />
+                </mask>
+                <g mask="url(#preview-logo-mask)">
+                  <path d="M 23.42 8.58 A 10.5 10.5 0 1 0 26.14 18.72" stroke="#1F1B18" stroke-width="5" stroke-linecap="round" fill="none" />
+                </g>
+              </svg>
+
+              <!-- 32px + Brand Text -->
+              <div style="display: flex; align-items: center; gap: 0.6rem;">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                  <mask id="preview-logo-mask-sm" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+                    <rect width="32" height="32" fill="#FFFFFF" />
+                    <circle cx="23.42" cy="8.58" r="1.15" fill="#000000" />
+                  </mask>
+                  <g mask="url(#preview-logo-mask-sm)">
+                    <path d="M 23.42 8.58 A 10.5 10.5 0 1 0 26.14 18.72" stroke="#1F1B18" stroke-width="5" stroke-linecap="round" fill="none" />
+                  </g>
+                </svg>
+                <span style="font-weight: 700; font-size: 1.25rem; letter-spacing: -0.02em;">voragent</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Favicon & Icon Ứng Dụng (16px & 24px)</h3>
+          <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.25rem;">
+            Hiển thị sắc nét trên tab trình duyệt và thanh địa chỉ URL.
+          </p>
+          <div class="preview-stage">
+            <div style="display: flex; gap: 1.5rem; align-items: center;">
+              <!-- 24px -->
+              <div style="background: #FFFFFF; border: 1px solid var(--border); padding: 8px; border-radius: 8px;">
+                <img src="/favicon.svg" width="24" height="24" alt="favicon 24" />
+              </div>
+              <!-- 16px Browser Tab mockup -->
+              <div style="background: #FFFFFF; border: 1px solid var(--border); padding: 6px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted);">
+                <img src="/favicon.svg" width="16" height="16" alt="favicon 16" />
+                <span>Voragent · Quota Dashboard</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHẦN 2: TẠO HÌNH LINH VẬT RẮN CHIBI MỚI -->
+    <section>
+      <h2><span>2. Tạo Hình Linh Vật: Chú Rắn Chibi Múp Míp & Có Hồn</span></h2>
+      <p style="color: var(--text-muted); font-size: 1rem; margin-bottom: 1.25rem;">
+        Khắc phục dứt điểm hình vẽ que củi mỏng manh trước đó. Thay thế bằng hình thể Chibi tròn trịa, đẫy đà, mắt anime lấp lánh và biểu cảm ngập tràn năng lượng.
+      </p>
+
+      <div class="grid-3">
+        <!-- RẮN TRƯỞNG / MẸ DEV -->
+        <div class="card recommended">
+          <span class="badge-star">★ TECH LEAD</span>
+          <h3 style="font-size: 1.05rem;">Rắn Trưởng (Orchestrator)</h3>
+          <div class="preview-stage" style="min-height: 140px;">
+            <svg width="86" height="76" viewBox="0 0 90 80" fill="none">
+              <!-- Thân dưới cuộn mập mạp ấm cúng -->
+              <path d="M 18 64 C 10 64 6 56 10 48 C 14 40 24 38 34 40 C 44 42 54 44 64 44 C 74 44 80 52 76 60 C 72 68 60 70 46 70 C 32 70 24 70 18 64 Z" fill="#1F1B18"/>
+              <path d="M 24 60 C 30 64 48 64 62 60 C 68 58 70 54 67 51 C 62 54 48 56 34 54 C 26 53 22 57 24 60 Z" fill="#F3EDE2"/>
+              
+              <!-- Cổ vươn -->
+              <path d="M 36 48 C 36 36 44 30 50 24" stroke="#1F1B18" stroke-width="14" stroke-linecap="round"/>
+              <path d="M 38 46 C 40 38 46 32 50 28" stroke="#F3EDE2" stroke-width="4" stroke-linecap="round"/>
+              <path d="M 12 50 C 6 46 4 38 9 34 C 12 31 16 34 15 38" stroke="#1F1B18" stroke-width="5" stroke-linecap="round" fill="none"/>
+
+              <!-- Đầu tròn to má phúng phính -->
+              <ellipse cx="52" cy="20" rx="17" ry="14" fill="#1F1B18"/>
+              
+              <!-- Kính thông thái -->
+              <circle cx="45" cy="18" r="5" stroke="#FAF8F5" stroke-width="1.8" fill="#2B2622"/>
+              <circle cx="59" cy="18" r="5" stroke="#FAF8F5" stroke-width="1.8" fill="#2B2622"/>
+              <line x1="50" y1="18" x2="54" y2="18" stroke="#FAF8F5" stroke-width="1.8"/>
+
+              <!-- Mắt qua kính -->
+              <circle cx="45" cy="18" r="2.8" fill="#FFFFFF"/>
+              <circle cx="45.5" cy="17.5" r="1.9" fill="#1F1B18"/>
+              <circle cx="44.5" cy="16.5" r="0.8" fill="#FFFFFF"/>
+
+              <circle cx="59" cy="18" r="2.8" fill="#FFFFFF"/>
+              <circle cx="58.5" cy="17.5" r="1.9" fill="#1F1B18"/>
+              <circle cx="57.5" cy="16.5" r="0.8" fill="#FFFFFF"/>
+
+              <!-- Tai nghe Headset -->
+              <path d="M 35 17 C 35 7 69 7 69 17" stroke="#E8E2D8" stroke-width="2" stroke-linecap="round" fill="none"/>
+              <rect x="32" y="15" width="4" height="8" rx="2" fill="#D97757"/>
+              <rect x="68" y="15" width="4" height="8" rx="2" fill="#D97757"/>
+              <path d="M 35 21 C 37 27 45 27 48 26" stroke="#E8E2D8" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+              <circle cx="49" cy="26" r="1.4" fill="#D97757"/>
+
+              <!-- Má hồng & nụ cười -->
+              <ellipse cx="37" cy="24" rx="2.8" ry="1.4" fill="#FCA5A5" opacity="0.85"/>
+              <ellipse cx="67" cy="24" rx="2.8" ry="1.4" fill="#FCA5A5" opacity="0.85"/>
+              <path d="M 50 25 Q 52 27 54 25" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+            </svg>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center;">
+            Ngồi cuộn tròn đẫy đà, đeo kính và tai nghe headset dev, gật gù ra hiệu phân chia quota và task.
+          </p>
+        </div>
+
+        <!-- RẮN CON MÚP MÍP NGUYÊN BẢN (QUAY MẶT SANG TRÁI VỀ RẮN MẸ) -->
+        <div class="card">
+          <h3 style="font-size: 1.05rem;">Rắn Con Hướng Về Rắn Mẹ</h3>
+          <div class="preview-stage" style="min-height: 140px;">
+            <svg width="80" height="70" viewBox="0 0 65 52" fill="none">
+              <!-- Đuôi vẫy phía sau bên phải -->
+              <g class="baby-tail">
+                <path d="M 53 36 C 59 36 61 28 57 22 C 54 18 49 21 51 26" stroke="#1F1B18" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+              </g>
+              <!-- Thân ngắn múp míp hướng sang trái -->
+              <path d="M 51 36 C 43 36 39 26 31 26 C 25 26 21 30 15 29" stroke="#1F1B18" stroke-width="11" stroke-linecap="round"/>
+              <path d="M 47 36 C 41 36 37 28 31 28 C 26 28 22 31 17 30" stroke="#F3EDE2" stroke-width="3.8" stroke-linecap="round"/>
+
+              <!-- Đầu to phúng phính hướng sang trái (x=17) -->
+              <ellipse cx="17" cy="18" rx="13" ry="11" fill="#1F1B18"/>
+              <ellipse cx="8" cy="21" rx="2.2" ry="1.3" fill="#FCA5A5"/>
+              <ellipse cx="26" cy="21" rx="2.2" ry="1.3" fill="#FCA5A5"/>
+
+              <!-- Mắt to long lanh ngước nhìn Rắn Mẹ -->
+              <ellipse cx="12" cy="15" rx="3.5" ry="4.2" fill="#FFFFFF"/>
+              <ellipse cx="11" cy="15" rx="2.5" ry="3.2" fill="#1F1B18"/>
+              <circle cx="10" cy="13.5" r="1" fill="#FFFFFF"/>
+
+              <ellipse cx="22" cy="15" rx="3.5" ry="4.2" fill="#FFFFFF"/>
+              <ellipse cx="21" cy="15" rx="2.5" ry="3.2" fill="#1F1B18"/>
+              <circle cx="20" cy="13.5" r="1" fill="#FFFFFF"/>
+
+              <!-- Cười toe toét háo hức -->
+              <path d="M 15 20 C 15 24 19 24 19 20 Z" fill="#FCA5A5"/>
+            </svg>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center;">
+            Đầu quay sang trái nhìn chăm chú về Rắn Mẹ, mắt to long lanh háo hức đón nhận nhiệm vụ.
+          </p>
+        </div>
+
+        <!-- RẮN CON NGẬM CODE HƯỚNG TRÁI -->
+        <div class="card">
+          <h3 style="font-size: 1.05rem;">Rắn Con Ngậm Task Về Worktree</h3>
+          <div class="preview-stage" style="min-height: 140px;">
+            <svg width="86" height="70" viewBox="0 0 75 52" fill="none">
+              <g class="baby-tail">
+                <path d="M 63 36 C 69 36 71 28 67 22 C 64 18 59 21 61 26" stroke="#1F1B18" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+              </g>
+              <path d="M 61 36 C 53 36 49 26 41 26 C 35 26 31 30 25 29" stroke="#1F1B18" stroke-width="11" stroke-linecap="round"/>
+              <path d="M 57 36 C 51 36 47 28 41 28 C 36 28 32 31 27 30" stroke="#F3EDE2" stroke-width="3.8" stroke-linecap="round"/>
+
+              <ellipse cx="27" cy="18" rx="13" ry="11" fill="#1F1B18"/>
+              <ellipse cx="18" cy="21" rx="2.2" ry="1.3" fill="#FCA5A5"/>
+              <ellipse cx="36" cy="21" rx="2.2" ry="1.3" fill="#FCA5A5"/>
+
+              <ellipse cx="22" cy="15" rx="3.5" ry="4.2" fill="#FFFFFF"/>
+              <ellipse cx="21" cy="15" rx="2.5" ry="3.2" fill="#1F1B18"/>
+              <circle cx="20" cy="13.5" r="1" fill="#FFFFFF"/>
+
+              <ellipse cx="32" cy="15" rx="3.5" ry="4.2" fill="#FFFFFF"/>
+              <ellipse cx="31" cy="15" rx="2.5" ry="3.2" fill="#1F1B18"/>
+              <circle cx="30" cy="13.5" r="1" fill="#FFFFFF"/>
+
+              <!-- Ngậm thẻ task code phía trước mồm (bên trái) -->
+              <rect x="6" y="14" width="16" height="12" rx="3" fill="#D97757"/>
+              <text x="8" y="23" font-size="8" font-weight="700" fill="#FAF8F5" font-family="monospace">&lt;/&gt;</text>
+            </svg>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center;">
+            Ngậm thẻ task phía trước mồm, vẫy đuôi hăm hở trườn theo góc chéo về worktree xử lý.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHẦN 3: HIỆU ỨNG LOADING THEO LOGO VORAGENT -->
+    <section>
+      <h2><span>3. Hiệu Ứng Loading: Rắn Dài Dần Ra Theo Logo (Không Xoay Logo)</span></h2>
+      <p style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+        Giữ nguyên <strong>100% phương hướng và hình học của Logo Ouroboros</strong> (hoàn toàn không xoay tròn cả logo). Hiệu ứng mô phỏng <strong>chú rắn xuất hiện dần dần, dài dần ra theo chu vi vòng tròn</strong> cho đến khi đạt hình dáng trọn vẹn của Logo, mắt âm bản chớp sáng xử lý rồi lặp lại chu trình sinh sôi vĩnh cửu.
+      </p>
+
+      <div class="grid-2">
+        <!-- BIẾN THỂ 1: OUROBOROS SLITHER GROW (KHUYẾN NGHỊ) -->
+        <div class="card recommended">
+          <span class="badge-star">★ KHUYẾN NGHỊ</span>
+          <h3>Biến Thể 1: Snake Slither Grow (Rắn Dài Dần Ra & Thu Đuôi Loop)</h3>
+          <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.25rem;">
+            Rắn dài dần ra từ đuôi uốn quanh vòng tròn $\to$ khi đầu chạm đích sẽ <strong>hình thành 100% Logo Ouroboros</strong> kèm mắt âm bản chớp sáng amber `#D97757` $\to$ đuôi thu gọn lại lướt tiếp chu trình mới.
+          </p>
+          <div class="preview-stage" style="gap: 2.5rem; min-height: 150px;">
+            <!-- Size LG (68px) -->
+            <div style="text-align: center;">
+              <div class="snake-loader-ouroboros grow-mode size-lg">
+                <svg viewBox="0 0 32 32" fill="none" class="ouro-grow-svg">
+                  <mask id="mask-grow-preview-lg" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+                    <rect width="32" height="32" fill="#FFFFFF"/>
+                    <circle cx="23.42" cy="8.58" r="1.15" fill="#000000" class="ouro-grow-eye-mask"/>
+                  </mask>
+                  <g mask="url(#mask-grow-preview-lg)">
+                    <path d="M 26.14 18.72 A 10.5 10.5 0 1 1 23.42 8.58" stroke="#1F1B18" stroke-width="5" stroke-linecap="round" fill="none" class="ouro-grow-body"/>
+                  </g>
+                  <circle cx="23.42" cy="8.58" r="0.95" class="ouro-grow-eye-dot"/>
+                </svg>
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; font-weight: 600;">Large (68px)</div>
+            </div>
+
+            <!-- Size MD (38px) -->
+            <div style="text-align: center;">
+              <div class="snake-loader-ouroboros grow-mode size-md">
+                <svg viewBox="0 0 32 32" fill="none" class="ouro-grow-svg">
+                  <mask id="mask-grow-preview-md" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+                    <rect width="32" height="32" fill="#FFFFFF"/>
+                    <circle cx="23.42" cy="8.58" r="1.15" fill="#000000" class="ouro-grow-eye-mask"/>
+                  </mask>
+                  <g mask="url(#mask-grow-preview-md)">
+                    <path d="M 26.14 18.72 A 10.5 10.5 0 1 1 23.42 8.58" stroke="#1F1B18" stroke-width="5" stroke-linecap="round" fill="none" class="ouro-grow-body"/>
+                  </g>
+                  <circle cx="23.42" cy="8.58" r="0.95" class="ouro-grow-eye-dot"/>
+                </svg>
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; font-weight: 600;">Medium (38px)</div>
+            </div>
+
+            <!-- Size SM (20px) Trong Button -->
+            <div style="text-align: center;">
+              <button class="btn-mock">
+                <div class="snake-loader-ouroboros grow-mode size-sm">
+                  <svg viewBox="0 0 32 32" fill="none" class="ouro-grow-svg">
+                    <mask id="mask-grow-preview-sm" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+                      <rect width="32" height="32" fill="#FFFFFF"/>
+                      <circle cx="23.42" cy="8.58" r="1.15" fill="#000000" class="ouro-grow-eye-mask"/>
+                    </mask>
+                    <g mask="url(#mask-grow-preview-sm)">
+                      <path d="M 26.14 18.72 A 10.5 10.5 0 1 1 23.42 8.58" stroke="#FAF8F5" stroke-width="5" stroke-linecap="round" fill="none" class="ouro-grow-body"/>
+                    </g>
+                    <circle cx="23.42" cy="8.58" r="0.95" class="ouro-grow-eye-dot"/>
+                  </svg>
+                </div>
+                <span>Đang điều phối task…</span>
+              </button>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; font-weight: 600;">Button Inline (20px)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- BIẾN THỂ 2: OUROBOROS GROW & FADE -->
+        <div class="card">
+          <h3>Biến Thể 2: Grow & Gentle Fade (Dài Ra Đầy Đủ $\to$ Mờ Dần)</h3>
+          <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.25rem;">
+            Rắn xuất hiện dài dần ra từ đuôi tới đầu $\to$ <strong>dừng lại ở hình dạng logo hoàn chỉnh</strong> trong 0.5s để người dùng nhận diện thương hiệu $\to$ mờ dần rồi tái lập chu trình mới.
+          </p>
+          <div class="preview-stage" style="gap: 3rem; min-height: 150px;">
+            <div style="text-align: center;">
+              <div class="snake-loader-ouroboros fade-mode size-lg">
+                <svg viewBox="0 0 32 32" fill="none" class="ouro-grow-svg">
+                  <mask id="mask-fade-demo-lg" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+                    <rect width="32" height="32" fill="#FFFFFF"/>
+                    <circle cx="23.42" cy="8.58" r="1.15" fill="#000000" class="ouro-fade-eye-mask"/>
+                  </mask>
+                  <g mask="url(#mask-fade-demo-lg)">
+                    <path d="M 26.14 18.72 A 10.5 10.5 0 1 1 23.42 8.58" stroke="#1F1B18" stroke-width="5" stroke-linecap="round" fill="none" class="ouro-fade-body"/>
+                  </g>
+                  <circle cx="23.42" cy="8.58" r="0.95" class="ouro-fade-eye-dot"/>
+                </svg>
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; font-weight: 600;">Large (68px)</div>
+            </div>
+
+            <div style="text-align: center;">
+              <div class="snake-loader-ouroboros fade-mode size-md">
+                <svg viewBox="0 0 32 32" fill="none" class="ouro-grow-svg">
+                  <mask id="mask-fade-demo-md" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+                    <rect width="32" height="32" fill="#FFFFFF"/>
+                    <circle cx="23.42" cy="8.58" r="1.15" fill="#000000" class="ouro-fade-eye-mask"/>
+                  </mask>
+                  <g mask="url(#mask-fade-demo-md)">
+                    <path d="M 26.14 18.72 A 10.5 10.5 0 1 1 23.42 8.58" stroke="#1F1B18" stroke-width="5" stroke-linecap="round" fill="none" class="ouro-fade-body"/>
+                  </g>
+                  <circle cx="23.42" cy="8.58" r="0.95" class="ouro-fade-eye-dot"/>
+                </svg>
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; font-weight: 600;">Medium (38px)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- BIẾN THỂ 3: OUROBOROS PULSE (CO DÃN NHỊP THỞ TẠI CHỖ) -->
+        <div class="card">
+          <h3>Biến Thể 3: Elastic Breathing Coil (Co Dãn Nhịp Thở Tại Chỗ)</h3>
+          <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.25rem;">
+            Logo luôn hiện hữu và không bao giờ biến mất: thân rắn co dãn nhẹ nhàng giữa 50% và 100% chiều dài như một nhịp thở sinh học sống động, hoàn toàn không xoay.
+          </p>
+          <div class="preview-stage" style="gap: 3rem; min-height: 150px;">
+            <div style="text-align: center;">
+              <div class="snake-loader-ouroboros pulse-mode size-lg">
+                <svg viewBox="0 0 32 32" fill="none" class="ouro-grow-svg">
+                  <mask id="mask-pulse-demo-lg" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+                    <rect width="32" height="32" fill="#FFFFFF"/>
+                    <circle cx="23.42" cy="8.58" r="1.15" fill="#000000" class="ouro-pulse-eye-mask"/>
+                  </mask>
+                  <g mask="url(#mask-pulse-demo-lg)">
+                    <path d="M 26.14 18.72 A 10.5 10.5 0 1 1 23.42 8.58" stroke="#1F1B18" stroke-width="5" stroke-linecap="round" fill="none" class="ouro-pulse-body"/>
+                  </g>
+                  <circle cx="23.42" cy="8.58" r="0.95" class="ouro-pulse-eye-dot"/>
+                </svg>
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; font-weight: 600;">Large (68px)</div>
+            </div>
+
+            <div style="text-align: center;">
+              <div class="snake-loader-ouroboros pulse-mode size-md">
+                <svg viewBox="0 0 32 32" fill="none" class="ouro-grow-svg">
+                  <mask id="mask-pulse-demo-md" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+                    <rect width="32" height="32" fill="#FFFFFF"/>
+                    <circle cx="23.42" cy="8.58" r="1.15" fill="#000000" class="ouro-pulse-eye-mask"/>
+                  </mask>
+                  <g mask="url(#mask-pulse-demo-md)">
+                    <path d="M 26.14 18.72 A 10.5 10.5 0 1 1 23.42 8.58" stroke="#1F1B18" stroke-width="5" stroke-linecap="round" fill="none" class="ouro-pulse-body"/>
+                  </g>
+                  <circle cx="23.42" cy="8.58" r="0.95" class="ouro-pulse-eye-dot"/>
+                </svg>
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; font-weight: 600;">Medium (38px)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- BIẾN THỂ 4: ORBITING PARTICLE (XOAY KÈM HẠT NHỎ ĐỐI CHIẾU) -->
+        <div class="card">
+          <h3>Biến Thể 4: Ouroboros Handoff Orbit (Hạt Năng Lượng Xuyên Tâm)</h3>
+          <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.25rem;">
+            Biến thể xoay trục nhẹ nhàng kết hợp 1 hạt task màu cam ấm (`#D97757`) bay theo quỹ đạo lượn qua tâm rỗng vào miệng rắn.
+          </p>
+          <div class="preview-stage" style="gap: 3rem; min-height: 150px;">
+            <div style="text-align: center;">
+              <div class="snake-loader-ouroboros orbit-mode size-lg">
+                <svg viewBox="0 0 32 32" fill="none" class="ouroboros-loader-svg">
+                  <mask id="mask-orbit-demo-lg" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+                    <rect width="32" height="32" fill="#FFFFFF"/>
+                    <circle cx="23.42" cy="8.58" r="1.15" fill="#000000"/>
+                  </mask>
+                  <g mask="url(#mask-orbit-demo-lg)">
+                    <path d="M 23.42 8.58 A 10.5 10.5 0 1 0 26.14 18.72" stroke="#1F1B18" stroke-width="5" stroke-linecap="round" fill="none"/>
+                  </g>
+                  <circle cx="23.42" cy="8.58" r="0.95" class="ouro-eye-sparkle"/>
+                </svg>
+                <div class="ouro-orbit-particle"></div>
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; font-weight: 600;">Large (68px)</div>
+            </div>
+
+            <div style="text-align: center;">
+              <div class="snake-loader-ouroboros orbit-mode size-md">
+                <svg viewBox="0 0 32 32" fill="none" class="ouroboros-loader-svg">
+                  <mask id="mask-orbit-demo-md2" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+                    <rect width="32" height="32" fill="#FFFFFF"/>
+                    <circle cx="23.42" cy="8.58" r="1.15" fill="#000000"/>
+                  </mask>
+                  <g mask="url(#mask-orbit-demo-md2)">
+                    <path d="M 23.42 8.58 A 10.5 10.5 0 1 0 26.14 18.72" stroke="#1F1B18" stroke-width="5" stroke-linecap="round" fill="none"/>
+                  </g>
+                  <circle cx="23.42" cy="8.58" r="0.95" class="ouro-eye-sparkle"/>
+                </svg>
+                <div class="ouro-orbit-particle"></div>
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; font-weight: 600;">Medium (38px)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

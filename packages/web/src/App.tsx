@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import type { Project, ProviderState, Task, VEvent } from '@voragent/shared';
 import { ApiError, api, errText } from './api';
 import { Board } from './Board';
+import { Logo } from './components/Logo';
 import { INITIAL_CONNECTION, nextConnectionState } from './connection';
 import type { ConnectionEvent, ConnectionState } from './connection';
 import { GraphCanvas } from './graph/GraphCanvas';
@@ -263,7 +264,7 @@ export function App() {
       <header className="app-header">
         <div className="brand-section">
           <div className="logo-badge" onClick={() => nav('')} title="Về trang chủ danh sách dự án">
-            <div className="logo-icon">v</div>
+            <Logo size={24} />
             <span className="brand-title">voragent</span>
           </div>
           <div className="status-pill">

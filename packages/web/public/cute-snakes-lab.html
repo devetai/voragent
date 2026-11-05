@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Voragent · Cute Chibi Snake Design Lab</title>
+  <style>
+    :root {
+      --bg: #FAF8F5;
+      --card: #FFFFFF;
+      --border: #E8E2D8;
+      --text: #1F1B18;
+      --text-muted: #6E655C;
+      --primary: #1F1B18;
+      --cream: #F3EDE2;
+      --blush: #FCA5A5;
+      --claude: #D97757;
+      --codex: #10A37F;
+      --agy: #4285F4;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 2.5rem 1.5rem;
+      line-height: 1.5;
+    }
+    .container { max-width: 1040px; margin: 0 auto; }
+    h1 { font-size: 2rem; margin-bottom: 0.5rem; font-weight: 700; letter-spacing: -0.02em; }
+    p.lead { color: var(--text-muted); margin-bottom: 2rem; font-size: 1.05rem; }
+    
+    .section-title {
+      font-size: 1.3rem;
+      font-weight: 600;
+      margin: 2.5rem 0 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .section-title::before {
+      content: "";
+      display: inline-block;
+      width: 4px;
+      height: 18px;
+      background: var(--primary);
+      border-radius: 2px;
+    }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 1.5rem; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+      position: relative;
+    }
+    .card.badge-recommended::after {
+      content: "★ KHUYÊN DÙNG";
+      position: absolute;
+      top: 12px;
+      right: 14px;
+      background: #1F1B18;
+      color: #FAF8F5;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 12px;
+      letter-spacing: 0.04em;
+    }
+    .card h3 { font-size: 1.15rem; margin: 0; font-weight: 600; text-align: center; }
+    .desc { font-size: 0.9rem; color: var(--text-muted); text-align: center; line-height: 1.45; }
+
+    .stage {
+      background: var(--bg);
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      width: 100%;
+      height: 150px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* THEATER THE DANCING DISPATCH */
+    .theater-card {
+      background: var(--card);
+      border: 2px solid var(--primary);
+      border-radius: 20px;
+      padding: 2rem;
+      margin-top: 1.5rem;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.05);
+    }
+    .theater-stage {
+      background: #FAF8F5;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      height: 160px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      margin: 1.5rem 0;
+    }
+
+    /* Floor line */
+    .theater-floor {
+      position: absolute;
+      bottom: 24px;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 0%, #E8E2D8 15%, #E8E2D8 85%, transparent 100%);
+    }
+
+    /* Boss Snake Placement */
+    .boss-box {
+      position: absolute;
+      left: 36px;
+      bottom: 22px;
+      width: 90px;
+      height: 80px;
+      animation: boss-breathe 2.4s infinite ease-in-out;
+      transform-origin: bottom center;
+    }
+    @keyframes boss-breathe {
+      0%, 100% { transform: translateY(0) scale(1, 1); }
+      50% { transform: translateY(-4px) scale(1.02, 0.98); }
+    }
+
+    /* Flying Task Parcel */
+    .task-bubble {
+      position: absolute;
+      left: 110px;
+      bottom: 60px;
+      width: 32px;
+      height: 32px;
+      background: #1F1B18;
+      color: #FAF8F5;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: monospace;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+      animation: task-dispatch 2.4s infinite cubic-bezier(0.25, 0.1, 0.25, 1);
+      z-index: 5;
+    }
+    .task-bubble .tag {
+      font-size: 7px;
+      color: #FCA5A5;
+      font-family: sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: -2px;
+    }
+
+    @keyframes task-dispatch {
+      0% {
+        transform: translate(0, 0) scale(0.2) rotate(-20deg);
+        opacity: 0;
+      }
+      20% {
+        transform: translate(18px, -16px) scale(1.1) rotate(5deg);
+        opacity: 1;
+      }
+      72% {
+        /* Đỉnh giao thoa - chờ Rắn Con đón */
+        transform: translate(65px, -24px) scale(1) rotate(-5deg);
+        opacity: 1;
+      }
+      78%, 100% {
+        /* Rắn con chạm tới ngậm đi -> task ở Rắn Mẹ ẩn */
+        transform: translate(68px, -24px) scale(0.2);
+        opacity: 0;
+      }
+    }
+
+    /* Thẻ Task ngậm trước mồm và đi cùng Rắn Con 100% */
+    .runner-carried-task {
+      position: absolute;
+      left: -12px;
+      top: 10px;
+      width: 26px;
+      height: 26px;
+      background: #1F1B18;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #FAF8F5;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      pointer-events: none;
+      z-index: 6;
+      animation: runner-task-carry 4.5s infinite linear;
+      animation-fill-mode: both;
+    }
+    .runner-carried-task .tag {
+      font-size: 6px;
+      color: #FCA5A5;
+      font-family: sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .b1 .runner-carried-task { animation-delay: 0s; }
+    .b2 .runner-carried-task { animation-delay: -1.5s; }
+    .b3 .runner-carried-task { animation-delay: -3.0s; }
+
+    @keyframes runner-task-carry {
+      0%, 36% {
+        transform: scale(0) rotate(-10deg);
+        opacity: 0;
+      }
+      38% {
+        transform: scale(1.18) rotate(8deg);
+        opacity: 1;
+      }
+      44% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+      }
+      88% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+      }
+      96%, 100% {
+        transform: scale(0.3);
+        opacity: 0;
+      }
+    }
+
+    /* Baby Snakes Slithering In Triangular Orbit */
+    .baby-parade {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .baby-runner {
+      position: absolute;
+      width: 65px;
+      height: 52px;
+      opacity: 0;
+      animation: triangle-slither-lab 4.5s infinite linear;
+      animation-fill-mode: both;
+    }
+    .baby-runner.b1 { animation-delay: 0s; }
+    .baby-runner.b2 { animation-delay: -1.5s; }
+    .baby-runner.b3 { animation-delay: -3.0s; }
+
+    /* Quỹ đạo tam giác:
+       - Cạnh 1: trườn dốc từ (480, 100) LÊN đỉnh (160, 30) đón task
+       - Cạnh 2: trượt dốc từ (160, 30) XUỐNG đáy (300, 100)
+       - Cạnh 3: trườn ngang đáy từ (300, 100) -> (480, 100)
+    */
+    @keyframes triangle-slither-lab {
+      0% {
+        transform: translate(480px, 100px) rotate(-14deg);
+        opacity: 0;
+      }
+      8% {
+        opacity: 1;
+      }
+      38% {
+        transform: translate(160px, 30px) rotate(0deg) scale(1.08);
+        opacity: 1;
+      }
+      44% {
+        transform: translate(150px, 32px) rotate(8deg) scale(1.12);
+      }
+      68% {
+        transform: translate(300px, 100px) rotate(16deg) scale(1);
+        opacity: 1;
+      }
+      88% {
+        transform: translate(450px, 100px) rotate(0deg);
+        opacity: 0.8;
+      }
+      100% {
+        transform: translate(480px, 100px) rotate(0deg);
+        opacity: 0;
+      }
+    }
+
+    /* Wiggling perky tail */
+    .cute-tail {
+      transform-origin: 53px 36px;
+      animation: cute-wag 0.22s infinite ease-in-out alternate;
+    }
+    @keyframes cute-wag {
+      0% { transform: rotate(-8deg); }
+      100% { transform: rotate(14deg); }
+    }
+
+    /* Sparkle shine */
+    @keyframes eye-blink {
+      0%, 94%, 98%, 100% { transform: scaleY(1); }
+      96% { transform: scaleY(0.1); }
+    }
+    .blinking-eyes {
+      transform-origin: 50% 50%;
+      animation: eye-blink 3.5s infinite;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Khắc Phục Tạo Hình Chú Rắn: Đáng Yêu, Tròn Trịa & Đầy Cảm Xúc 🐍✨</h1>
+    <p class="lead">
+      Loại bỏ hoàn toàn nét que củi gầy guộc. Thiết kế lại chú rắn theo tỷ lệ <strong>Chibi Anime / Kawaii</strong>: 
+      Thân tròn đẫy đà, đầu to má phúng phính phớt hồng, đôi mắt to long lanh có 2 tầng đốm sáng phản chiếu, biểu cảm sinh động!
+    </p>
+
+    <!-- SECTION 1: CÁC MẪU CHIBI SNAKE MASCOT -->
+    <div class="section-title">1. Các Mẫu Tạo Hình Chú Rắn Chibi Đơn Lẻ (Mascot Variations)</div>
+    <div class="grid">
+
+      <!-- MẪU A: RẮN CHIBI NGUYÊN BẢN (CHUBBY PLUMP KAWAII) -->
+      <div class="card badge-recommended">
+        <h3>Phương án A: Chibi Múp Míp Đáng Yêu</h3>
+        <div class="stage">
+          <svg width="100" height="96" viewBox="0 0 100 96" fill="none">
+            <!-- Thân cuộn mập mạp vững chãi -->
+            <!-- Vòng thân dưới (Coiled bottom) -->
+            <path d="M 22 76 C 14 76 10 68 14 60 C 18 52 28 50 38 52 C 48 54 58 56 68 56 C 78 56 86 64 82 72 C 78 80 66 82 52 82 C 38 82 28 82 22 76 Z" fill="#1F1B18"/>
+            <!-- Dải vảy bụng kem mềm mại -->
+            <path d="M 28 72 C 34 76 52 76 68 72 C 74 70 76 66 73 63 C 68 66 52 68 38 66 C 30 65 26 69 28 72 Z" fill="#F3EDE2"/>
+            
+            <!-- Cổ vươn tròn mập -->
+            <path d="M 40 60 C 40 46 48 38 54 30" stroke="#1F1B18" stroke-width="16" stroke-linecap="round"/>
+            <path d="M 42 58 C 43 48 49 42 53 36" stroke="#F3EDE2" stroke-width="5" stroke-linecap="round"/>
+
+            <!-- Đuôi vểnh nhỏ nhí nhảnh phía sau -->
+            <path d="M 16 60 C 10 56 8 48 13 44 C 16 41 21 44 20 48" stroke="#1F1B18" stroke-width="6" stroke-linecap="round" fill="none"/>
+
+            <!-- Đầu to phúng phính (Head) -->
+            <ellipse cx="56" cy="26" rx="19" ry="16" fill="#1F1B18"/>
+
+            <!-- Má hồng đào phớt nhẹ -->
+            <ellipse cx="42" cy="30" rx="3.5" ry="2" fill="#FCA5A5" opacity="0.85"/>
+            <ellipse cx="70" cy="30" rx="3.5" ry="2" fill="#FCA5A5" opacity="0.85"/>
+
+            <!-- Đôi mắt to tròn Chibi Anime long lanh -->
+            <g class="blinking-eyes">
+              <!-- Mắt trái -->
+              <ellipse cx="48" cy="22" rx="5" ry="6" fill="#FFFFFF"/>
+              <ellipse cx="48.5" cy="22" rx="3.8" ry="4.8" fill="#1F1B18"/>
+              <circle cx="47" cy="20" r="1.6" fill="#FFFFFF"/>
+              <circle cx="49.5" cy="24" r="0.8" fill="#FFFFFF"/>
+
+              <!-- Mắt phải -->
+              <ellipse cx="64" cy="22" rx="5" ry="6" fill="#FFFFFF"/>
+              <ellipse cx="63.5" cy="22" rx="3.8" ry="4.8" fill="#1F1B18"/>
+              <circle cx="62" cy="20" r="1.6" fill="#FFFFFF"/>
+              <circle cx="64.5" cy="24" r="0.8" fill="#FFFFFF"/>
+            </g>
+
+            <!-- Nụ cười mỉm nhỏ xinh ngọt ngào -->
+            <path d="M 53 30 Q 56 33 59 30" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" fill="none"/>
+            <!-- Lưỡi hồng le le tinh nghịch -->
+            <path d="M 56 32 Q 56 36 58 35.5" stroke="#FCA5A5" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+          </svg>
+        </div>
+        <p class="desc">
+          <strong>Đầu to tròn má phúng phính</strong>, mắt long lanh 2 tầng sáng, dáng ngồi cuộn tròn ấm áp, lưỡi nhỏ le tinh nghịch. Trông đáng yêu như nhân vật hoạt hình.
+        </p>
+      </div>
+
+      <!-- MẪU B: RẮN TECH LEAD THÔNG THÁI (DEV GLASSES & HEADSET) -->
+      <div class="card">
+        <h3>Phương án B: Rắn Trưởng Đeo Kính & Headset</h3>
+        <div class="stage">
+          <svg width="100" height="96" viewBox="0 0 100 96" fill="none">
+            <!-- Thân cuộn mập mạp vững chãi -->
+            <path d="M 22 76 C 14 76 10 68 14 60 C 18 52 28 50 38 52 C 48 54 58 56 68 56 C 78 56 86 64 82 72 C 78 80 66 82 52 82 C 38 82 28 82 22 76 Z" fill="#1F1B18"/>
+            <path d="M 28 72 C 34 76 52 76 68 72 C 74 70 76 66 73 63 C 68 66 52 68 38 66 C 30 65 26 69 28 72 Z" fill="#F3EDE2"/>
+            
+            <path d="M 40 60 C 40 46 48 38 54 30" stroke="#1F1B18" stroke-width="16" stroke-linecap="round"/>
+            <path d="M 42 58 C 43 48 49 42 53 36" stroke="#F3EDE2" stroke-width="5" stroke-linecap="round"/>
+            <path d="M 16 60 C 10 56 8 48 13 44 C 16 41 21 44 20 48" stroke="#1F1B18" stroke-width="6" stroke-linecap="round" fill="none"/>
+
+            <!-- Đầu to -->
+            <ellipse cx="56" cy="26" rx="19" ry="16" fill="#1F1B18"/>
+
+            <!-- Kính gọng tròn thông thái (Smart Tech Glasses) -->
+            <circle cx="48" cy="23" r="6" stroke="#FAF8F5" stroke-width="2" fill="#2B2622"/>
+            <circle cx="64" cy="23" r="6" stroke="#FAF8F5" stroke-width="2" fill="#2B2622"/>
+            <line x1="54" y1="23" x2="58" y2="23" stroke="#FAF8F5" stroke-width="2"/>
+
+            <!-- Mắt long lanh qua tròng kính -->
+            <circle cx="48" cy="23" r="3.2" fill="#FFFFFF"/>
+            <circle cx="48.5" cy="22.5" r="2.2" fill="#1F1B18"/>
+            <circle cx="47.5" cy="21.5" r="0.9" fill="#FFFFFF"/>
+
+            <circle cx="64" cy="23" r="3.2" fill="#FFFFFF"/>
+            <circle cx="63.5" cy="22.5" r="2.2" fill="#1F1B18"/>
+            <circle cx="62.5" cy="21.5" r="0.9" fill="#FFFFFF"/>
+
+            <!-- Tai nghe Dev Headset -->
+            <path d="M 37 22 C 37 11 75 11 75 22" stroke="#E8E2D8" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+            <rect x="34" y="20" width="5" height="10" rx="2.5" fill="#D97757"/>
+            <rect x="73" y="20" width="5" height="10" rx="2.5" fill="#D97757"/>
+            <!-- Mic nói -->
+            <path d="M 37 28 C 39 35 48 35 51 34" stroke="#E8E2D8" stroke-width="2" stroke-linecap="round" fill="none"/>
+            <circle cx="52" cy="34" r="1.8" fill="#D97757"/>
+
+            <!-- Má hồng & cười mỉm -->
+            <ellipse cx="40" cy="32" rx="3" ry="1.5" fill="#FCA5A5" opacity="0.8"/>
+            <ellipse cx="72" cy="32" rx="3" ry="1.5" fill="#FCA5A5" opacity="0.8"/>
+            <path d="M 54 32 Q 56 34 58 32" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+          </svg>
+        </div>
+        <p class="desc">
+          <strong>Đeo tai nghe điều phối và kính tròn</strong> đại diện cho "Tech Lead Orchestrator". Vừa tri thức, vừa hài hước đáng yêu.
+        </p>
+      </div>
+
+      <!-- MẪU C: CHÚ RẮN CON MÚP MÍP HÁO HỨC (BABY RUNNER) -->
+      <div class="card">
+        <h3>Phương án C: Chú Rắn Con Múp Míp Lon Ton</h3>
+        <div class="stage">
+          <svg width="100" height="96" viewBox="0 0 100 96" fill="none">
+            <!-- Thân chú rắn con: ngắn tròn, uốn lượn múp míp -->
+            <!-- Đuôi vểnh nhí nhảnh -->
+            <path d="M 20 66 C 14 66 12 58 16 52 C 19 47 24 50 23 56" stroke="#1F1B18" stroke-width="7" stroke-linecap="round" fill="none"/>
+            
+            <!-- Thân ngắn tròn đẫy đà -->
+            <path d="M 22 66 C 30 66 34 54 44 54 C 52 54 58 60 64 58" stroke="#1F1B18" stroke-width="13" stroke-linecap="round"/>
+            <path d="M 26 66 C 32 66 36 56 44 56 C 50 56 55 60 61 59" stroke="#F3EDE2" stroke-width="4.5" stroke-linecap="round"/>
+
+            <!-- Đầu to chiếm 50% cơ thể (Đặc trưng Chibi đỉnh cao) -->
+            <ellipse cx="66" cy="40" rx="16" ry="14" fill="#1F1B18"/>
+
+            <!-- Má hồng hây hây -->
+            <ellipse cx="54" cy="44" rx="3" ry="1.8" fill="#FCA5A5" opacity="0.9"/>
+            <ellipse cx="78" cy="44" rx="3" ry="1.8" fill="#FCA5A5" opacity="0.9"/>
+
+            <!-- Mắt to tròn xoe ngây thơ, háo hức -->
+            <ellipse cx="60" cy="36" rx="4.5" ry="5.5" fill="#FFFFFF"/>
+            <ellipse cx="61" cy="36" rx="3.3" ry="4.3" fill="#1F1B18"/>
+            <circle cx="59.5" cy="34" r="1.4" fill="#FFFFFF"/>
+            <circle cx="62" cy="38" r="0.7" fill="#FFFFFF"/>
+
+            <ellipse cx="73" cy="36" rx="4.5" ry="5.5" fill="#FFFFFF"/>
+            <ellipse cx="72" cy="36" rx="3.3" ry="4.3" fill="#1F1B18"/>
+            <circle cx="70.5" cy="34" r="1.4" fill="#FFFFFF"/>
+            <circle cx="73" cy="38" r="0.7" fill="#FFFFFF"/>
+
+            <!-- Miệng mở chữ D toe toét háo hức đón việc -->
+            <path d="M 63 43 C 63 47 69 47 69 43 Z" fill="#FCA5A5"/>
+
+            <!-- Thẻ Task ngậm ở miệng hoặc đội đầu -->
+            <rect x="74" y="32" width="14" height="11" rx="3" fill="#D97757"/>
+            <text x="76" y="40" font-size="7" font-weight="700" fill="#FAF8F5" font-family="monospace">&lt;/&gt;</text>
+          </svg>
+        </div>
+        <p class="desc">
+          <strong>Rắn con mini</strong> thân ngắn mũm mĩm, đuôi vẫy nốt nhạc, miệng cười toe toét ngậm thẻ code chạy lon ton về worktree.
+        </p>
+      </div>
+
+    </div>
+
+    <!-- SECTION 2: HOẠT CẢNH ĐIỀU PHỐI (THE DISPATCH THEATER ANIMATION) -->
+    <div class="theater-card">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+        <div>
+          <h2>Hoạt Cảnh Trọn Vẹn: Rắn Mẹ Giao Việc Cho Đàn Rắn Con</h2>
+          <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 0.25rem;">
+            Rắn Mẹ (Orchestrator) ngồi múp míp bên trái gật đầu điều phối, nhả gói task; Đàn Rắn Con (Claude, Codex, AGY) lon ton chạy tới đón task với biểu cảm hân hoan!
+          </p>
+        </div>
+        <span style="background: #E8F5E9; color: #2E7D32; font-weight: 700; font-size: 11px; padding: 4px 10px; border-radius: 20px; border: 1px solid #C8E6C9;">
+          LIVE ANIMATION
+        </span>
+      </div>
+
+      <div class="theater-stage">
+        <!-- Đường sàn tinh tế -->
+        <div class="theater-floor"></div>
+
+        <!-- RẮN MẸ (Orchestrator bên trái) -->
+        <div class="boss-box">
+          <svg width="90" height="80" viewBox="0 0 90 80" fill="none">
+            <!-- Thân dưới cuộn mập mạp ấm cúng -->
+            <path d="M 18 64 C 10 64 6 56 10 48 C 14 40 24 38 34 40 C 44 42 54 44 64 44 C 74 44 80 52 76 60 C 72 68 60 70 46 70 C 32 70 24 70 18 64 Z" fill="#1F1B18"/>
+            <path d="M 24 60 C 30 64 48 64 62 60 C 68 58 70 54 67 51 C 62 54 48 56 34 54 C 26 53 22 57 24 60 Z" fill="#F3EDE2"/>
+            
+            <!-- Cổ vươn -->
+            <path d="M 36 48 C 36 36 44 30 50 24" stroke="#1F1B18" stroke-width="14" stroke-linecap="round"/>
+            <path d="M 38 46 C 40 38 46 32 50 28" stroke="#F3EDE2" stroke-width="4" stroke-linecap="round"/>
+            
+            <!-- Đuôi nhỏ ngoe nguẩy -->
+            <path d="M 12 50 C 6 46 4 38 9 34 C 12 31 16 34 15 38" stroke="#1F1B18" stroke-width="5" stroke-linecap="round" fill="none"/>
+
+            <!-- Đầu tròn to má phúng phính -->
+            <ellipse cx="52" cy="20" rx="17" ry="14" fill="#1F1B18"/>
+            
+            <!-- Kính thông thái -->
+            <circle cx="45" cy="18" r="5" stroke="#FAF8F5" stroke-width="1.8" fill="#2B2622"/>
+            <circle cx="59" cy="18" r="5" stroke="#FAF8F5" stroke-width="1.8" fill="#2B2622"/>
+            <line x1="50" y1="18" x2="54" y2="18" stroke="#FAF8F5" stroke-width="1.8"/>
+
+            <!-- Mắt long lanh qua kính -->
+            <circle cx="45" cy="18" r="2.8" fill="#FFFFFF"/>
+            <circle cx="45.5" cy="17.5" r="1.9" fill="#1F1B18"/>
+            <circle cx="44.5" cy="16.5" r="0.8" fill="#FFFFFF"/>
+
+            <circle cx="59" cy="18" r="2.8" fill="#FFFFFF"/>
+            <circle cx="58.5" cy="17.5" r="1.9" fill="#1F1B18"/>
+            <circle cx="57.5" cy="16.5" r="0.8" fill="#FFFFFF"/>
+
+            <!-- Tai nghe Dev Headset -->
+            <path d="M 35 17 C 35 7 69 7 69 17" stroke="#E8E2D8" stroke-width="2" stroke-linecap="round" fill="none"/>
+            <rect x="32" y="15" width="4" height="8" rx="2" fill="#D97757"/>
+            <rect x="68" y="15" width="4" height="8" rx="2" fill="#D97757"/>
+            <path d="M 35 21 C 37 27 45 27 48 26" stroke="#E8E2D8" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+            <circle cx="49" cy="26" r="1.4" fill="#D97757"/>
+
+            <!-- Má hồng đào & nụ cười hiền hậu -->
+            <ellipse cx="37" cy="24" rx="2.8" ry="1.4" fill="#FCA5A5" opacity="0.85"/>
+            <ellipse cx="67" cy="24" rx="2.8" ry="1.4" fill="#FCA5A5" opacity="0.85"/>
+            <path d="M 50 25 Q 52 27 54 25" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+          </svg>
+        </div>
+
+        <!-- GÓI TASK BAY RA (Thẻ bài có nhãn code) -->
+        <div class="task-bubble">
+          <span class="tag">TASK</span>
+          <span>&lt;/&gt;</span>
+        </div>
+
+        <!-- ĐÀN RẮN CON NỐI ĐUÔI NHAU TRƯỜN TỚI (ĐẦU HƯỚNG VỀ RẮN MẸ) -->
+        <div class="baby-parade">
+
+          <!-- RẮN CON 1: CLAUDE AGENT (Cam đất ấm - Đầu hướng sang trái) -->
+          <div class="baby-runner b1">
+            <svg width="65" height="52" viewBox="0 0 65 52" fill="none">
+              <!-- Đuôi vẫy ngoe nguẩy bên phải -->
+              <g class="cute-tail">
+                <path d="M 53 36 C 59 36 61 28 57 22 C 54 18 49 21 51 26" stroke="#1F1B18" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+              </g>
+
+              <!-- Thân ngắn múp míp hướng sang trái -->
+              <path d="M 51 36 C 43 36 39 26 31 26 C 25 26 21 30 15 29" stroke="#1F1B18" stroke-width="11" stroke-linecap="round"/>
+              <path d="M 47 36 C 41 36 37 28 31 28 C 26 28 22 31 17 30" stroke="#F3EDE2" stroke-width="3.8" stroke-linecap="round"/>
+
+              <!-- Đầu to phúng phính hướng trái (x=17) -->
+              <ellipse cx="17" cy="18" rx="13" ry="11" fill="#1F1B18"/>
+
+              <!-- Má hồng & nơ cam Claude -->
+              <ellipse cx="8" cy="21" rx="2.2" ry="1.3" fill="#FCA5A5"/>
+              <ellipse cx="26" cy="21" rx="2.2" ry="1.3" fill="#FCA5A5"/>
+              <circle cx="17" cy="7" r="3" fill="#D97757"/>
+
+              <!-- Mắt to long lanh háo hức nhìn sang trái -->
+              <ellipse cx="12" cy="15" rx="3.5" ry="4.2" fill="#FFFFFF"/>
+              <ellipse cx="11" cy="15" rx="2.5" ry="3.2" fill="#1F1B18"/>
+              <circle cx="10" cy="13.5" r="1" fill="#FFFFFF"/>
+
+              <ellipse cx="22" cy="15" rx="3.5" ry="4.2" fill="#FFFFFF"/>
+              <ellipse cx="21" cy="15" rx="2.5" ry="3.2" fill="#1F1B18"/>
+              <circle cx="20" cy="13.5" r="1" fill="#FFFFFF"/>
+
+              <!-- Miệng cười mở rộng háo hức đớp task -->
+              <path d="M 15 20 C 15 24 19 24 19 20 Z" fill="#FCA5A5"/>
+            </svg>
+            <div class="runner-carried-task">
+              <span class="tag">TASK</span>
+              <span>&lt;/&gt;</span>
+            </div>
+          </div>
+
+          <!-- RẮN CON 2: CODEX AGENT (Mint tươi - Đầu hướng sang trái) -->
+          <div class="baby-runner b2">
+            <svg width="65" height="52" viewBox="0 0 65 52" fill="none">
+              <g class="cute-tail">
+                <path d="M 53 36 C 59 36 61 28 57 22 C 54 18 49 21 51 26" stroke="#1F1B18" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+              </g>
+
+              <path d="M 51 36 C 43 36 39 26 31 26 C 25 26 21 30 15 29" stroke="#1F1B18" stroke-width="11" stroke-linecap="round"/>
+              <path d="M 47 36 C 41 36 37 28 31 28 C 26 28 22 31 17 30" stroke="#F3EDE2" stroke-width="3.8" stroke-linecap="round"/>
+
+              <ellipse cx="17" cy="18" rx="13" ry="11" fill="#1F1B18"/>
+
+              <ellipse cx="8" cy="21" rx="2.2" ry="1.3" fill="#FCA5A5"/>
+              <ellipse cx="26" cy="21" rx="2.2" ry="1.3" fill="#FCA5A5"/>
+              <circle cx="17" cy="7" r="3" fill="#10A37F"/>
+
+              <ellipse cx="12" cy="15" rx="3.5" ry="4.2" fill="#FFFFFF"/>
+              <ellipse cx="11" cy="15" rx="2.5" ry="3.2" fill="#1F1B18"/>
+              <circle cx="10" cy="13.5" r="1" fill="#FFFFFF"/>
+
+              <ellipse cx="22" cy="15" rx="3.5" ry="4.2" fill="#FFFFFF"/>
+              <ellipse cx="21" cy="15" rx="2.5" ry="3.2" fill="#1F1B18"/>
+              <circle cx="20" cy="13.5" r="1" fill="#FFFFFF"/>
+
+              <path d="M 15 20 C 15 24 19 24 19 20 Z" fill="#FCA5A5"/>
+            </svg>
+            <div class="runner-carried-task">
+              <span class="tag">TASK</span>
+              <span>&lt;/&gt;</span>
+            </div>
+          </div>
+
+          <!-- RẮN CON 3: ANTIGRAVITY AGENT (Xanh dịu - Đầu hướng sang trái) -->
+          <div class="baby-runner b3">
+            <svg width="65" height="52" viewBox="0 0 65 52" fill="none">
+              <g class="cute-tail">
+                <path d="M 53 36 C 59 36 61 28 57 22 C 54 18 49 21 51 26" stroke="#1F1B18" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+              </g>
+
+              <path d="M 51 36 C 43 36 39 26 31 26 C 25 26 21 30 15 29" stroke="#1F1B18" stroke-width="11" stroke-linecap="round"/>
+              <path d="M 47 36 C 41 36 37 28 31 28 C 26 28 22 31 17 30" stroke="#F3EDE2" stroke-width="3.8" stroke-linecap="round"/>
+
+              <ellipse cx="17" cy="18" rx="13" ry="11" fill="#1F1B18"/>
+
+              <ellipse cx="8" cy="21" rx="2.2" ry="1.3" fill="#FCA5A5"/>
+              <ellipse cx="26" cy="21" rx="2.2" ry="1.3" fill="#FCA5A5"/>
+              <circle cx="17" cy="7" r="3" fill="#4285F4"/>
+
+              <ellipse cx="12" cy="15" rx="3.5" ry="4.2" fill="#FFFFFF"/>
+              <ellipse cx="11" cy="15" rx="2.5" ry="3.2" fill="#1F1B18"/>
+              <circle cx="10" cy="13.5" r="1" fill="#FFFFFF"/>
+
+              <ellipse cx="22" cy="15" rx="3.5" ry="4.2" fill="#FFFFFF"/>
+              <ellipse cx="21" cy="15" rx="2.5" ry="3.2" fill="#1F1B18"/>
+              <circle cx="20" cy="13.5" r="1" fill="#FFFFFF"/>
+
+              <path d="M 15 20 C 15 24 19 24 19 20 Z" fill="#FCA5A5"/>
+            </svg>
+            <div class="runner-carried-task">
+              <span class="tag">TASK</span>
+              <span>&lt;/&gt;</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Caption -->
+      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; color: var(--text-muted); padding: 0.5rem 0;">
+        <div>
+          🐍 <strong>Rắn Mẹ (Tech Lead)</strong> nhả task ➔ 👶 <strong>Rắn Con (Claude / Codex / AGY)</strong> lon ton nhận việc!
+        </div>
+        <div style="font-size: 0.82rem; background: var(--bg); border: 1px solid var(--border); padding: 4px 10px; border-radius: 6px;">
+          Warm Cozy Tech &bull; Zero Glitch &bull; Kawaii Mascot
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

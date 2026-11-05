@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Project } from '@voragent/shared';
+import { SnakeLoader } from './components/SnakeLoader';
 import { describeProjectSources, filterProjects, formatLastUsed, sortProjects } from './state';
 
 /** Danh sách dự án. Mọi văn bản của dự án chỉ render dạng văn bản (React tự thoát ký tự). */
@@ -30,7 +31,7 @@ export function ProjectList({
         <button type="button" onClick={onRefresh} disabled={loading}>Làm mới</button>
       </div>
       {error !== null && <div className="error" role="alert">{error}</div>}
-      {loading && <div className="muted">Đang tải danh sách dự án…</div>}
+      {loading && <SnakeLoader size="md" variant="crawl" label="Đang tải danh sách dự án…" />}
       {!loading && projects !== null && projects.length === 0 && error === null && (
         <div className="muted">
           Chưa tìm thấy dự án nào. Hãy gõ một thư mục qua “Thư mục khác…” khi tạo task, hoặc chạy <code>voragent add</code>.

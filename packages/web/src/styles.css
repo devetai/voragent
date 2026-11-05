@@ -1142,3 +1142,635 @@ textarea {
   box-shadow: 0 16px 44px rgba(43, 38, 34, 0.22) !important;
 }
 
+/* ==========================================================================
+   Logo & Brand Styles
+   ========================================================================== */
+.logo-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+.logo-icon {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Shared SnakeLoader Component (Rắn Giao Việc Cho Đàn Rắn Con)
+   ========================================================================== */
+.snake-loader-container {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: #1F1B18;
+}
+.snake-loader-container.is-block {
+  flex-direction: column;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  text-align: center;
+}
+.snake-loader-container.is-inline {
+  display: inline-flex;
+  vertical-align: middle;
+}
+.snake-loader-label {
+  font-size: 0.875rem;
+  color: #6E655C;
+  font-weight: 500;
+}
+
+/* --------------------------------------------------------------------------
+   0. OUROBOROS LOGO LOADER (RẮN DÀI DẦN RA THEO LOGO - KHÔNG XOAY CẢ LOGO)
+   -------------------------------------------------------------------------- */
+.snake-loader-ouroboros {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.snake-loader-ouroboros.size-sm {
+  width: 20px;
+  height: 20px;
+}
+.snake-loader-ouroboros.size-md {
+  width: 38px;
+  height: 38px;
+}
+.snake-loader-ouroboros.size-lg {
+  width: 68px;
+  height: 68px;
+}
+
+/* SVG giữ nguyên phương hướng chuẩn của Logo voragent, KHÔNG XOAY */
+.ouro-grow-svg {
+  width: 100%;
+  height: 100%;
+  transform: none;
+}
+
+/* 1. Mặc định (Grow & Slither Loop): Rắn dài dần ra từ đuôi tới đầu */
+.ouro-grow-body {
+  stroke-dasharray: 55;
+  stroke-dashoffset: 55;
+  animation: ouro-snake-grow 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes ouro-snake-grow {
+  0% {
+    stroke-dashoffset: 55;
+    opacity: 0.2;
+  }
+  6% {
+    opacity: 1;
+  }
+  48% {
+    /* Đạt chiều dài cực đại: hình thành trọn vẹn Logo Ouroboros */
+    stroke-dashoffset: 0;
+  }
+  68% {
+    /* Giữ nguyên hình dạng logo chuẩn để nhận diện thương hiệu rõ nét */
+    stroke-dashoffset: 0;
+  }
+  92% {
+    /* Đuôi thu gọn lại, lướt về phía trước mở ra chu trình tiếp theo */
+    stroke-dashoffset: -55;
+  }
+  100% {
+    stroke-dashoffset: -55;
+  }
+}
+
+.ouro-grow-eye-mask {
+  transform-origin: 23.42px 8.58px;
+  animation: ouro-grow-eye-mask-anim 2.2s ease-in-out infinite;
+}
+.ouro-grow-eye-dot {
+  fill: #D97757;
+  transform-origin: 23.42px 8.58px;
+  animation: ouro-grow-dot-anim 2.2s ease-in-out infinite;
+}
+
+@keyframes ouro-grow-eye-mask-anim {
+  0%, 42% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  48% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  68% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  88%, 100% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+}
+
+@keyframes ouro-grow-dot-anim {
+  0%, 44% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.3);
+  }
+  65% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  85%, 100% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+}
+
+/* 2. Biến thể Fade: Rắn dài dần ra -> Đủ Logo -> Mờ dần reset */
+.ouro-fade-body {
+  stroke-dasharray: 55;
+  stroke-dashoffset: 55;
+  animation: ouro-snake-fade-anim 2.4s ease-in-out infinite;
+}
+
+@keyframes ouro-snake-fade-anim {
+  0% {
+    stroke-dashoffset: 55;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  55% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  75% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  95%, 100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+.ouro-fade-eye-mask {
+  transform-origin: 23.42px 8.58px;
+  animation: ouro-fade-eye-mask-anim 2.4s ease-in-out infinite;
+}
+.ouro-fade-eye-dot {
+  fill: #D97757;
+  transform-origin: 23.42px 8.58px;
+  animation: ouro-fade-dot-anim 2.4s ease-in-out infinite;
+}
+
+@keyframes ouro-fade-eye-mask-anim {
+  0%, 50% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  75% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  95%, 100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+@keyframes ouro-fade-dot-anim {
+  0%, 52% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  58% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+  75% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  95%, 100% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+}
+
+/* 3. Biến thể Pulse: Co dãn nhịp thở tại chỗ (không biến mất hoàn toàn) */
+.ouro-pulse-body {
+  stroke-dasharray: 55;
+  stroke-dashoffset: 20;
+  animation: ouro-snake-pulse-anim 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes ouro-snake-pulse-anim {
+  0% {
+    stroke-dashoffset: 28;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.ouro-pulse-eye-mask {
+  transform-origin: 23.42px 8.58px;
+  animation: ouro-pulse-eye-anim 1.8s ease-in-out infinite alternate;
+}
+.ouro-pulse-eye-dot {
+  fill: #D97757;
+  transform-origin: 23.42px 8.58px;
+  animation: ouro-pulse-dot-anim 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes ouro-pulse-eye-anim {
+  0% { transform: scale(0.85); opacity: 0.5; }
+  100% { transform: scale(1.15); opacity: 1; }
+}
+
+@keyframes ouro-pulse-dot-anim {
+  0% { transform: scale(0.7); opacity: 0.3; }
+  100% { transform: scale(1.25); opacity: 1; }
+}
+
+/* Biến thể: Orbiting Handoff Particle */
+.ouro-orbit-particle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #D97757;
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(217, 119, 87, 0.6);
+  animation: ouro-particle-orbit 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+.snake-loader-ouroboros.size-sm .ouro-orbit-particle { width: 3px; height: 3px; }
+.snake-loader-ouroboros.size-lg .ouro-orbit-particle { width: 9px; height: 9px; }
+
+@keyframes ouro-particle-orbit {
+  0% { transform: rotate(0deg) translateX(18px) scale(0.8); opacity: 0.4; }
+  35% { transform: rotate(140deg) translateX(12px) scale(1.2); opacity: 1; }
+  70% { transform: rotate(260deg) translateX(4px) scale(0.9); opacity: 0.8; }
+  100% { transform: rotate(360deg) translateX(18px) scale(0.8); opacity: 0.4; }
+}
+
+/* Biến thể: Cozy Ripple Rings */
+.ouro-ripple-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  transform: translate(-50%, -50%) scale(0.8);
+  opacity: 0;
+  pointer-events: none;
+  animation: ouro-ripple-pulse 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+.ouro-ripple-ring:nth-child(2) {
+  animation-delay: 1s;
+}
+@keyframes ouro-ripple-pulse {
+  0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.45; }
+  100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+}
+
+/* --------------------------------------------------------------------------
+   1. DISPATCH MOTION (Rắn Mẹ Giao Việc Cho Đàn Rắn Con Theo Quỹ Đạo Tam Giác)
+   -------------------------------------------------------------------------- */
+.snake-loader-dispatch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+}
+.snake-loader-dispatch.size-sm { width: 100px; height: 36px; }
+.snake-loader-dispatch.size-md { width: 220px; height: 68px; }
+.snake-loader-dispatch.size-lg { width: 300px; height: 90px; }
+
+/* Rắn Mẹ Tech Lead (Bên trái) */
+.dispatch-boss {
+  position: absolute;
+  left: 2px;
+  bottom: 4px;
+  animation: voragent-boss-nod 2.2s infinite ease-in-out;
+  transform-origin: bottom center;
+}
+.snake-loader-dispatch.size-sm .dispatch-boss { width: 28px; height: 25px; }
+.snake-loader-dispatch.size-md .dispatch-boss { width: 54px; height: 48px; }
+.snake-loader-dispatch.size-lg .dispatch-boss { width: 72px; height: 64px; }
+
+@keyframes voragent-boss-nod {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  50% { transform: translateY(-3px) scale(1.02, 0.98); }
+}
+
+/* Gói Task (Rắn Mẹ nhả ra và trao tại điểm hẹn đỉnh tam giác) */
+.dispatch-parcel {
+  position: absolute;
+  background: var(--primary, #1F1B18);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #FAF8F5;
+  font-weight: 700;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  animation: voragent-boss-handover 2.1s infinite cubic-bezier(0.25, 0.1, 0.25, 1);
+  z-index: 2;
+}
+.dispatch-parcel .dispatch-tag {
+  font-size: 5px;
+  color: #FCA5A5;
+  font-family: sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+
+.snake-loader-dispatch.size-sm .dispatch-parcel {
+  width: 9px;
+  height: 9px;
+  left: 32px;
+  bottom: 14px;
+  font-size: 0;
+  border-radius: 2px;
+}
+.snake-loader-dispatch.size-sm .dispatch-parcel .dispatch-tag { display: none; }
+
+.snake-loader-dispatch.size-md .dispatch-parcel {
+  width: 18px;
+  height: 18px;
+  left: 62px;
+  bottom: 30px;
+  font-size: 8px;
+}
+.snake-loader-dispatch.size-lg .dispatch-parcel {
+  width: 24px;
+  height: 24px;
+  left: 84px;
+  bottom: 40px;
+  font-size: 10px;
+}
+
+/* Rắn Mẹ đẩy task ra điểm hẹn, vừa chạm mồm Rắn Con thì trao giao thành công */
+@keyframes voragent-boss-handover {
+  0% { transform: translate(0, 0) scale(0.2) rotate(-20deg); opacity: 0; }
+  22% { transform: translate(12px, -14px) scale(1) rotate(5deg); opacity: 1; }
+  68% { transform: translate(32px, -18px) scale(1) rotate(-4deg); opacity: 1; }
+  76%, 100% {
+    /* Đã được Rắn con đón ngậm đi -> task ở Rắn Mẹ tan biến để Rắn con mang đi */
+    transform: translate(34px, -18px) scale(0.2);
+    opacity: 0;
+  }
+}
+
+/* Đàn Rắn Con (Trườn liên tục theo quỹ đạo vô hình, đầu hướng về Rắn Mẹ) */
+.dispatch-babies {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  height: 100%;
+  width: 75%;
+  pointer-events: none;
+}
+.dispatch-baby {
+  position: absolute;
+  width: 44px;
+  height: 35px;
+  opacity: 0;
+  animation: voragent-triangle-slither 4.2s infinite linear;
+  animation-fill-mode: both;
+}
+.snake-loader-dispatch.size-sm .dispatch-baby { width: 24px; height: 19px; }
+.snake-loader-dispatch.size-md .dispatch-baby { width: 44px; height: 35px; }
+.snake-loader-dispatch.size-lg .dispatch-baby { width: 58px; height: 46px; }
+
+/* Thẻ Task ngậm trước mồm Rắn Con - đi theo Rắn Con 100% */
+.baby-carried-task {
+  position: absolute;
+  background: var(--primary, #1F1B18);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #FAF8F5;
+  font-weight: 700;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  z-index: 3;
+  animation: voragent-baby-task-carry 4.2s infinite linear;
+  animation-fill-mode: both;
+}
+.baby-carried-task .dispatch-tag {
+  font-size: 5px;
+  color: #FCA5A5;
+  font-family: sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+
+.snake-loader-dispatch.size-sm .baby-carried-task {
+  width: 9px;
+  height: 9px;
+  left: -4px;
+  top: 4px;
+  font-size: 0;
+  border-radius: 2px;
+}
+.snake-loader-dispatch.size-sm .baby-carried-task .dispatch-tag { display: none; }
+
+.snake-loader-dispatch.size-md .baby-carried-task {
+  width: 18px;
+  height: 18px;
+  left: -7px;
+  top: 7px;
+  font-size: 8px;
+}
+.snake-loader-dispatch.size-lg .baby-carried-task {
+  width: 24px;
+  height: 24px;
+  left: -9px;
+  top: 9px;
+  font-size: 10px;
+}
+
+/* Negative delay đồng bộ giữa Rắn Con và Thẻ Task ngậm theo */
+.dispatch-baby-1 { animation-delay: 0s; }
+.dispatch-baby-1 .baby-carried-task { animation-delay: 0s; }
+
+.dispatch-baby-2 { animation-delay: -2.1s; }
+.dispatch-baby-2 .baby-carried-task { animation-delay: -2.1s; }
+
+@keyframes voragent-baby-task-carry {
+  0%, 36% {
+    transform: scale(0) rotate(-10deg);
+    opacity: 0;
+  }
+  38% {
+    /* Đón lấy task tại đỉnh giao thoa */
+    transform: scale(1.15) rotate(6deg);
+    opacity: 1;
+  }
+  44% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  88% {
+    /* Mang task suốt đường trượt xuống đáy và chạy về worktree */
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  96%, 100% {
+    /* Về đến worktree bàn giao */
+    transform: scale(0.3);
+    opacity: 0;
+  }
+}
+
+/* Quỹ đạo tam giác:
+   Cạnh 1: Từ góc dưới phải trườn dốc LÊN đỉnh (đón task từ Rắn Mẹ)
+   Cạnh 2: Từ đỉnh trượt dốc XUỐNG trạm đáy (mang task về worktree)
+   Cạnh 3: Trườn ngang đáy khép kín chu trình
+*/
+@keyframes voragent-triangle-slither {
+  0% {
+    transform: translate(160px, 28px) rotate(-14deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  38% {
+    /* Đỉnh tam giác - đớp task */
+    transform: translate(42px, -8px) rotate(0deg) scale(1.08);
+    opacity: 1;
+  }
+  44% {
+    transform: translate(36px, -6px) rotate(8deg) scale(1.1);
+  }
+  68% {
+    /* Trượt dốc xuống đáy */
+    transform: translate(95px, 28px) rotate(14deg) scale(1);
+    opacity: 1;
+  }
+  88% {
+    /* Trườn ngang đáy */
+    transform: translate(150px, 28px) rotate(0deg);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(160px, 28px) rotate(0deg);
+    opacity: 0;
+  }
+}
+
+/* Đuôi rắn con vẫy ngoe nguẩy bên phải */
+.baby-tail-wag {
+  transform-origin: 53px 36px;
+  animation: voragent-tail-wag 0.22s infinite ease-in-out alternate;
+}
+@keyframes voragent-tail-wag {
+  0% { transform: rotate(-8deg); }
+  100% { transform: rotate(14deg); }
+}
+
+/* --------------------------------------------------------------------------
+   2. INFINITY MOTION & WAVE & DOTS
+   -------------------------------------------------------------------------- */
+.snake-loader-infinity {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.snake-loader-infinity.size-sm { width: 36px; height: 20px; }
+.snake-loader-infinity.size-md { width: 58px; height: 32px; }
+.snake-loader-infinity.size-lg { width: 84px; height: 46px; }
+
+.infinity-track-path { stroke: #E8E2D8; fill: none; }
+.infinity-snake-path {
+  stroke: currentColor;
+  stroke-linecap: round;
+  fill: none;
+  stroke-dasharray: 45 120;
+  animation: voragent-infinity-slither 2.2s linear infinite;
+}
+@keyframes voragent-infinity-slither {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -165; }
+}
+
+.snake-loader-wave {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.snake-loader-wave .wave-seg {
+  background: currentColor;
+  border-radius: 2px;
+  animation: voragent-wave 0.9s ease-in-out infinite;
+}
+.snake-loader-wave.size-sm .wave-seg { width: 3px; height: 10px; }
+.snake-loader-wave.size-md .wave-seg { width: 4px; height: 16px; }
+.snake-loader-wave.size-lg .wave-seg { width: 6px; height: 24px; }
+.snake-loader-wave .wave-seg:nth-child(1) { animation-delay: 0s; }
+.snake-loader-wave .wave-seg:nth-child(2) { animation-delay: 0.15s; }
+.snake-loader-wave .wave-seg:nth-child(3) { animation-delay: 0.3s; }
+.snake-loader-wave .wave-seg:nth-child(4) { animation-delay: 0.45s; }
+
+@keyframes voragent-wave {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.snake-loader-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.snake-loader-dots .dot {
+  background: currentColor;
+  border-radius: 50%;
+  animation: voragent-dot-pulse 1.2s ease-in-out infinite;
+}
+.snake-loader-dots.size-sm .dot { width: 4px; height: 4px; }
+.snake-loader-dots.size-md .dot { width: 6px; height: 6px; }
+.snake-loader-dots.size-lg .dot { width: 10px; height: 10px; }
+.snake-loader-dots .dot:nth-child(1) { animation-delay: 0s; }
+.snake-loader-dots .dot:nth-child(2) { animation-delay: 0.2s; }
+.snake-loader-dots .dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes voragent-dot-pulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+/* Accessibility helper */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

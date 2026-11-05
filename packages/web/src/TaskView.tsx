@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Task, VEvent } from '@voragent/shared';
 import { api, errText } from './api';
 import type { Diff } from './api';
+import { SnakeLoader } from './components/SnakeLoader';
 import { isUnisolated, transcript } from './state';
 
 const STATUS_LABEL: Record<Task['status'], { label: string; badgeClass: string }> = {
@@ -151,7 +152,7 @@ export function TaskView({
       <div className="diff-section">
         <h3>Thay đổi mã nguồn (Git Diff)</h3>
         {diff === null ? (
-          <div className="muted">Đang tải diff…</div>
+          <SnakeLoader size="sm" inline label="Đang tải thay đổi…" />
         ) : (
           <div className="diff-container">
             {diff.commits.length > 0 && (

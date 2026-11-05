@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    :root { color: #1F1B18; }
+    @media (prefers-color-scheme: dark) {
+      :root { color: #FAF8F5; }
+    }
+  </style>
+  <mask id="eye-cutout" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+    <rect width="32" height="32" fill="#FFFFFF" />
+    <circle cx="23.42" cy="8.58" r="1.15" fill="#000000" />
+  </mask>
+  <g mask="url(#eye-cutout)">
+    <!-- Vòng tròn Ouroboros chuẩn xác hình học: R=10.5, stroke=5, bo tròn sinh học mượt mà -->
+    <path
+      d="M 23.42 8.58 A 10.5 10.5 0 1 0 26.14 18.72"
+      stroke="currentColor"
+      stroke-width="5"
+      stroke-linecap="round"
+      fill="none"
+    />
+  </g>
+</svg>
