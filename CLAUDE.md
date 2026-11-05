@@ -8,9 +8,8 @@ voragent là chương trình chạy trên máy người dùng. Nó điều phố
 - Nguồn sự thật duy nhất về quy chuẩn UI/UX (cả 2D và 3D): [DESIGN.md](DESIGN.md). Mọi thay đổi về giao diện web, màu sắc, bố cục và văn phòng 3D phải tuân thủ nghiêm ngặt tài liệu này.
 - Hướng dẫn tổng quan & sử dụng: [README.md](README.md).
 - Trạng thái: giai đoạn 1 (lõi) đã xong và đã gộp vào `main`: daemon, hàng đợi, adapter Claude/Codex, worktree, bàn giao khi hết quota, API HTTP/WebSocket, lệnh `voragent`, web tối thiểu. Kế hoạch đã thực hiện ở [docs/superpowers/plans/2026-11-04-voragent-phase1-core.md](docs/superpowers/plans/2026-11-04-voragent-phase1-core.md). Giai đoạn 2 (văn phòng 3D) là bước tiếp theo, kế hoạch tại [docs/superpowers/plans/2026-11-05-voragent-phase2-3d-office.md](docs/superpowers/plans/2026-11-05-voragent-phase2-3d-office.md); các giai đoạn 3–4 theo sau.
-- Repo này độc lập hoàn toàn. Không tích hợp TipTask.
-- Dự án tham khảo, chỉ để học cách làm, không phụ thuộc:
-  - tiptask runner (`D:\Projects\young-turtles\tiptask\packages\runner`, xem `src/presets.ts`, `src/agui.ts`): cách chạy CLI headless, đọc stream, tiếp tục phiên;
+- Repo này độc lập hoàn toàn, không phụ thuộc vào bất kỳ công cụ quản lý tác vụ hay runner bên ngoài nào.
+- Dự án tham khảo kiến trúc (không phụ thuộc):
   - GitNexus (<https://github.com/abhigyanpatwari/GitNexus>): CLI kèm web cục bộ, đồ thị Sigma.js.
 
 ## Làm việc với người dùng
@@ -36,10 +35,10 @@ voragent là chương trình chạy trên máy người dùng. Nó điều phố
   - script trong `package.json` phải chạy được trên cả Windows lẫn POSIX.
 - Mỗi nền tảng là một adapter. Thêm adapter không được phải sửa lõi. Mẫu nhận diện hết quota phải có test bằng output thật đã thu lại.
 
-## Môi trường máy này
+## Môi trường & Thiết lập
 
-- Node quản lý bằng fnm, không có sẵn trong PATH. Trước lệnh `node`/`pnpm`/`npx` cần chạy `eval "$(fnm env --shell bash)"` (Git Bash) hoặc `fnm env --shell powershell | Out-String | Invoke-Expression` (PowerShell).
-- Ổ C: gần đầy. Mọi file tạm, log và script nháp để trong `D:\.ai-agents\Claude\temp`. Khi chạy test hoặc các lệnh tạo file tạm, đặt `TEMP`, `TMP`, `TMPDIR` trỏ vào đó.
+- Node.js ≥ 22, pnpm monorepo. Nếu Node được quản lý bằng công cụ môi trường (fnm, nvm...), đảm bảo shell đã kích hoạt Node trước khi chạy lệnh.
+- Quản lý vị trí lưu trữ: voragent tự động lưu trữ dữ liệu tại thư mục `.voragent`. Người dùng có thể tùy chỉnh hoặc di chuyển toàn bộ dữ liệu sang ổ đĩa khác qua biến môi trường `VORAGENT_HOME`, tệp cấu hình `~/.voragentrc` hoặc giao diện Cài đặt (Settings).
 
 ## Quy ước
 
@@ -60,3 +59,4 @@ voragent là chương trình chạy trên máy người dùng. Nó điều phố
 - **Hiển thị chuẩn xác (Rule 12):** Hỗ trợ khởi tạo Git 1-click (`POST /api/projects/git-init`) cho thư mục chưa có Git; parse & render Markdown (`<MarkdownContent />`) thay vì raw text; reset `padding: 0` cho `input[type="checkbox"]`; dùng biểu tượng thương hiệu nhà cung cấp (`<ProviderIcon />` cho Claude/Codex/Antigravity) thay vì emoji `🐍` trên đồ thị và badge 2D; ưu tiên nút `.icon-btn` kèm Custom UI Tooltip (`<Tooltip />` / `data-tooltip` qua `<GlobalTooltipLayer />`, cấm chỉ dùng native `title`); cô lập `zIndexRange={[5, 0]}` và `isolation: isolate` cho `<Html>` 3D để không che khuất Popover/Modal hay nhân vật 3D.
 
 - **Con trỏ chuột ngữ nghĩa (Rule 14):** Dùng đúng `cursor: pointer` cho phần tử bấm được (kể cả vật thể 3D tương tác), `cursor: grab` / `grabbing` cho bề mặt kéo/xoay (Canvas 3D & Đồ thị 2D), `cursor: not-allowed` cho phần tử bị khóa (`disabled`), `cursor: text` cho vùng nhập liệu/code diff, và `cursor: help` cho badge có tooltip giải thích.
+

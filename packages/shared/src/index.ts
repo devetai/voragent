@@ -223,3 +223,75 @@ export interface ModelQuotaInfo {
   usedPercent: number | null;
   note?: string;
 }
+
+export interface StorageBreakdown {
+  worktreesBytes: number;
+  databaseBytes: number;
+  logsBytes: number;
+  totalBytes: number;
+}
+
+export interface DiskSpace {
+  freeBytes: number;
+  totalBytes: number;
+}
+
+export interface AvailableDrive {
+  drive: string;
+  path: string;
+  freeBytes: number;
+  totalBytes: number;
+}
+
+export interface PickDirectoryResult {
+  path: string | null;
+}
+
+export interface FolderEntry {
+  name: string;
+  path: string;
+}
+
+export interface BrowseFolderResult {
+  currentPath: string | null;
+  parentPath: string | null;
+  isRoot: boolean;
+  folders: FolderEntry[];
+}
+
+export interface StorageStats {
+  dataDir: string;
+  defaultDataDir: string;
+  isCustomLocation: boolean;
+  breakdown: StorageBreakdown;
+  disk: DiskSpace | null;
+  prunableWorktreesCount: number;
+  orphanWorktreesCount: number;
+  availableDrives?: AvailableDrive[];
+}
+
+export interface PruneOptions {
+  olderThanDays?: number;
+  orphanWorktrees?: boolean;
+  logs?: boolean;
+  vacuum?: boolean;
+}
+
+export interface PruneResult {
+  freedBytes: number;
+  prunedWorktrees: number;
+  prunedOrphans: number;
+  logsTruncated: boolean;
+  vacuumed: boolean;
+}
+
+export interface MigrateOptions {
+  newPath: string;
+  deleteOld?: boolean;
+}
+
+export interface MigrateResult {
+  success: boolean;
+  oldPath: string;
+  newPath: string;
+}

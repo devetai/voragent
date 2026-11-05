@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { timingSafeEqual } from 'node:crypto';
-import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, Server } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
@@ -18,9 +18,13 @@ import type { Context } from 'hono';
 import { WebSocketServer } from 'ws';
 import type { WebSocket } from 'ws';
 import type {
-  Config, ManagerMode, ManagerPlan, ManagerSubtask, MemoryCategory, ModelQuotaInfo, ProviderId, WorkspaceMode,
+  Config, ManagerMode, ManagerPlan, ManagerSubtask, MemoryCategory, ModelQuotaInfo, ProviderId, WorkspaceMode, PruneOptions,
 } from '@voragent/shared';
 import { PROVIDER_MODELS, PROVIDER_QUOTA_TYPE } from '@voragent/shared';
+import { getStorageStats, pickSystemDirectory, browseFolders } from './storage.js';
+import { pruneStorage } from './cleanup.js';
+import { migrateDataDir } from './migration.js';
+import { resolveDataDir } from './location.js';
 import type { EventBus } from './bus.js';
 import { DEFAULT_CONFIG, saveConfig } from './config.js';
 import type { Orchestrator } from './orchestrator.js';
@@ -132,6 +136,7 @@ export function createServer(d: {
   bus: EventBus;
   key: string;
   webDir: string | null;
+  dataDir?: string;
   /** Cấu hình hiện hành cho GET /api/config. Thiếu thì trả cấu hình mặc định. */
   config?: Config;
   /** Gọi sau khi trả 204 cho POST /api/shutdown. `force`: dừng cứng các lượt đang chạy. Không có thì route trả 501. */
@@ -140,6 +145,7 @@ export function createServer(d: {
   projects?: ProjectCatalog;
 }): Hono {
   const { orchestrator, store, bus, key } = d;
+  const dataDir = d.dataDir ?? d.config?.dataDir ?? resolveDataDir();
   const app = new Hono();
 
   const kick = (): void => {
@@ -832,6 +838,58 @@ export function createServer(d: {
       }
     }
     return c.json(d.config);
+  });
+
+  app.get('/api/system/storage', async (c) => {
+    const stats = await getStorageStats(dataDir, store);
+    return c.json(stats);
+  });
+
+  app.post('/api/system/prune', async (c) => {
+    const b = await readJson(c, true);
+    const options: PruneOptions = {
+      ...(b.olderThanDays !== undefined ? { olderThanDays: Number(b.olderThanDays) } : {}),
+      ...(b.orphanWorktrees !== undefined ? { orphanWorktrees: Boolean(b.orphanWorktrees) } : {}),
+      ...(b.logs !== undefined ? { logs: Boolean(b.logs) } : {}),
+      ...(b.vacuum !== undefined ? { vacuum: Boolean(b.vacuum) } : {}),
+    };
+    const res = await pruneStorage(options, dataDir, store);
+    return c.json(res);
+  });
+
+  app.post('/api/system/migrate', async (c) => {
+    const b = await readJson(c);
+    const newPath = reqString(b, 'newPath');
+    const deleteOld = b.deleteOld === true;
+    try {
+      const res = await migrateDataDir({ newPath, deleteOld }, dataDir, store);
+      return c.json(res);
+    } catch (e) {
+      throw new BadRequest(e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  app.get('/api/system/browse-folders', (c) => {
+    const p = c.req.query('path') ?? null;
+    return c.json(browseFolders(p));
+  });
+
+  app.post('/api/system/create-folder', async (c) => {
+    const b = await readJson(c);
+    const parentPath = reqString(b, 'parentPath');
+    const folderName = reqString(b, 'folderName');
+    const target = join(parentPath, folderName.trim());
+    try {
+      mkdirSync(target, { recursive: true });
+      return c.json({ path: target });
+    } catch (e) {
+      throw new BadRequest(e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  app.post('/api/system/pick-directory', async (c) => {
+    const chosen = await pickSystemDirectory();
+    return c.json({ path: chosen });
   });
 
   app.post('/api/shutdown', async (c) => {

@@ -10,6 +10,7 @@ import {
   KanbanSquare,
   Network,
   Plus,
+  Settings,
 } from 'lucide-react';
 import type { ManagerPlan, MemoryItem, Project, ProviderState, Task, VEvent } from '@voragent/shared';
 import { ApiError, api, errText } from './api';
@@ -26,6 +27,7 @@ import { OfficeCanvas } from './office/OfficeCanvas';
 import { ProjectList } from './ProjectList';
 import { QuotaBar } from './QuotaBar';
 import { SharedMemoryPanel } from './SharedMemoryPanel';
+import { SettingsView } from './SettingsView';
 import { TaskView } from './TaskView';
 import { applyEvent, mergeEvents, projectKeyOf, resolveProjectRoute, tasksOfProject } from './state';
 import type { UiState } from './state';
@@ -394,7 +396,7 @@ export function App() {
               >
                 <Network size={15} /> Đồ thị
               </button>
-            </nav>
+              </nav>
           </div>
 
           <div className="header-right">
@@ -446,6 +448,29 @@ export function App() {
               <span>{managerInboxCount > 0 ? `Trưởng phòng (${managerInboxCount})` : 'Trưởng phòng'}</span>
             </button>
 
+                        {/* Nút Cài đặt hệ thống & Quản lý lưu trữ */}
+            <button
+              type="button"
+              className={`icon-btn ${route.view === 'settings' ? 'active' : ''}`}
+              onClick={() => nav('/settings')}
+              data-tooltip="Cài đặt hệ thống, vị trí lưu trữ & dọn dẹp rác"
+              data-tooltip-placement="bottom"
+              aria-label="Cài đặt hệ thống"
+              style={{
+                width: '32px',
+                height: '32px',
+                padding: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: route.view === 'settings' ? 'var(--amber-bg)' : undefined,
+                color: route.view === 'settings' ? 'var(--amber-text)' : undefined,
+                borderColor: route.view === 'settings' ? 'var(--amber-border)' : undefined,
+              }}
+            >
+              <Settings size={16} />
+            </button>
+
             <button
               className="primary"
               onClick={() => nav(viewedPath !== null ? `/new?project=${encodeURIComponent(viewedPath)}` : '/new')}
@@ -479,7 +504,9 @@ export function App() {
       )}
 
       {/* Main Content Router */}
-      {route.view === 'new' ? (
+      {route.view === 'settings' ? (
+        <SettingsView />
+      ) : route.view === 'new' ? (
         <NewTaskForm
           providers={providers}
           projects={projects ?? []}

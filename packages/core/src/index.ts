@@ -9,3 +9,7 @@ export * from './orchestrator.js';
 export * from './server.js';
 export * from './daemon.js';
 export * from './projects.js';
+export * from './location.js';
+export * from './storage.js';
+export * from './cleanup.js';
+export * from './migration.js';

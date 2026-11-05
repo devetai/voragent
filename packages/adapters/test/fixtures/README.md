@@ -12,7 +12,7 @@
 - `claude-mentions-limit.jsonl`: dựng từ `claude-ok.jsonl`; câu trả lời chứa "usage limit reached"
   nhưng `is_error: false`. Dùng để chứng minh adapter không đọc chữ trong câu trả lời.
 - `codex-ok.jsonl`, `codex-tools.jsonl`, `codex-quota.jsonl`, `codex-mentions-limit.jsonl`: DỰNG TAY
-  cả bốn, theo định dạng JSONL mà parser Codex trong `agui.ts` của TipTask runner đọc
+  cả bốn, theo định dạng JSONL chuẩn của parser Codex headless CLI
   (`thread.started`, `item.started`/`item.completed`, `turn.completed`, `error`). KHÔNG đối chiếu với
   Codex CLI thật (chưa cài trên máy dev, không cài global); phiên bản Codex: chưa biết. Id và đường dẫn
   là giá trị giả (`s-demo-1`, `C:\work\demo`). Cần thay bằng bản thu thật khi cài được Codex.

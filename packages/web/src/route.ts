@@ -7,6 +7,7 @@
  *   /manager       hoặc /manager?project= -> Bàn Trưởng phòng & Sub-agents
  *   /memory        hoặc /memory?project=. -> Bộ nhớ dùng chung (Shared Memory)
  *   /graph         hoặc /graph?project=.. -> Đồ thị quan hệ
+ *   /settings                             -> Cài đặt hệ thống, vị trí lưu trữ & dọn dẹp rác
  *   /new           hoặc /new?project=..   -> Tạo task mới
  *   /task/<id>                            -> Chi tiết task và phiên làm việc
  *
@@ -17,8 +18,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-export type AppView = 'projects' | 'board' | 'office' | 'manager' | 'memory' | 'graph' | 'new' | 'task';
-export type TabId = 'projects' | 'board' | 'office' | 'manager' | 'memory' | 'graph';
+export type AppView = 'projects' | 'board' | 'office' | 'manager' | 'memory' | 'graph' | 'settings' | 'new' | 'task';
+export type TabId = 'projects' | 'board' | 'office' | 'manager' | 'memory' | 'graph' | 'settings';
 
 export interface AppRoute {
   view: AppView;
@@ -81,6 +82,8 @@ export function parseLocation(loc: { pathname: string; search: string; hash?: st
     view = 'memory';
   } else if (pathname === '/graph' || hash === '#/graph') {
     view = 'graph';
+  } else if (pathname === '/settings' || hash === '#/settings') {
+    view = 'settings';
   } else if (pathname === '/board' || hash === '#/board' || projectPath !== null) {
     view = 'board';
   } else {
@@ -93,6 +96,7 @@ export function parseLocation(loc: { pathname: string; search: string; hash?: st
   else if (view === 'manager') activeTab = 'manager';
   else if (view === 'memory') activeTab = 'memory';
   else if (view === 'graph') activeTab = 'graph';
+  else if (view === 'settings') activeTab = 'settings';
   else if (view === 'board' || projectPath !== null) activeTab = 'board';
   else activeTab = 'projects';
 
@@ -165,6 +169,9 @@ export function buildUrl(
       break;
     case 'graph':
       basePath = '/graph';
+      break;
+    case 'settings':
+      basePath = '/settings';
       break;
     case 'new':
       basePath = '/new';

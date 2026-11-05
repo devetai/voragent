@@ -3,11 +3,11 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import spawn from 'cross-spawn';
-import { isPidAlive, readDaemonInfo, startDaemon } from '@voragent/core';
+import { isPidAlive, readDaemonInfo, startDaemon, resolveDataDir, getStorageStats, pruneStorage, migrateDataDir, openStore } from '@voragent/core';
 import type { Daemon, DaemonInfo } from '@voragent/core';
 import type { Adapter } from '@voragent/adapters';
 import { TASK_STATUS_LABEL } from '@voragent/shared';
-import type { ProviderId, ProviderState, Project, Task } from '@voragent/shared';
+import type { ProviderId, ProviderState, Project, Task, StorageStats, PruneResult, MigrateResult } from '@voragent/shared';
 
 export interface CliContext {
   /** Thư mục dữ liệu (mặc định `$VORAGENT_HOME` hoặc `~/.voragent`). */
@@ -17,6 +17,7 @@ export interface CliContext {
   err: (s: string) => void;
   /** File JS để chạy lại chính nó ở chế độ nền. */
   entry: string;
+  home?: string;
   /** Chỉ dùng trong test: adapter thay cho adapter thật. */
   adapters?: Map<ProviderId, Adapter>;
   /** Chỉ dùng trong test. */
@@ -28,8 +29,8 @@ export interface CliContext {
   hardExit?: (code: number) => void;
 }
 
-export function defaultDataDir(env: NodeJS.ProcessEnv = process.env): string {
-  return env.VORAGENT_HOME && env.VORAGENT_HOME !== '' ? env.VORAGENT_HOME : join(homedir(), '.voragent');
+export function defaultDataDir(env: NodeJS.ProcessEnv = process.env, home?: string): string {
+  return resolveDataDir(env, home);
 }
 
 export const NO_DAEMON = 'Daemon chưa chạy. Chạy: voragent';
@@ -41,6 +42,9 @@ const USAGE = `Cách dùng:
   voragent add <dự-án|đường-dẫn> <tin nhắn…> [--mode m] [--agent id]
                                           dự án chọn theo tên (xem: voragent projects)
   voragent status
+  voragent storage                        xem dung lượng voragent đang dùng và tình trạng ổ đĩa
+  voragent prune [--days N] [--logs]      dọn dẹp worktrees cũ, log và tối ưu database
+  voragent migrate <đường-dẫn-mới>       di chuyển toàn bộ dữ liệu sang thư mục mới
   voragent stop [--force]                 --force: dừng ngay các lượt đang chạy (xếp lại để chạy tiếp lần sau)`;
 
 /** Mở URL bằng trình duyệt mặc định; mọi lỗi đều bị bỏ qua. */
@@ -309,6 +313,30 @@ export function formatStatus(providers: ProviderState[], tasks: Task[], now = Da
   return `${out}\n`;
 }
 
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${(bytes / Math.pow(k, i)).toFixed(i >= 2 ? 1 : 0)} ${sizes[i]}`;
+}
+
+function formatStorageStats(stats: StorageStats): string {
+  const b = stats.breakdown;
+  const lines = [
+    `Thư mục dữ liệu: ${stats.dataDir} (${stats.isCustomLocation ? 'tùy chỉnh ~/.voragentrc' : 'mặc định'})`,
+    `Tổng dung lượng đang dùng: ${formatBytes(b.totalBytes)}`,
+    `  - Worktrees: ${formatBytes(b.worktreesBytes)} (${stats.prunableWorktreesCount} có thể dọn, ${stats.orphanWorktreesCount} mồ côi)`,
+    `  - Database:  ${formatBytes(b.databaseBytes)}`,
+    `  - Logs:      ${formatBytes(b.logsBytes)}`,
+  ];
+  if (stats.disk) {
+    lines.push(`Ổ đĩa: Còn trống ${formatBytes(stats.disk.freeBytes)} / ${formatBytes(stats.disk.totalBytes)}`);
+  }
+  return lines.join('\n') + '\n';
+}
+
 // ------------------------------------------------------------------ điểm vào
 
 export async function runCli(argv: string[], ctx: CliContext): Promise<number> {
@@ -327,6 +355,10 @@ export async function runCli(argv: string[], ctx: CliContext): Promise<number> {
         background: { type: 'boolean' },
         mode: { type: 'string' },
         agent: { type: 'string' },
+        days: { type: 'string' },
+        logs: { type: 'boolean' },
+        vacuum: { type: 'boolean' },
+        'delete-old': { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
       },
     });
@@ -442,6 +474,93 @@ export async function runCli(argv: string[], ctx: CliContext): Promise<number> {
         ctx.out(formatStatus(p.json as ProviderState[], t.json as Task[]));
         return 0;
       });
+    case 'storage': {
+      const info = readDaemonInfo(ctx.dataDir);
+      let stats: StorageStats;
+      if (info && isPidAlive(info.pid)) {
+        const r = await call(info, 'GET', '/api/system/storage');
+        if (r.status !== 200) {
+          ctx.err(`Không đọc được thông tin lưu trữ: ${errorOf(r.json, `HTTP ${r.status}`)}\n`);
+          return 1;
+        }
+        stats = r.json as StorageStats;
+      } else {
+        const dbFile = join(ctx.dataDir, 'voragent.db');
+        const store = openStore(existsSync(dbFile) ? dbFile : ':memory:');
+        try {
+          stats = await getStorageStats(ctx.dataDir, store);
+        } finally {
+          store.close();
+        }
+      }
+      ctx.out(formatStorageStats(stats));
+      return 0;
+    }
+    case 'prune': {
+      const olderThanDays = values.days !== undefined ? Number(values.days) : 7;
+      const pruneOpts = {
+        olderThanDays,
+        orphanWorktrees: true,
+        logs: values.logs === true,
+        vacuum: values.vacuum === true,
+      };
+      const info = readDaemonInfo(ctx.dataDir);
+      let result: PruneResult;
+      if (info && isPidAlive(info.pid)) {
+        const r = await call(info, 'POST', '/api/system/prune', pruneOpts);
+        if (r.status !== 200) {
+          ctx.err(`Không dọn dẹp được: ${errorOf(r.json, `HTTP ${r.status}`)}\n`);
+          return 1;
+        }
+        result = r.json as PruneResult;
+      } else {
+        const dbFile = join(ctx.dataDir, 'voragent.db');
+        const store = openStore(existsSync(dbFile) ? dbFile : ':memory:');
+        try {
+          result = await pruneStorage(pruneOpts, ctx.dataDir, store);
+        } finally {
+          store.close();
+        }
+      }
+      ctx.out(
+        `Đã dọn dẹp thành công! Giải phóng: ${formatBytes(result.freedBytes)}\n`
+        + `  - Worktrees: ${result.prunedWorktrees} task, ${result.prunedOrphans} orphan\n`
+        + `  - Logs: ${result.logsTruncated ? 'Đã thu gọn' : 'Giữ nguyên'}\n`
+        + `  - Database: ${result.vacuumed ? 'Đã tối ưu (vacuum)' : 'Giữ nguyên'}\n`,
+      );
+      return 0;
+    }
+    case 'migrate': {
+      const targetPath = positionals[0];
+      if (!targetPath) {
+        ctx.err('Thiếu đường dẫn thư mục mới: voragent migrate <đường-dẫn-mới>\n');
+        return 1;
+      }
+      const deleteOld = values['delete-old'] === true;
+      const info = readDaemonInfo(ctx.dataDir);
+      let result: MigrateResult;
+      if (info && isPidAlive(info.pid)) {
+        const r = await call(info, 'POST', '/api/system/migrate', { newPath: targetPath, deleteOld });
+        if (r.status !== 200) {
+          ctx.err(`Không di chuyển được: ${errorOf(r.json, `HTTP ${r.status}`)}\n`);
+          return 1;
+        }
+        result = r.json as MigrateResult;
+      } else {
+        const dbFile = join(ctx.dataDir, 'voragent.db');
+        const store = openStore(existsSync(dbFile) ? dbFile : ':memory:');
+        try {
+          result = await migrateDataDir({ newPath: targetPath, deleteOld }, ctx.dataDir, store, ctx.home);
+        } finally {
+          store.close();
+        }
+      }
+      ctx.out(
+        `Đã di chuyển thành công dữ liệu sang: ${result.newPath}\n`
+        + 'Đã cập nhật ~/.voragentrc. Khởi động lại voragent để áp dụng vị trí mới.\n',
+      );
+      return 0;
+    }
     case 'stop':
       return withDaemon(ctx, async (info) => {
         const r = await call(info, 'POST', '/api/shutdown', values.force ? { force: true } : undefined);

@@ -13,7 +13,7 @@ voragent là một chương trình chạy trên máy người dùng, làm hai vi
 
 Hai dự án tham khảo (chỉ để học cách làm, voragent không phụ thuộc vào chúng):
 
-- **tiptask runner** (`D:\Projects\young-turtles\tiptask\packages\runner`): cách chạy CLI không cần người trông, cách đọc luồng sự kiện của từng CLI rồi đổi về chuẩn AG-UI, cách tiếp tục phiên cũ. Xem `src/presets.ts` và `src/agui.ts`.
+- **Headless Agent Runner Architecture**: cách chạy CLI tự động (unattended execution), cách đọc luồng sự kiện stream-json của từng CLI rồi đổi về chuẩn sự kiện nội bộ, cách tiếp tục phiên cũ qua cờ tiếp tục phiên.
 - **GitNexus** (<https://github.com/abhigyanpatwari/GitNexus>): một lệnh khởi chạy (`npx …`), máy chủ HTTP cục bộ, giao diện web React đọc dữ liệu cục bộ, đồ thị vẽ bằng Sigma.js, tích hợp agent qua MCP và hook.
 
 ## 2. Mục tiêu, không phải mục tiêu, phản mục tiêu
@@ -29,7 +29,7 @@ Hai dự án tham khảo (chỉ để học cách làm, voragent không phụ th
 ### Không phải mục tiêu (ít nhất ở bản đầu)
 
 - Không có máy chủ đám mây, không có tài khoản, không chia sẻ nhiều người dùng. Mọi thứ nằm trên một máy.
-- Không tích hợp TipTask hay bất kỳ công cụ quản lý việc nào bên ngoài.
+- Không tích hợp bất kỳ công cụ quản lý việc bên ngoài nào.
 - Không tự gọi API mô hình. voragent chỉ chạy các CLI chính thức mà người dùng đã cài và đăng nhập.
 - Không lấy được toàn bộ "suy nghĩ" của agent A khi chuyển sang agent B. Chỉ có bản bàn giao.
 
@@ -80,7 +80,7 @@ Các thành phần:
 | Event (sự kiện) | Đơn vị nhỏ nhất, được tất cả các chế độ xem dùng chung | `TOOL_CALL_START Read src/auth.ts` |
 | Workspace | Thư mục, thường là git worktree, nơi một task chạy | `.voragent/worktrees/<project-slug>/task-42` |
 
-**Dạng sự kiện chung:** dựa trên các loại sự kiện AG-UI giống tiptask runner (`RUN_STARTED`, `TEXT_MESSAGE_*`, `TOOL_CALL_*`, `RUN_FINISHED`, `RUN_ERROR`), bổ sung các sự kiện voragent cần:
+**Dạng sự kiện chung:** dựa trên chuẩn sự kiện AG-UI (`RUN_STARTED`, `TEXT_MESSAGE_*`, `TOOL_CALL_*`, `RUN_FINISHED`, `RUN_ERROR`), bổ sung các sự kiện voragent cần:
 
 - `STATE_CHANGED` (làm việc, chờ duyệt, rảnh, lỗi, xong);
 - `APPROVAL_REQUESTED` / `APPROVAL_RESOLVED`;
@@ -97,8 +97,8 @@ Mỗi sự kiện ghi rõ nguồn: `managed` (voragent giao) hay `observed` (phi
 Mỗi adapter cung cấp:
 
 1. **Phát hiện:** CLI đã cài chưa, phiên bản nào, đã đăng nhập chưa (nếu kiểm tra được).
-2. **Tạo lệnh chạy không cần người trông:** cờ headless, cách đưa yêu cầu vào (stdin hay đối số), cách đưa system prompt, cách tiếp tục phiên. Tham khảo `PRESETS` trong tiptask runner. Ví dụ Claude: `claude -p --output-format stream-json --verbose --include-partial-messages`, có `--resume <id>` khi tiếp tục phiên.
-3. **Đọc luồng output:** đổi stream của CLI sang sự kiện chung. Tham khảo `AnswerStream` trong `agui.ts` của runner.
+2. **Tạo lệnh chạy không cần người trông:** cờ headless, cách đưa yêu cầu vào (stdin hay đối số), cách đưa system prompt, cách tiếp tục phiên. Ví dụ Claude: `claude -p --output-format stream-json --verbose --include-partial-messages`, có `--resume <id>` khi tiếp tục phiên.
+3. **Đọc luồng output:** đổi stream của CLI sang sự kiện chung. Được chuẩn hóa trực tiếp thành luồng sự kiện AG-UI nội bộ.
 4. **Nhận diện hết quota / bị giới hạn tốc độ:** dựa vào mã thoát, stderr và các sự kiện trong stream. Đọc giờ được dùng lại nếu CLI có báo. Mẫu nhận diện nằm trong adapter, có test bằng các mẫu output thật.
 5. **Đọc lượng đã dùng (nếu có):** ví dụ thông tin `rate_limits` trong luồng JSON của Codex, hoặc số token trong file nhật ký phiên của Claude. Không có thì để trống. Hệ thống vẫn chạy được, chỉ là không đoán trước được lúc sắp hết.
 6. **Cách đọc phiên tự mở:** vị trí file nhật ký phiên và định dạng của nó, nếu nền tảng có.

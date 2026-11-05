@@ -66,6 +66,8 @@ export interface Store {
   createManagerPlan(p: CreateManagerPlanInput): ManagerPlan;
   updateManagerPlan(id: string, patch: Partial<Omit<ManagerPlan, 'id' | 'repoPath' | 'createdAt'>>): ManagerPlan;
   deleteManagerPlan(id: string): boolean;
+  vacuum(): void;
+  checkpoint(): void;
   close(): void;
 }
 
@@ -603,6 +605,12 @@ export function openStore(file: string): Store {
       return true;
     },
 
+    vacuum() {
+      db.exec('VACUUM');
+    },
+    checkpoint() {
+      db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+    },
     close() {
       db.close();
     },

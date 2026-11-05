@@ -1,6 +1,23 @@
 import type {
-  Config, ManagerMode, ManagerPlan, ManagerSubtask, MemoryCategory, MemoryItem, ModelQuotaInfo,
-  Project, ProviderState, Run, Task, Turn, VEvent, WorkspaceMode,
+  Config,
+  ManagerMode,
+  ManagerPlan,
+  ManagerSubtask,
+  MemoryCategory,
+  MemoryItem,
+  MigrateOptions,
+  MigrateResult,
+  ModelQuotaInfo,
+  Project,
+  ProviderState,
+  PruneOptions,
+  PruneResult,
+  Run,
+  StorageStats,
+  Task,
+  Turn,
+  VEvent,
+  WorkspaceMode,
 } from '@voragent/shared';
 
 /** Lỗi API: `message` là chuỗi tiếng Việt trong trường `error` của JSON trả về. */
@@ -69,6 +86,14 @@ export const api = {
   initGit: (repoPath: string) =>
     call<{ ok: boolean; branch: string; commit: string; projects: Project[] }>('POST', '/api/projects/git-init', { repoPath }),
   config: () => call<Config>('GET', '/api/config'),
+  storage: () => call<StorageStats>('GET', '/api/system/storage'),
+  prune: (options: PruneOptions) => call<PruneResult>('POST', '/api/system/prune', options),
+  migrate: (options: MigrateOptions) => call<MigrateResult>('POST', '/api/system/migrate', options),
+  pickDirectory: () => call<PickDirectoryResult>('POST', '/api/system/pick-directory'),
+  browseFolders: (path?: string | null) =>
+    call<BrowseFolderResult>('GET', path ? `/api/system/browse-folders?path=${encodeURIComponent(path)}` : '/api/system/browse-folders'),
+  createFolder: (parentPath: string, folderName: string) =>
+    call<{ path: string }>('POST', '/api/system/create-folder', { parentPath, folderName }),
   updateConfig: (patch: { models?: Record<string, string>; modelFallbackPolicy?: 'auto' | 'ask' }) =>
     call<Config>('PATCH', '/api/config', patch),
   createTask: (b: {

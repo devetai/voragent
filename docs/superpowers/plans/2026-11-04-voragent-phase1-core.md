@@ -311,7 +311,7 @@ args: ['-p', ...(sessionId ? ['--resume', sessionId] : []), '--output-format', '
 stdin: prompt
 ```
 
-Ánh xạ stream sang sự kiện. Cách đọc giống `AnswerStream` trong `tiptask/packages/runner/src/agui.ts`:
+Ánh xạ stream sang sự kiện theo chuẩn AG-UI:
 
 - `session_id` có trên mọi dòng. Lấy giá trị ở dòng đầu tiên.
 - `stream_event` có `content_block_delta.text_delta` cho ra `TEXT_MESSAGE_CONTENT`.
