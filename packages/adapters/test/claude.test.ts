@@ -83,6 +83,14 @@ test('invocation: --resume, --append-system-prompt, stdin là prompt', () => {
   expect(bare.args).not.toContain('--append-system-prompt');
 });
 
+test('invocation: chuẩn hóa model alias hoặc legacy ID (sonnet-5.5 -> claude-sonnet-5-5)', () => {
+  const inv = createClaudeAdapter().invocation({
+    prompt: 'hi', systemPrompt: '', sessionId: null, cwd: '.', network: false, model: 'sonnet-5.5',
+  });
+  expect(inv.args).toContain('--model');
+  expect(inv.args).toContain('claude-sonnet-5-5');
+});
+
 test('dòng JSON hợp lệ nhưng không phải object bị bỏ qua như JSON hỏng', () => {
   const parser = createClaudeAdapter().createParser();
   for (const line of ['null', '5', '"x"', '[1]', '{not json']) {

@@ -86,3 +86,11 @@ test('config.json saved with a UTF-8 BOM still loads', () => {
     expect(c.quotaThreshold).toBe(0.9);
   });
 });
+
+test('legacy claude model id mapped to claude-sonnet-5-5', () => {
+  withDir((dir) => {
+    writeFileSync(join(dir, 'config.json'), JSON.stringify({ models: { claude: 'sonnet-5.5' } }));
+    const c = loadConfig(dir);
+    expect(c.models?.claude).toBe('claude-sonnet-5-5');
+  });
+});

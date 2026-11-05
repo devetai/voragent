@@ -13,7 +13,7 @@ export const DEFAULT_CONFIG: Omit<Config, 'dataDir'> = {
   defaultMode: 'head-dirty-commit',
   handoffMaxChars: 24_000,
   models: {
-    claude: 'sonnet-5.5',
+    claude: 'claude-sonnet-5-5',
     codex: 'gpt-5.6-luna',
     antigravity: 'gemini-3.8-flash',
   },
@@ -21,6 +21,12 @@ export const DEFAULT_CONFIG: Omit<Config, 'dataDir'> = {
 };
 
 const MODES: WorkspaceMode[] = ['head-dirty-commit', 'head-commit', 'dirty-nocommit'];
+
+const LEGACY_CLAUDE_MODELS: Record<string, string> = {
+  'sonnet-5.5': 'claude-sonnet-5-5',
+  'opus-5.5': 'claude-opus-5-5',
+  'haiku-5.5': 'claude-haiku-4-5',
+};
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -95,6 +101,9 @@ export function loadConfig(dataDir: string): Config {
   if (raw.models !== undefined) {
     if (!isObject(raw.models)) fail(file, 'models', 'một đối tượng JSON');
     base.models = { ...base.models, ...(raw.models as Record<string, string>) };
+  }
+  if (base.models?.claude && LEGACY_CLAUDE_MODELS[base.models.claude]) {
+    base.models.claude = LEGACY_CLAUDE_MODELS[base.models.claude]!;
   }
   if (raw.modelFallbackPolicy !== undefined) {
     if (raw.modelFallbackPolicy !== 'auto' && raw.modelFallbackPolicy !== 'ask') {

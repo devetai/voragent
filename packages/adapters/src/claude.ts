@@ -122,17 +122,27 @@ function createClaudeParser(): StreamParser {
   };
 }
 
+function normalizeClaudeModel(model?: string | null): string | null {
+  if (!model) return null;
+  const m = model.trim();
+  if (m === 'sonnet-5.5' || m === 'sonnet-5-5') return 'claude-sonnet-5-5';
+  if (m === 'opus-5.5' || m === 'opus-5-5') return 'claude-opus-5-5';
+  if (m === 'haiku-5.5' || m === 'haiku-4.5' || m === 'haiku-4-5') return 'claude-haiku-4-5';
+  return m;
+}
+
 export function createClaudeAdapter(): Adapter {
   return {
     id: 'claude',
     detect: () => detectBinary('claude'),
     invocation(input: TurnInput): Invocation {
+      const resolvedModel = normalizeClaudeModel(input.model);
       return {
         bin: 'claude',
         args: [
           '-p',
           ...(input.sessionId ? ['--resume', input.sessionId] : []),
-          ...(input.model ? ['--model', input.model] : []),
+          ...(resolvedModel ? ['--model', resolvedModel] : []),
           '--output-format', 'stream-json', '--include-partial-messages', '--verbose',
           '--permission-mode', 'auto',
           ...(input.systemPrompt ? ['--append-system-prompt', input.systemPrompt] : []),

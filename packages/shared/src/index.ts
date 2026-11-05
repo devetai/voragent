@@ -178,9 +178,9 @@ export interface ModelOption {
 
 export const PROVIDER_MODELS: Record<string, ModelOption[]> = {
   claude: [
-    { id: 'sonnet-5.5', name: 'Sonnet 5.5', description: 'Mô hình thông minh cân bằng (Mặc định)', default: true },
-    { id: 'opus-5.5', name: 'Opus 5.5', description: 'Mô hình mạnh mẽ, tư duy chuyên sâu' },
-    { id: 'haiku-5.5', name: 'Haiku 5.5', description: 'Tốc độ cực nhanh, tiết kiệm hạn mức' },
+    { id: 'claude-sonnet-5-5', name: 'Sonnet 5.5', description: 'Mô hình thông minh cân bằng (Mặc định)', default: true },
+    { id: 'claude-opus-5-5', name: 'Opus 5.5', description: 'Mô hình mạnh mẽ, tư duy chuyên sâu' },
+    { id: 'claude-haiku-4-5', name: 'Haiku 4.5', description: 'Tốc độ cực nhanh, tiết kiệm hạn mức' },
   ],
   codex: [
     { id: 'gpt-5.6-luna', name: 'GPT-5.6-Luna', description: 'Older fast and efficient model (Mặc định)', default: true },

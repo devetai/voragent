@@ -176,10 +176,10 @@ describe('createServer (không cần socket)', () => {
     expect(p.map((x) => x.id)).toEqual(['fake-a']);
     const cfg = (await (await a.request('/api/config', { headers: h })).json()) as { port: number };
     expect(cfg.port).toBe(DEFAULT_CONFIG.port);
-    const patched = await a.request('/api/config', { method: 'PATCH', headers: { ...h, 'content-type': 'application/json' }, body: JSON.stringify({ models: { claude: 'opus-5.5' } }) });
+    const patched = await a.request('/api/config', { method: 'PATCH', headers: { ...h, 'content-type': 'application/json' }, body: JSON.stringify({ models: { claude: 'claude-opus-5-5' } }) });
     expect(patched.status).toBe(200);
     const updatedCfg = (await patched.json()) as { models?: Record<string, string> };
-    expect(updatedCfg.models?.claude).toBe('opus-5.5');
+    expect(updatedCfg.models?.claude).toBe('claude-opus-5-5');
   });
 
   it('close, retry và diff trên task có sẵn', async () => {
@@ -679,12 +679,14 @@ describe('startDaemon: cô lập thư mục người dùng', () => {
       startDaemon({ dataDir, port, adapters: fakeAdapters(), projectTmpDirs: [] }),
     );
     daemons.push(d);
-    const taskRes = await fetch(`${base(d)}/api/tasks`, {
-      ...authed(d),
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ repoPath: repo, message: 'test preview', mode: 'dirty-nocommit' }),
-    });
+    const taskRes = await fetch(
+      `${base(d)}/api/tasks`,
+      authed(d, {
+        method: 'POST',
+        body: JSON.stringify({ repoPath: repo, message: 'test preview', mode: 'dirty-nocommit' }),
+      }),
+    );
+    expect(taskRes.status).toBe(201);
     const task = (await taskRes.json()) as Task;
     const prevRes = await fetch(`${base(d)}/api/tasks/${task.id}/preview/index.html`, authed(d));
     expect(prevRes.status).toBe(200);
@@ -692,12 +694,13 @@ describe('startDaemon: cô lập thư mục người dùng', () => {
     expect(prevRes.headers.get('content-type')).toContain('text/html');
 
     // Cập nhật model bằng PATCH
-    const patchRes = await fetch(`${base(d)}/api/tasks/${task.id}`, {
-      ...authed(d),
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-3-5-haiku' }),
-    });
+    const patchRes = await fetch(
+      `${base(d)}/api/tasks/${task.id}`,
+      authed(d, {
+        method: 'PATCH',
+        body: JSON.stringify({ model: 'claude-3-5-haiku' }),
+      }),
+    );
     expect(patchRes.status).toBe(200);
     const updatedTask = (await patchRes.json()) as Task;
     expect(updatedTask.model).toBe('claude-3-5-haiku');
