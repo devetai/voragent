@@ -366,8 +366,10 @@ export function App() {
                 type="button"
                 className={`view-tab ${activeTab === 'projects' ? 'active' : ''}`}
                 onClick={() => { setOverlay(null); nav('/'); }}
+                data-tooltip="Danh sách toàn bộ dự án"
+                data-tooltip-placement="bottom"
               >
-                <FolderGit2 size={15} /> Dự án
+                <FolderGit2 size={15} /> <span className="tab-label">Dự án</span>
               </button>
               <button
                 type="button"
@@ -379,29 +381,38 @@ export function App() {
                     nav({ view: 'office', projectPath: viewedPath });
                   }
                 }}
+                data-tooltip={viewedPath !== null ? `Văn phòng 3D (${viewedName})` : 'Không gian Văn phòng 3D'}
+                data-tooltip-placement="bottom"
               >
-                <Building2 size={15} /> Văn phòng 3D {viewedPath !== null && `(${viewedName})`}
+                <Building2 size={15} /> <span className="tab-label">Văn phòng 3D</span>
               </button>
               <button
                 type="button"
                 className={`view-tab ${activeTab === 'board' ? 'active' : ''}`}
                 onClick={() => nav({ view: 'board', projectPath: viewedPath })}
+                data-tooltip="Bảng Kanban theo dõi công việc"
+                data-tooltip-placement="bottom"
               >
-                <KanbanSquare size={15} /> Bảng Kanban ({officeTasks.length})
+                <KanbanSquare size={15} /> <span className="tab-label">Bảng Kanban</span>
+                {officeTasks.length > 0 && (
+                  <span className="tab-count-badge tabular">{officeTasks.length}</span>
+                )}
               </button>
               <button
                 type="button"
                 className={`view-tab ${activeTab === 'graph' ? 'active' : ''}`}
                 onClick={() => nav({ view: 'graph', projectPath: viewedPath })}
+                data-tooltip="Đồ thị quan hệ kiến trúc & nhiệm vụ"
+                data-tooltip-placement="bottom"
               >
-                <Network size={15} /> Đồ thị
+                <Network size={15} /> <span className="tab-label">Đồ thị</span>
               </button>
-              </nav>
+            </nav>
           </div>
 
           <div className="header-right">
             {/* Bộ chọn nhanh Văn phòng Dự án */}
-            <div style={{ minWidth: '205px', maxWidth: '260px' }}>
+            <div className="header-project-select">
               <CustomSelect
                 options={officeOptions}
                 value={viewedPath ?? ''}
@@ -421,11 +432,12 @@ export function App() {
             {/* Nút mở Modal Shared Memory — gọn gàng với Icon + số đếm + Tooltip */}
             <button
               type="button"
+              className="header-memory-btn"
               onClick={() => setOverlay(overlay?.kind === 'memory' ? null : { kind: 'memory' })}
               data-tooltip="Mở Bộ nhớ chung của Văn phòng (Shared Memory)"
               data-tooltip-placement="bottom"
               aria-label="Bộ nhớ chung Văn phòng"
-              style={{ padding: '0 10px', gap: '5px' }}
+              style={{ padding: '0 8px', gap: '5px' }}
             >
               <Brain size={15} />
               <span className="tabular" style={{ fontSize: '12px', fontWeight: 600 }}>{officeMemories.length}</span>
@@ -434,6 +446,7 @@ export function App() {
             {/* Nút mở Modal Bàn Trưởng Phòng & Báo cáo tập trung */}
             <button
               type="button"
+              className="header-manager-btn"
               onClick={() => setOverlay(overlay?.kind === 'manager' ? null : { kind: 'manager' })}
               data-tooltip="Mở Bàn Trưởng phòng — Duyệt câu hỏi, nghiệm thu & giao mục tiêu"
               data-tooltip-placement="bottom"
@@ -445,10 +458,15 @@ export function App() {
               }}
             >
               {managerInboxCount > 0 ? <Bell size={14} /> : <Crown size={14} />}
-              <span>{managerInboxCount > 0 ? `Trưởng phòng (${managerInboxCount})` : 'Trưởng phòng'}</span>
+              <span className="header-btn-text">Trưởng phòng</span>
+              {managerInboxCount > 0 && (
+                <span className="tab-count-badge tabular" style={{ background: '#F59E0B', color: '#FFF' }}>
+                  {managerInboxCount}
+                </span>
+              )}
             </button>
 
-                        {/* Nút Cài đặt hệ thống & Quản lý lưu trữ */}
+            {/* Nút Cài đặt hệ thống & Quản lý lưu trữ */}
             <button
               type="button"
               className={`icon-btn ${route.view === 'settings' ? 'active' : ''}`}
@@ -472,12 +490,12 @@ export function App() {
             </button>
 
             <button
-              className="primary"
+              className="primary header-new-task-btn"
               onClick={() => nav(viewedPath !== null ? `/new?project=${encodeURIComponent(viewedPath)}` : '/new')}
               data-tooltip="Tạo task mới (N)"
               data-tooltip-placement="bottom"
             >
-              <Plus size={15} /> Task mới <kbd>N</kbd>
+              <Plus size={15} /> <span className="new-task-text">Task mới</span> <kbd className="header-kbd">N</kbd>
             </button>
           </div>
         </header>

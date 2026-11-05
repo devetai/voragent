@@ -92,12 +92,12 @@ export function CustomSelect<T extends string = string>({
       top = Math.max(8, rect.bottom + 4);
     }
 
-    const minWidth = Math.max(rect.width, 320);
+    const minWidth = Math.min(vw - 24, Math.max(rect.width, 260));
     let left: number | undefined;
     let right: number | undefined;
 
     // Nếu mép phải của trigger gần viền màn hình thì căn theo cạnh phải
-    if (rect.left + minWidth > vw - 16 && rect.right > 300) {
+    if (rect.left + minWidth > vw - 16 && rect.right > 240) {
       right = Math.max(12, vw - rect.right);
     } else {
       left = Math.max(12, Math.min(rect.left, vw - minWidth - 12));

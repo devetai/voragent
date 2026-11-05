@@ -170,14 +170,15 @@ export function NewTaskForm({
   };
 
   return (
-    <form className="panel form" onSubmit={submit} style={{ maxWidth: '680px', margin: '0 auto' }}>
+    <form className="panel form form-new-task" onSubmit={submit} style={{ maxWidth: '680px', margin: '0 auto' }}>
       <div className="task-nav">
         <h2>Tạo Task Mới</h2>
         <button
           type="button"
-          className="icon-btn"
+          className="icon-btn-sm"
           onClick={onCancel}
-          title="Đóng (Phím tắt: Esc)"
+          data-tooltip="Đóng (Esc)"
+          data-tooltip-placement="bottom"
           aria-label="Đóng"
         >
           <X size={16} />
@@ -247,7 +248,8 @@ export function NewTaskForm({
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            rows={4}
+            rows={3}
+            style={{ minHeight: '80px', resize: 'vertical' }}
             placeholder="Mô tả cụ thể nhiệm vụ bạn muốn giao cho Agent: sửa lỗi, thêm tính năng, viết bài test, review mã nguồn..."
             required
           />
@@ -360,7 +362,7 @@ export function NewTaskForm({
         </div>
       )}
 
-      <div className="row" style={{ marginTop: '1.5rem', justifyContent: 'flex-end', gap: '0.75rem' }}>
+      <div className="row form-new-task-actions" style={{ marginTop: '1.25rem', justifyContent: 'flex-end', gap: '0.75rem' }}>
         <button type="button" onClick={onCancel} disabled={busy}>
           Hủy bỏ <kbd>Esc</kbd>
         </button>

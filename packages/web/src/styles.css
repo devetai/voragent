@@ -75,6 +75,13 @@
   box-sizing: border-box;
 }
 
+html {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -85,6 +92,18 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+  position: relative;
+}
+
+#root,
+.app {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: clip;
+  box-sizing: border-box;
 }
 
 /* ==========================================================================
@@ -414,6 +433,9 @@ input:focus, textarea:focus, select:focus {
   border-radius: var(--radius-lg);
   padding: 1.25rem;
   box-shadow: var(--shadow-sm);
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .projects-toolbar {
@@ -434,6 +456,8 @@ input:focus, textarea:focus, select:focus {
   border-bottom: 1px solid var(--border-subtle);
   border-top-left-radius: var(--radius-lg);
   border-top-right-radius: var(--radius-lg);
+  max-width: calc(100% + 2.5rem);
+  box-sizing: border-box;
 }
 
 .projects-search-wrap {
@@ -567,27 +591,59 @@ input:focus, textarea:focus, select:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  min-height: 42px;
+  gap: 0.5rem;
+  min-height: 44px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
+  gap: 0.5rem;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .header-divider {
   width: 1px;
   height: 16px;
   background: rgba(31, 27, 24, 0.12);
-  margin: 0 0.2rem;
+  margin: 0 0.15rem;
+  flex-shrink: 0;
 }
 
 .header-right {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.header-project-select {
+  flex: 0 1 200px;
+  min-width: 120px;
+  max-width: 220px;
+}
+
+.tab-count-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.05rem 0.35rem;
+  border-radius: var(--radius-full);
+  background: rgba(31, 27, 24, 0.08);
+  color: var(--text-secondary);
+  line-height: 1.2;
+}
+
+.view-tab.active .tab-count-badge {
+  background: var(--text-primary);
+  color: var(--bg-surface);
 }
 
 .sticky-top-header .view-tabs {
@@ -720,7 +776,8 @@ input:focus, textarea:focus, select:focus {
   margin-bottom: 0;
   border: none;
   box-shadow: none;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
 }
 
 .view-tab {
@@ -1448,35 +1505,168 @@ input:focus, textarea:focus, select:focus {
 }
 
 /* ==========================================================================
-   Responsive Adaptations
+   Responsive Adaptations & Small Screen Optimization (Rule 10, 11 & DESIGN.md)
    ========================================================================== */
 
-@media (max-width: 1024px) {
-  .board {
-    display: flex;
-    overflow-x: auto;
-    padding-bottom: 1rem;
-    gap: 1rem;
-    scroll-snap-type: x mandatory;
+/* Wide & Laptop Breakpoint (<= 1360px): Early compacting to guarantee ZERO horizontal scrollbar */
+@media (max-width: 1360px) {
+  .header-project-select {
+    min-width: 120px !important;
+    max-width: 165px !important;
   }
-  .column {
-    min-width: 280px;
-    flex-shrink: 0;
-    scroll-snap-align: start;
+  .header-kbd {
+    display: none !important;
+  }
+  .view-tab {
+    padding: 0.32rem 0.55rem;
+    font-size: 0.8rem;
+    gap: 0.3rem;
   }
 }
 
-@media (max-width: 768px) {
-  .app {
-    padding: 1rem 0.75rem;
-  }
-  .app-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .header-actions {
+/* Medium Desktop & Split Screen (<= 1240px - matches 1280px / 1366px scaled displays) */
+@media (max-width: 1240px) {
+  .board {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 0.75rem;
+    gap: 0.85rem;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
     width: 100%;
-    justify-content: space-between;
+    max-width: 100%;
+  }
+  .column {
+    min-width: 270px;
+    max-width: 320px;
+    flex-shrink: 0;
+    scroll-snap-align: start;
+    height: calc(100vh - 120px);
+    max-height: calc(100vh - 120px);
+  }
+  .header-bar {
+    gap: 0.4rem;
+  }
+  .header-left {
+    gap: 0.4rem;
+  }
+  .header-right {
+    gap: 0.3rem;
+  }
+  .header-project-select {
+    min-width: 105px !important;
+    max-width: 140px !important;
+  }
+  .header-btn-text {
+    display: none !important; /* Hides "Trưởng phòng" text, showing icon + badge */
+  }
+  .header-manager-btn {
+    padding: 0 8px !important;
+    gap: 4px !important;
+  }
+  .header-memory-btn {
+    padding: 0 6px !important;
+  }
+  .header-new-task-btn {
+    padding: 0.36rem 0.65rem !important;
+    font-size: 0.8rem !important;
+  }
+  .view-tab {
+    padding: 0.32rem 0.5rem;
+  }
+}
+
+/* Tablet & Smaller Windows (<= 1060px): Icon-only tabs maintain single-row with ZERO overflow */
+@media (max-width: 1060px) {
+  .view-tab .tab-label {
+    display: none !important;
+  }
+  .view-tab {
+    padding: 0.36rem 0.55rem !important;
+  }
+  .header-project-select {
+    min-width: 95px !important;
+    max-width: 125px !important;
+  }
+}
+
+/* Mobile & Narrow Windows (<= 860px) */
+@media (max-width: 860px) {
+  .header-bar {
+    gap: 0.25rem;
+  }
+  .header-left {
+    gap: 0.25rem;
+  }
+  .header-right {
+    gap: 0.2rem;
+  }
+  .new-task-text {
+    display: none !important;
+  }
+  .header-new-task-btn {
+    padding: 0.38rem 0.5rem !important;
+  }
+  .header-project-select {
+    min-width: 90px !important;
+    max-width: 110px !important;
+  }
+}
+
+/* Small Mobile Screens (<= 640px) */
+@media (max-width: 640px) {
+  .brand-title {
+    display: none !important;
+  }
+  .header-divider {
+    display: none !important;
+  }
+  .header-project-select {
+    max-width: 95px !important;
+  }
+}
+
+/* Form New Task on small screens & short viewports */
+.form-new-task {
+  cursor: default !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+.form-new-task:hover {
+  transform: none !important;
+  box-shadow: var(--shadow-sm) !important;
+  border-color: var(--border-subtle) !important;
+}
+
+@media (max-width: 768px) {
+  .form-new-task {
+    padding: 1rem 0.85rem !important;
+    border-radius: var(--radius-md);
+  }
+  .projects-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    padding: 0.65rem 0.75rem;
+  }
+}
+
+@media (max-height: 800px) {
+  .form-new-task-actions {
+    position: sticky;
+    bottom: -0.5rem;
+    background: var(--bg-surface);
+    padding: 0.75rem 0 0.25rem;
+    border-top: 1px solid var(--border-subtle);
+    margin-top: 1rem !important;
+    z-index: 10;
+  }
+}
+
+@media (max-width: 480px) {
+  .office-grid {
+    grid-template-columns: 1fr !important;
   }
 }
 
@@ -2746,8 +2936,10 @@ input:focus, textarea:focus, select:focus {
 /* Clean Project Cards Grid */
 .office-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
   gap: 10px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .office-project-card {
@@ -3968,9 +4160,12 @@ span.badge[data-tooltip]:not([role="button"]),
 }
 
 
-/* 15. Compact Main Layout Horizontal & Vertical Margins (Maximize Viewport Coverage) */
+/* 15. Compact Main Layout Horizontal & Vertical Margins (Maximize Viewport Coverage & Zero Horizontal Overflow) */
 .app {
   padding: 0 0.75rem 0.5rem !important;
+  max-width: 100vw !important;
+  overflow-x: clip !important;
+  box-sizing: border-box !important;
 }
 
 .sticky-top-header {
@@ -3978,6 +4173,9 @@ span.badge[data-tooltip]:not([role="button"]),
   margin-right: -0.75rem !important;
   padding: 0.4rem 0.75rem !important;
   margin-bottom: 0.6rem !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  max-width: 100vw !important;
 }
 
 .office-canvas-wrapper {
