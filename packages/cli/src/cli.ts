@@ -36,8 +36,10 @@ export function defaultDataDir(env: NodeJS.ProcessEnv = process.env, home?: stri
 export const NO_DAEMON = 'Daemon chưa chạy. Chạy: voragent';
 
 const USAGE = `Cách dùng:
-  voragent [--port N] [--no-open]        chạy daemon trong terminal, mở trình duyệt
-  voragent start --background [--port N] chạy daemon nền, in URL rồi thoát
+  voragent [--port N] [--key KEY] [--dev] [--no-open]
+                                          chạy daemon trong terminal, mở trình duyệt
+  voragent start --background [--port N] [--key KEY] [--dev]
+                                          chạy daemon nền, in URL rồi thoát
   voragent projects                       liệt kê các dự án đã dùng với Claude Code / Antigravity
   voragent add <dự-án|đường-dẫn> <tin nhắn…> [--mode m] [--agent id]
                                           dự án chọn theo tên (xem: voragent projects)
@@ -65,13 +67,15 @@ export function openUrl(url: string): void {
 // ------------------------------------------------------------------ chế độ foreground
 
 async function runForeground(
-  ctx: CliContext, o: { port?: number; open: boolean; quiet: boolean },
+  ctx: CliContext, o: { port?: number; key?: string; dev?: boolean; open: boolean; quiet: boolean },
 ): Promise<number> {
   let d: Daemon;
   try {
     d = await startDaemon({
       dataDir: ctx.dataDir,
       ...(o.port !== undefined ? { port: o.port } : {}),
+      ...(o.key !== undefined ? { key: o.key } : {}),
+      ...(o.dev !== undefined ? { dev: o.dev } : {}),
       ...(ctx.adapters ? { adapters: ctx.adapters } : {}),
     });
   } catch (e) {
@@ -122,7 +126,7 @@ async function runForeground(
 
 // ------------------------------------------------------------------ chế độ nền
 
-async function runBackground(ctx: CliContext, o: { port?: number }): Promise<number> {
+async function runBackground(ctx: CliContext, o: { port?: number; key?: string; dev?: boolean }): Promise<number> {
   const running = readDaemonInfo(ctx.dataDir);
   if (running && isPidAlive(running.pid)) {
     ctx.out(`Daemon đã chạy. Mở: ${urlOf(running)}\n`);
@@ -137,7 +141,14 @@ async function runBackground(ctx: CliContext, o: { port?: number }): Promise<num
     // Windows hoặc hệ thống không hỗ trợ
   }
   let exited = false;
-  const args = [ctx.entry, '--no-open', '--quiet', ...(o.port !== undefined ? ['--port', String(o.port)] : [])];
+  const args = [
+    ctx.entry,
+    '--no-open',
+    '--quiet',
+    ...(o.port !== undefined ? ['--port', String(o.port)] : []),
+    ...(o.key !== undefined ? ['--key', o.key] : []),
+    ...(o.dev === true ? ['--dev'] : []),
+  ];
   try {
     const child = spawn(process.execPath, args, {
       detached: true,
@@ -349,6 +360,8 @@ export async function runCli(argv: string[], ctx: CliContext): Promise<number> {
       allowPositionals: true,
       options: {
         port: { type: 'string' },
+        key: { type: 'string' },
+        dev: { type: 'boolean' },
         force: { type: 'boolean' },
         'no-open': { type: 'boolean' },
         quiet: { type: 'boolean' }, // nội bộ: tiến trình nền không in khóa
@@ -381,16 +394,18 @@ export async function runCli(argv: string[], ctx: CliContext): Promise<number> {
     }
   }
   const portOpt = port !== undefined ? { port } : {};
+  const keyOpt = typeof values.key === 'string' && values.key.trim() !== '' ? { key: values.key.trim() } : {};
+  const devOpt = values.dev ? { dev: true } : {};
 
   switch (sub) {
     case null:
-      return runForeground(ctx, { ...portOpt, open: values['no-open'] !== true, quiet: values.quiet === true });
+      return runForeground(ctx, { ...portOpt, ...keyOpt, ...devOpt, open: values['no-open'] !== true, quiet: values.quiet === true });
     case 'start':
       if (!values.background) {
         ctx.err(`Chỉ hỗ trợ: voragent start --background\n${USAGE}\n`);
         return 1;
       }
-      return runBackground(ctx, portOpt);
+      return runBackground(ctx, { ...portOpt, ...keyOpt, ...devOpt });
     case 'add': {
       const [target, ...words] = positionals;
       if (!target || words.length === 0) {

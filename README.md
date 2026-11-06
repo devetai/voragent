@@ -76,8 +76,8 @@ Sau khi liên kết, bạn có thể gõ trực tiếp lệnh `voragent` ở b�
 
 | Lệnh | Mô tả chi tiết |
 | :--- | :--- |
-| `voragent [--port N] [--no-open]` | Chạy daemon trực tiếp trên terminal, in URL kèm khóa truy cập và tự động mở trình duyệt. Nhấn `Ctrl + C` lần một để dừng êm (chờ lượt hiện tại xong); nhấn lần hai để dừng cứng. |
-| `voragent start --background` | Khởi chạy daemon chạy ngầm, ghi log vào `daemon.log`, in URL và thoát ngay. |
+| `voragent [--port N] [--key KEY] [--dev] [--no-open]` | Chạy daemon trực tiếp trên terminal, in URL kèm khóa truy cập và tự động mở trình duyệt. Nhấn `Ctrl + C` lần một để dừng êm; nhấn lần hai để dừng cứng. Hỗ trợ `--key` đặt khóa tùy chỉnh hoặc `--dev` dùng khóa cố định khi phát triển. |
+| `voragent start --background [--port N] [--key KEY] [--dev]` | Khởi chạy daemon chạy ngầm, ghi log vào `daemon.log`, in URL và thoát ngay. |
 | `voragent projects` | Liệt kê danh sách các dự án đã phát hiện từ Claude Code và Antigravity (Tên, Đường dẫn, Lần dùng cuối, Nhánh, File sửa dở, Task). |
 | `voragent add <dự-án-hoặc-đường-dẫn> <nội-dung-task...> [--mode m] [--agent id]` | Tạo một task mới. Cho phép dùng tên dự án (khớp mờ hoặc chính xác) hoặc đường dẫn thư mục. Hỗ trợ tùy chọn `--mode` (`head-dirty-commit`, `head-commit`, `dirty-nocommit`) và `--agent`. |
 | `voragent status` | Hiển thị bảng trạng thái các nền tảng (đã cài đặt, hạn ngạch quota, thời gian tạm nghỉ) cùng danh sách các task chưa đóng. |
@@ -168,6 +168,16 @@ Thứ tự ưu tiên xác định thư mục dữ liệu của voragent:
 1. Biến môi trường `VORAGENT_HOME` (nếu được đặt).
 2. File con trỏ cấu hình người dùng `~/.voragentrc` (tạo tự động khi bạn di chuyển dữ liệu qua Web UI `/settings` hoặc lệnh `voragent migrate`).
 3. Mặc định: `~/.voragent` (nằm ở `C:\Users\<Tên_User>\.voragent` trên Windows).
+
+### Khóa Xác Thực Cố Định Khi Phát Triển (Dev Auth Key)
+
+Mặc định khi chạy production, mỗi lần daemon khởi động sẽ sinh một khóa ngẫu nhiên 24 bytes (48 ký tự hex) để đảm bảo an toàn cục bộ. Trong giai đoạn phát triển và debug hệ thống, bạn có thể cố định khóa này để không phải mở tab mới mỗi khi restart daemon (WebSocket và API trên trình duyệt sẽ tự động kết nối lại):
+
+- **Cách 1 (Khuyến nghị):** Dùng lệnh `pnpm dev` (đã tích hợp sẵn cờ `--dev`). Daemon sẽ sử dụng khóa phát triển cố định `dev-voragent-local-key`.
+- **Cách 2:** Truyền cờ CLI `voragent --dev` hoặc `voragent --key <khoá-của-bạn>` (áp dụng cho cả chế độ chạy trực tiếp lẫn `start --background`).
+- **Cách 3:** Đặt biến môi trường `VORAGENT_KEY=<khoá-của-bạn>` hoặc `VORAGENT_DEV=1`.
+
+---
 
 ### Tệp Cấu Hình `config.json`
 

@@ -229,6 +229,25 @@ describe('voragent (foreground)', () => {
     expect(urls[0]).toMatch(new RegExp(`^http://127\\.0\\.0\\.1:${port}/\\?key=[0-9a-f]{48}$`));
   });
 
+  it('--key tùy chỉnh gán khóa phiên cụ thể', async () => {
+    const customKey = 'my-custom-cli-key-123';
+    const { p, port } = await fg(['--no-open', '--key', customKey]);
+    const info = JSON.parse(readFileSync(join(home, 'daemon.json'), 'utf8')) as { port: number; key: string };
+    expect(info.key).toBe(customKey);
+    expect(outBuf).toContain(`http://127.0.0.1:${port}/?key=${customKey}`);
+    expect(await runCli(['stop'], ctx())).toBe(0);
+    expect(await p).toBe(0);
+  });
+
+  it('--dev tự động dùng khóa dev cố định', async () => {
+    const { p, port } = await fg(['--no-open', '--dev']);
+    const info = JSON.parse(readFileSync(join(home, 'daemon.json'), 'utf8')) as { port: number; key: string };
+    expect(info.key).toBe('dev-voragent-local-key');
+    expect(outBuf).toContain(`http://127.0.0.1:${port}/?key=dev-voragent-local-key`);
+    expect(await runCli(['stop'], ctx())).toBe(0);
+    expect(await p).toBe(0);
+  });
+
   it('báo lỗi tiếng Việt khi đã có daemon chạy', async () => {
     await live();
     expect(await runCli(['--no-open'], ctx())).toBe(1);

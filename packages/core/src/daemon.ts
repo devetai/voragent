@@ -39,6 +39,33 @@ export interface Daemon {
 
 export const DAEMON_FILE = 'daemon.json';
 
+/** Khóa xác thực cố định dùng trong môi trường phát triển (giúp tái sử dụng phiên, không cần mở lại web khi reload). */
+export const DEV_AUTH_KEY = 'dev-voragent-local-key';
+
+/**
+ * Xác định auth key cho phiên daemon:
+ * 1. Khóa truyền trực tiếp (`explicitKey`).
+ * 2. Biến môi trường `VORAGENT_KEY`.
+ * 3. Chế độ phát triển (`VORAGENT_DEV=1` hoặc `NODE_ENV=development`) -> dùng `DEV_AUTH_KEY`.
+ * 4. Mặc định: chuỗi ngẫu nhiên 24 bytes (48 ký tự hex).
+ */
+export function resolveAuthKey(
+  explicitKey?: string,
+  env: NodeJS.ProcessEnv = process.env,
+  isDev?: boolean,
+): string {
+  if (typeof explicitKey === 'string' && explicitKey.trim() !== '') {
+    return explicitKey.trim();
+  }
+  if (typeof env.VORAGENT_KEY === 'string' && env.VORAGENT_KEY.trim() !== '') {
+    return env.VORAGENT_KEY.trim();
+  }
+  if (isDev === true || env.VORAGENT_DEV === '1' || env.NODE_ENV === 'development') {
+    return DEV_AUTH_KEY;
+  }
+  return randomBytes(24).toString('hex');
+}
+
 /** Đọc `<dataDir>/daemon.json`; null nếu không có hoặc hỏng. */
 export function readDaemonInfo(dataDir: string): DaemonInfo | null {
   try {
@@ -81,6 +108,10 @@ function createFakeAdapters(): Map<ProviderId, Adapter> {
 export async function startDaemon(o: {
   dataDir: string;
   port?: number;
+  /** Khóa phiên tùy chỉnh (mặc định: lấy từ VORAGENT_KEY / chế độ dev / ngẫu nhiên 24 bytes). */
+  key?: string;
+  /** Chế độ phát triển (sử dụng DEV_AUTH_KEY cố định). */
+  dev?: boolean;
   /** Map adapter có sẵn, hoặc hàm dựng từ `config.priority` (mặc định: `createAdapters`). */
   adapters?: Map<ProviderId, Adapter> | ((ids: ProviderId[]) => Map<ProviderId, Adapter>);
   /** Mặc định: tự tìm `packages/web/dist`. */
@@ -105,7 +136,7 @@ export async function startDaemon(o: {
   const config = loadConfig(dataDir);
   const store = openStore(join(dataDir, 'voragent.db'));
   const bus = new EventBus();
-  const key = randomBytes(24).toString('hex');
+  const key = resolveAuthKey(o.key, process.env, o.dev);
   const port = o.port ?? config.port;
   let orchestrator: ReturnType<typeof createOrchestrator> | null = null;
 

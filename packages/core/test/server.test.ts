@@ -13,7 +13,7 @@ import type { ProviderId, Task, VEvent } from '@voragent/shared';
 import { freePort, until, withFreePort, rmTmp } from './helpers.js';
 import { EventBus } from '../src/bus.js';
 import { DEFAULT_CONFIG } from '../src/config.js';
-import { startDaemon } from '../src/daemon.js';
+import { startDaemon, readDaemonInfo, resolveAuthKey, DEV_AUTH_KEY } from '../src/daemon.js';
 import type { Daemon } from '../src/daemon.js';
 import { createOrchestrator } from '../src/orchestrator.js';
 import { createProjectCatalog } from '../src/projects.js';
@@ -748,6 +748,42 @@ describe('startDaemon: cô lập thư mục người dùng', () => {
       expect(list.map((p) => p.path)).toEqual([realpathSync.native(proj)]);
     } finally {
       rmSync(join(home!, '.claude.json'), { force: true });
+    }
+  });
+});
+
+describe('Auth Key: resolveAuthKey và startDaemon key', () => {
+  it('ưu tiên explicit key nếu được truyền', () => {
+    expect(resolveAuthKey('my-secret-key', { VORAGENT_KEY: 'env-key', VORAGENT_DEV: '1' })).toBe('my-secret-key');
+  });
+
+  it('sử dụng VORAGENT_KEY nếu không có explicit key', () => {
+    expect(resolveAuthKey(undefined, { VORAGENT_KEY: 'my-env-key', VORAGENT_DEV: '1' })).toBe('my-env-key');
+  });
+
+  it('sử dụng DEV_AUTH_KEY khi VORAGENT_DEV=1 hoặc NODE_ENV=development', () => {
+    expect(resolveAuthKey(undefined, { VORAGENT_DEV: '1' })).toBe(DEV_AUTH_KEY);
+    expect(resolveAuthKey(undefined, { NODE_ENV: 'development' })).toBe(DEV_AUTH_KEY);
+  });
+
+  it('sinh key ngẫu nhiên 48 ký tự hex khi không có cấu hình dev/env', () => {
+    const key = resolveAuthKey(undefined, {});
+    expect(key).toMatch(/^[0-9a-f]{48}$/);
+  });
+
+  it('startDaemon nhận key tùy chỉnh và ghi nhận vào daemon info/url', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'voragent-auth-'));
+    const dataDir = join(root, 'data');
+    const customKey = 'test-custom-key-12345';
+    const d = await withFreePort((port) => startDaemon({ dataDir, port, key: customKey, adapters: fakeAdapters() }));
+    try {
+      expect(d.key).toBe(customKey);
+      expect(d.url).toContain(`?key=${customKey}`);
+      const info = readDaemonInfo(dataDir);
+      expect(info?.key).toBe(customKey);
+    } finally {
+      await d.stop();
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });
