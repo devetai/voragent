@@ -165,9 +165,11 @@ export async function startDaemon(o: {
     if (fakeMode && config.priority.join() === DEFAULT_CONFIG.priority.join()) {
       config.priority = ['fake-a', 'fake-b'];
     }
+    const knownProviders: ProviderId[] = ['claude', 'antigravity', 'codex', 'opencode'];
+    const adapterIds = Array.from(new Set([...config.priority, ...knownProviders]));
     const adapters = typeof o.adapters === 'function'
       ? o.adapters(config.priority)
-      : o.adapters ?? (fakeMode ? createFakeAdapters() : createAdapters(config.priority));
+      : o.adapters ?? (fakeMode ? createFakeAdapters() : createAdapters(adapterIds));
     const orch = createOrchestrator({ store, bus, adapters, config });
     orchestrator = orch;
 

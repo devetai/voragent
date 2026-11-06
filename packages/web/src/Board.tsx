@@ -23,6 +23,7 @@ const AGENT_CLASS = (provider: string | null): string => {
   if (p.includes('claude')) return 'claude';
   if (p.includes('codex')) return 'codex';
   if (p.includes('antigravity') || p.includes('agy')) return 'antigravity';
+  if (p.includes('opencode')) return 'opencode';
   return '';
 };
 

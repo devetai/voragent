@@ -374,3 +374,28 @@ Sử dụng bảng kiểm tra này trước khi merge bất kỳ thay đổi UI 
     2. Xuất hiện tiêu đề địa chỉ IP cục bộ thô kệch (`127.0.0.1:4717 says`), phá vỡ thẩm mỹ và trải nghiệm Warm Cozy Tech.
     3. Không thể tùy chỉnh kiểu dáng, màu sắc, phím tắt hoặc văn bản nút bấm theo ngữ cảnh.
   - **Quy chuẩn bắt buộc:** Mọi thao tác xác nhận phá hủy (Hủy/xóa kế hoạch Trưởng phòng, xóa task, xóa bộ nhớ chung, reset trạng thái) phải sử dụng component Modal chuyên dụng (`<ConfirmModal />` hoặc In-place Confirm Card). Modal phải được render qua React Portal (`createPortal(..., document.body)`), có lớp nền mờ (`backdrop-filter: blur(...)`), tự động bẫy phím `Escape` để hủy và tự động focus nút Hủy an toàn.
+
+- **Sử dụng Tooltip có Mục đích & Triệt tiêu Rác thị giác (Intentional Tooltips & Zero Tooltip Clutter - Rule 16):**
+  - **Triết lý:** Tooltip là công cụ trợ giúp bổ sung cho phần tử khiếm khuyết chữ (icon-only), văn bản bị cắt ngắn hoặc chỉ số kỹ thuật trừu tượng. Việc lạm dụng gắn tooltip lên mọi nút bấm, nhãn chữ, checkbox hay logo khiến tooltip bật liên tục khi di chuột, gây giật mắt và ức chế thị giác cho người dùng.
+  - **Chỉ gắn Tooltip cho:**
+    1. Các nút Icon-only (`.icon-btn`, `.icon-btn-sm`).
+    2. Văn bản đường dẫn dài bị co ngắn (`text-overflow: ellipsis`).
+    3. Chấm trạng thái hoặc chỉ báo màu sắc trừu tượng (như chấm mất kết nối, thanh Quota).
+  - **Nghiêm cấm gắn Tooltip cho:**
+    1. Các nút, tab, liên kết đã có nhãn chữ rõ ràng (Tab Header, nút Task mới khi có nhãn chữ, Checkbox, nút thao tác chính).
+    2. Logo thương hiệu chính.
+    3. Bất kỳ tooltip nào chỉ lặp lại nguyên văn nhãn chữ đang hiển thị.
+
+- **Rà soát Tác động Toàn diện & Không bỏ sót khi Thêm/Sửa Tính năng (Exhaustive Impact Audit - Rule 17):**
+  - **Triết lý:** Một Agent CLI mới hoặc tính năng mới là một công dân hạng nhất (first-class citizen) trong hệ thống. Việc bổ sung phải diễn ra đồng bộ từ thiết lập cấu hình, định tuyến adapter, phân công nhiệm vụ, biểu tượng vector, màu sắc thương hiệu, giao diện 2D đến không gian 3D.
+  - **Checklist bắt buộc khi tích hợp nền tảng/thực thể mới:**
+    1. **Nhận diện & Cài đặt:** Có lệnh nhận diện binary, câu lệnh cài đặt npm / CLI (`QuotaBar`), và cấu hình gói trong `PROVIDER_NPM_PACKAGES` (`server.ts`).
+    2. **Giao diện 2D:** Có biểu tượng vector chuẩn trong `ProviderIcon`, màu sắc thẻ `.card-agent-badge.<id>`, phân loại `AGENT_CLASS`, màu sắc trên Đồ thị 2D `graphModel.ts`, và nhận diện lệnh terminal `COMMAND_PREFIXES`.
+    3. **Không gian 3D:** Có bàn làm việc, chủ đề màu sắc `PROVIDER_THEMES`, và phụ kiện đại diện render bằng 3D mesh (`Accessory` trong `SnakeMesh.tsx`).
+    4. **Điều phối & Dự án:** Tự động nâng cấp tệp cấu hình cũ (`loadConfig` auto-migration), ánh xạ nguồn dự án `SOURCE_LABEL`, và tích hợp vào phân rã nhiệm vụ Trưởng phòng `buildDefaultSubtasks`.
+
+- **Lớp phủ Mất kết nối & Hoạt họa Linh vật (Friendly Disconnected Overlay & Zero Raw Error Banners):**
+  - **Triết lý:** Khi daemon khởi động lại (đổi khóa 401) hoặc tạm ngắt kết nối, tuyệt đối không chèn các thanh banner cảnh báo màu đỏ/hồng làm xô lệch bố cục trang. Thay vào đó, kích hoạt một lớp phủ toàn màn hình (`<ConnectionOverlay />`) với nền mờ `backdrop-filter: blur(10px)`.
+  - **Trải nghiệm thân thiện:**
+    1. Hoạt họa SVG chú rắn Voragent dễ thương chớp mắt, vẫy đuôi cùng tia lửa điện từ trường giữa 2 đầu dây cắm, biến sự cố kỹ thuật thành trải nghiệm thú vị, nhẹ nhàng.
+    2. Cung cấp giải pháp xử lý tức thì: Nút "Thử kết nối lại ngay", "Tải lại trang", và ô dán URL/khóa key mới để kết nối lại 1-click mà không bắt người dùng phải gõ thủ công.

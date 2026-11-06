@@ -54,3 +54,39 @@ describe('formatFullDateTime', () => {
     expect(res).toBe('14:30:45 • 05/11/2026');
   });
 });
+
+import React from 'react';
+import { renderToString } from 'react-dom/server';
+import { ConnectionOverlay } from '../src/components/ConnectionOverlay';
+
+describe('ConnectionOverlay', () => {
+  it('không hiển thị khi trạng thái là connected', () => {
+    const html = renderToString(
+      React.createElement(ConnectionOverlay, {
+        conn: { status: 'connected', failures: 0, retryMs: 2000, probe: false },
+      })
+    );
+    expect(html).toBe('');
+  });
+
+  it('hiển thị lớp phủ và thông điệp đổi khóa khi auth-failed', () => {
+    const html = renderToString(
+      React.createElement(ConnectionOverlay, {
+        conn: { status: 'auth-failed', failures: 1, retryMs: 30000, probe: false },
+      })
+    );
+    expect(html).toContain('Khóa truy cập đã thay đổi');
+    expect(html).toContain('conn-snake-character');
+    expect(html).toContain('Áp dụng khóa');
+  });
+
+  it('hiển thị lớp phủ và thông điệp kết nối lại khi daemon-down', () => {
+    const html = renderToString(
+      React.createElement(ConnectionOverlay, {
+        conn: { status: 'daemon-down', failures: 3, retryMs: 2000, probe: false },
+      })
+    );
+    expect(html).toContain('Mất kết nối với Voragent');
+    expect(html).toContain('Thử kết nối lại ngay');
+  });
+});

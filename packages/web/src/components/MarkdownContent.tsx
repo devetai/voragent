@@ -26,13 +26,13 @@ export function stripMarkdown(raw: string): string {
 
 const COMMAND_PREFIXES = [
   'npm ', 'pnpm ', 'yarn ', 'npx ', 'node ', 'python ', 'python3 ', 'git ',
-  'cargo ', 'deno ', 'bun ', 'cd ', 'eval ', 'fnm ', 'agy ', 'claude ', 'codex ', 'serve ',
+  'cargo ', 'deno ', 'bun ', 'cd ', 'eval ', 'fnm ', 'agy ', 'claude ', 'codex ', 'opencode ', 'serve ',
 ];
 
 function isCommandLine(str: string): boolean {
   const trimmed = str.trim();
   return COMMAND_PREFIXES.some((prefix) => trimmed.startsWith(prefix)) ||
-    /^(npm|pnpm|yarn|npx|node|python|git|deno|bun|agy|claude|codex)(.exe)?(\s|$)/i.test(trimmed);
+    /^(npm|pnpm|yarn|npx|node|python|git|deno|bun|agy|claude|codex|opencode)(.exe)?(\s|$)/i.test(trimmed);
 }
 
 function isUrl(str: string): boolean {

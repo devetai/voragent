@@ -34,7 +34,7 @@ const DEFAULT_GIT_TIMEOUT_MS = 3000;
 const ENRICH_CONCURRENCY = 4;
 const PATH_CONCURRENCY = 8;
 const DEFAULT_PATH_TIMEOUT_MS = 2000;
-const HOME_DOT_DIRS = ['.claude', '.gemini', '.codex', '.antigravity', '.voragent'];
+const HOME_DOT_DIRS = ['.claude', '.gemini', '.codex', '.antigravity', '.voragent', '.opencode'];
 
 function realPathOrNull(p: string): string | null {
   try {

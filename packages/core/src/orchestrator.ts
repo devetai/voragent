@@ -92,7 +92,7 @@ export function buildDefaultSubtasks(goal: string, installedProviders: ProviderI
   const pUi = pool.find((p) => p.includes('antigravity') || p.includes('agy')) ?? pool[1 % pool.length]!;
   const pQa = pool.find((p) => p.includes('codex')) ?? pool[2 % pool.length]!;
 
-  return [
+  const subtasks: ManagerSubtask[] = [
     {
       id: randomUUID(),
       title: `[Kiến trúc & Lõi] ${shortGoal}`,
@@ -118,6 +118,20 @@ export function buildDefaultSubtasks(goal: string, installedProviders: ProviderI
       taskId: null,
     },
   ];
+
+  if (pool.some((p) => p.includes('opencode'))) {
+    const pExec = pool.find((p) => p.includes('opencode'))!;
+    subtasks.push({
+      id: randomUUID(),
+      title: `[Đa mô hình & Thực thi] ${shortGoal}`,
+      message: `Trưởng phòng giao việc (Vai trò: Đa mô hình & Thực thi):\nMục tiêu chung của dự án: "${cleanGoal}"\n\nNhiệm vụ của bạn:\n1. Tích hợp các thành phần, kiểm tra tính tương thích đa môi trường và hỗ trợ thực thi.\n2. Báo cáo tiến độ và đồng bộ kết quả vào Shared Memory.`,
+      assignedProvider: pExec,
+      role: 'Đa mô hình & Thực thi',
+      taskId: null,
+    });
+  }
+
+  return subtasks;
 }
 
 const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e));

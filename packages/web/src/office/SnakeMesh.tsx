@@ -674,5 +674,25 @@ function Accessory({ kind }: { kind: AgentAccessory }) {
     );
   }
 
+  if (kind === 'bow') {
+    return (
+      <group position={[0, -0.16, 0.26]}>
+        {/* Nơ cổ công nghệ xanh ngọc của OpenCode */}
+        <mesh position={[-0.07, 0, 0]} rotation={[0, 0, 0.35]}>
+          <coneGeometry args={[0.07, 0.11, 12]} />
+          <meshStandardMaterial color="#059669" roughness={0.4} />
+        </mesh>
+        <mesh position={[0.07, 0, 0]} rotation={[0, 0, -0.35]}>
+          <coneGeometry args={[0.07, 0.11, 12]} />
+          <meshStandardMaterial color="#059669" roughness={0.4} />
+        </mesh>
+        <mesh position={[0, 0, 0.015]}>
+          <sphereGeometry args={[0.035, 12, 12]} />
+          <meshStandardMaterial color="#A7F3D0" roughness={0.3} />
+        </mesh>
+      </group>
+    );
+  }
+
   return null;
 }

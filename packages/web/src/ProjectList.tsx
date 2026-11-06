@@ -142,12 +142,12 @@ export function ProjectList({
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           {runningTasks > 0 && (
-            <span className="badge info" data-tooltip="Tổng số task đang thực thi trên mọi dự án">
+            <span className="badge info">
               ⚡ {runningTasks} đang làm
             </span>
           )}
           {inboxTotal > 0 && (
-            <span className="badge warn" data-tooltip="Tổng số mục cần bạn duyệt hoặc trả lời">
+            <span className="badge warn">
               🔔 {inboxTotal} chờ bạn duyệt
             </span>
           )}
@@ -162,7 +162,6 @@ export function ProjectList({
               userSelect: 'none',
               padding: '0 6px',
             }}
-            data-tooltip="Chỉ hiện các dự án đã có task, kế hoạch hoặc bộ nhớ"
           >
             <input
               type="checkbox"
@@ -294,7 +293,6 @@ export function ProjectList({
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
                         }}
-                        data-tooltip={p.name}
                       >
                         {p.name}
                       </strong>
@@ -327,7 +325,7 @@ export function ProjectList({
                     {/* Chỉ hiển thị các tín hiệu cần hành động ngay ở hàng đầu để không chèn ép tên */}
                     <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignItems: 'center' }}>
                       {pRunning > 0 && (
-                        <span className="badge info" data-tooltip="Số task đang thực thi">
+                        <span className="badge info">
                           ⚡ {pRunning}
                         </span>
                       )}
@@ -340,7 +338,6 @@ export function ProjectList({
                             e.stopPropagation();
                             onOpenManager?.(p);
                           }}
-                          data-tooltip="Bấm để mở ngay Hộp thư Trưởng phòng duyệt việc"
                         >
                           🔔 {pInboxCount} cần duyệt
                         </button>
@@ -376,7 +373,7 @@ export function ProjectList({
                         </span>
                       ))}
                       {p.branch !== null && (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }} data-tooltip={`Nhánh Git hiện tại: ${p.branch}`}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
                           <GitBranch size={11} /> {p.branch}
                         </span>
                       )}
@@ -390,7 +387,7 @@ export function ProjectList({
                     {/* Icon-only buttons + Custom UI Tooltip khi hover (Rule 12) */}
                     <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignItems: 'center', marginRight: '4px' }}>
                         {count > 0 && (
-                          <span className="badge neutral" data-tooltip={`Dự án có ${count} task`}>
+                          <span className="badge neutral">
                             {count} task
                           </span>
                         )}
@@ -536,7 +533,6 @@ export function ProjectList({
                             {p.branch !== null ? (
                               <span
                                 className="projects-git-pill"
-                                data-tooltip={`Nhánh Git hiện tại: ${p.branch}`}
                               >
                                 <GitBranch size={11} />
                                 <span>{p.branch}</span>
@@ -570,7 +566,7 @@ export function ProjectList({
                         ) : (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
                             {pRunning > 0 && (
-                              <span className="badge info" data-tooltip="Số task đang thực thi">
+                              <span className="badge info">
                                 ⚡ {pRunning}
                               </span>
                             )}
@@ -583,7 +579,6 @@ export function ProjectList({
                                   e.stopPropagation();
                                   onOpenManager?.(p);
                                 }}
-                                data-tooltip="Bấm để mở ngay Hộp thư Trưởng phòng duyệt việc"
                               >
                                 🔔 {pInboxCount} cần duyệt
                               </button>

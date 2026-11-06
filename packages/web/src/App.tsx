@@ -18,6 +18,7 @@ import { Board } from './Board';
 import { CustomSelect, type SelectOption } from './components/CustomSelect';
 import { Logo } from './components/Logo';
 import { GlobalTooltipLayer } from './components/Tooltip';
+import { ConnectionOverlay } from './components/ConnectionOverlay';
 import { INITIAL_CONNECTION, nextConnectionState } from './connection';
 import type { ConnectionEvent, ConnectionState } from './connection';
 import { GraphCanvas } from './graph/GraphCanvas';
@@ -182,6 +183,21 @@ export function App() {
     }
   }, [loadOfficeMeta]);
 
+  const handleRetryConnection = useCallback(() => {
+    void api.providers().then(
+      () => {
+        setConn({ status: 'connected', failures: 0, retryMs: 2000, probe: false });
+        void reload();
+      },
+      (e: unknown) => {
+        if (e instanceof ApiError && e.status === 401) {
+          setConn((prev) => ({ ...prev, status: 'auth-failed' }));
+        } else {
+          setConn((prev) => ({ ...prev, status: 'daemon-down' }));
+        }
+      }
+    );
+  }, [reload]);
   const refreshProviders = useCallback((): void => {
     api.providers().then((providers) => dispatch({ t: 'providers', providers }), () => undefined);
   }, []);
@@ -343,8 +359,6 @@ export function App() {
             <div
               className="logo-badge"
               onClick={() => { setOverlay(null); nav('/'); }}
-              data-tooltip="Về Đại sảnh Dự án"
-              data-tooltip-placement="bottom"
             >
               <Logo size={22} />
               <span className="brand-title">voragent</span>
@@ -353,7 +367,6 @@ export function App() {
               <span
                 className="status-dot-pulse-offline"
                 data-tooltip="Mất kết nối tới Daemon cục bộ — Đang tự động thử kết nối lại"
-                data-tooltip-placement="bottom"
                 aria-label="Mất kết nối tới Daemon"
               />
             )}
@@ -366,8 +379,6 @@ export function App() {
                 type="button"
                 className={`view-tab ${activeTab === 'projects' ? 'active' : ''}`}
                 onClick={() => { setOverlay(null); nav('/'); }}
-                data-tooltip="Danh sách toàn bộ dự án"
-                data-tooltip-placement="bottom"
               >
                 <FolderGit2 size={15} /> <span className="tab-label">Dự án</span>
               </button>
@@ -381,8 +392,6 @@ export function App() {
                     nav({ view: 'office', projectPath: viewedPath });
                   }
                 }}
-                data-tooltip={viewedPath !== null ? `Văn phòng 3D (${viewedName})` : 'Không gian Văn phòng 3D'}
-                data-tooltip-placement="bottom"
               >
                 <Building2 size={15} /> <span className="tab-label">Văn phòng 3D</span>
               </button>
@@ -390,8 +399,6 @@ export function App() {
                 type="button"
                 className={`view-tab ${activeTab === 'board' ? 'active' : ''}`}
                 onClick={() => nav({ view: 'board', projectPath: viewedPath })}
-                data-tooltip="Bảng Kanban theo dõi công việc"
-                data-tooltip-placement="bottom"
               >
                 <KanbanSquare size={15} /> <span className="tab-label">Bảng Kanban</span>
                 {officeTasks.length > 0 && (
@@ -402,8 +409,6 @@ export function App() {
                 type="button"
                 className={`view-tab ${activeTab === 'graph' ? 'active' : ''}`}
                 onClick={() => nav({ view: 'graph', projectPath: viewedPath })}
-                data-tooltip="Đồ thị quan hệ kiến trúc & nhiệm vụ"
-                data-tooltip-placement="bottom"
               >
                 <Network size={15} /> <span className="tab-label">Đồ thị</span>
               </button>
@@ -435,7 +440,6 @@ export function App() {
               className="header-memory-btn"
               onClick={() => setOverlay(overlay?.kind === 'memory' ? null : { kind: 'memory' })}
               data-tooltip="Mở Bộ nhớ chung của Văn phòng (Shared Memory)"
-              data-tooltip-placement="bottom"
               aria-label="Bộ nhớ chung Văn phòng"
               style={{ padding: '0 8px', gap: '5px' }}
             >
@@ -449,7 +453,6 @@ export function App() {
               className="header-manager-btn"
               onClick={() => setOverlay(overlay?.kind === 'manager' ? null : { kind: 'manager' })}
               data-tooltip="Mở Bàn Trưởng phòng — Duyệt câu hỏi, nghiệm thu & giao mục tiêu"
-              data-tooltip-placement="bottom"
               style={{
                 background: managerInboxCount > 0 ? '#FEF3C7' : 'var(--bg-surface)',
                 color: managerInboxCount > 0 ? '#92400E' : 'var(--text-primary)',
@@ -472,7 +475,6 @@ export function App() {
               className={`icon-btn ${route.view === 'settings' ? 'active' : ''}`}
               onClick={() => nav('/settings')}
               data-tooltip="Cài đặt hệ thống, vị trí lưu trữ & dọn dẹp rác"
-              data-tooltip-placement="bottom"
               aria-label="Cài đặt hệ thống"
               style={{
                 width: '32px',
@@ -492,19 +494,14 @@ export function App() {
             <button
               className="primary header-new-task-btn"
               onClick={() => nav(viewedPath !== null ? `/new?project=${encodeURIComponent(viewedPath)}` : '/new')}
-              data-tooltip="Tạo task mới (N)"
-              data-tooltip-placement="bottom"
             >
               <Plus size={15} /> <span className="new-task-text">Task mới</span> <kbd className="header-kbd">N</kbd>
             </button>
           </div>
         </header>
 
-        {conn.status === 'auth-failed' && (
-          <div className="error banner" role="alert" style={{ marginTop: '0.5rem', marginBottom: 0 }}>
-            Khóa truy cập đã đổi (có thể voragent đã khởi động lại). Hãy mở lại URL do voragent in ra.
-          </div>
-        )}
+        {/* Lớp phủ toàn màn hình khi mất kết nối / đổi khóa kèm hoạt họa chú rắn dễ thương */}
+        <ConnectionOverlay conn={conn} onRetry={handleRetryConnection} />
       </div>
 
       {error !== null && <div className="error" role="alert">{error}</div>}

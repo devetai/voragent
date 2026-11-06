@@ -106,6 +106,10 @@ export function loadConfig(dataDir: string): Config {
   if (base.models?.claude && LEGACY_CLAUDE_MODELS[base.models.claude]) {
     base.models.claude = LEGACY_CLAUDE_MODELS[base.models.claude]!;
   }
+  // Tự động nâng cấp các tệp config cũ có 3 provider ban đầu nhưng chưa có opencode
+  if (base.priority.includes('claude') && base.priority.includes('antigravity') && base.priority.includes('codex') && !base.priority.includes('opencode')) {
+    base.priority.push('opencode');
+  }
   if (raw.modelFallbackPolicy !== undefined) {
     if (raw.modelFallbackPolicy !== 'auto' && raw.modelFallbackPolicy !== 'ask') {
       fail(file, 'modelFallbackPolicy', 'một trong: "auto", "ask"');

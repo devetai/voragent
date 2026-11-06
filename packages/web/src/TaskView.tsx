@@ -61,7 +61,7 @@ function CopyableTag({ text, label, icon }: { text: string; label: string; icon:
   };
 
   return (
-    <div className="task-meta-item" data-tooltip={label}>
+    <div className="task-meta-item">
       {icon}
       <span style={{ maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</span>
       <button
@@ -649,7 +649,6 @@ export function TaskView({
                 whiteSpace: 'nowrap',
                 margin: 0,
               }}
-              data-tooltip={`#${task.seq} ${task.title}`}
             >
               {!inModal && <span className="mono text-muted">#{task.seq} </span>}
               {task.title}
@@ -736,7 +735,7 @@ export function TaskView({
               />
             )}
             {task.currentProvider && (
-              <div className="task-meta-item" data-tooltip="Nền tảng thực thi hiện hành">
+              <div className="task-meta-item">
                 <ProviderIcon provider={task.currentProvider} size={13} />
                 <span style={{ textTransform: 'capitalize' }}>{task.currentProvider}</span>
               </div>
@@ -771,7 +770,7 @@ export function TaskView({
               );
             })()}
 
-            <div className="task-meta-item" data-tooltip="Thời gian cập nhật gần nhất">
+            <div className="task-meta-item">
               <TimeBadge timestamp={task.updatedAt || task.createdAt} />
             </div>
             {isUnisolated(task) && (

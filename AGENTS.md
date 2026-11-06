@@ -93,3 +93,31 @@ Mọi AI Agent (Antigravity, Claude Code, Codex, opencode...) khi làm việc tr
    - **TUYỆT ĐỐI CẤM** sử dụng các hộp thoại mặc định của trình duyệt (`window.alert()`, `window.confirm()`, `window.prompt()`).
    - Mọi thao tác yêu cầu xác nhận (Hủy/xóa kế hoạch Trưởng phòng, xóa task, xóa bộ nhớ chung, thoát trạng thái quan trọng) **BẮT BUỘC** phải sử dụng UI component chuyên dụng (`<ConfirmModal />` hoặc In-place Confirm Card).
    - Component modal xác nhận phải được render qua React Portal (`createPortal(..., document.body)`), có lớp nền mờ (`backdrop-filter: blur(...)`), tự động bẫy phím `Escape` để hủy và focus nút an toàn để chống bấm nhầm.
+
+16. **SỬ DỤNG TOOLTIP CÓ MỤC ĐÍCH & TRIỆT TIÊU RÁC THỊ GIÁC (INTENTIONAL TOOLTIPS & ZERO TOOLTIP CLUTTER):**
+   - **Chỉ sử dụng Tooltip khi thật sự cần thiết và mang lại giá trị gia tăng thông tin:**
+     - **Nút chỉ có Icon (Icon-only buttons):** BẮT BUỘC có Custom UI Tooltip giải thích chức năng (ví dụ: Làm mới, Đóng ✕, Quay lại ←, Sao chép, Xóa 🗑, Cài đặt, View Switcher Grid/Table, Zoom in/out).
+     - **Văn bản bị cắt ngắn (Truncated text):** Tên đường dẫn dài, tiêu đề bị `text-overflow: ellipsis`.
+     - **Chỉ báo trạng thái trừu tượng (Abstract status indicators):** Chấm trạng thái (offline pulse dot), thanh quota hoặc badge số liệu kỹ thuật cần diễn giải chi tiết.
+     - **Phím tắt ẩn (Keyboard shortcuts):** Cung cấp phím tắt kích hoạt nhanh khi nhãn nút không hiển thị phím tắt.
+   - **TUYỆT ĐỐI CẤM gắn Tooltip cho:**
+     - Các phần tử **ĐÃ CÓ NHÃN CHỮ RÕ RÀNG (Self-explanatory text labels):**
+       - Tab điều hướng Header khi đang hiện chữ (`Dự án`, `Văn phòng 3D`, `Bảng Kanban`, `Đồ thị`).
+       - Nút hành động chính khi đang có chữ (ví dụ: nút `Task mới` khi nhãn chữ đang hiện).
+       - Checkbox và Radio khi nhãn mô tả đã ghi rõ ràng (ví dụ: `Chỉ dự án đang hoạt động`).
+       - Các nút bấm hành động có chữ trực quan (Lưu, Hủy, Đăng nhập, v.v.).
+     - Logo thương hiệu chính (`voragent`).
+     - Tooltip **lặp lại y hệt hoặc diễn giải thừa thãi** nội dung nhãn chữ đang nhìn thấy (ví dụ: badge ghi `1 task` thì CẤM gắn tooltip `Dự án có 1 task`, badge ghi `main` thì CẤM gắn tooltip `Nhánh Git hiện tại: main`).
+
+17. **RÀ SOÁT TÁC ĐỘNG TOÀN DIỆN & KHÔNG BỎ SÓT KHI THÊM/SỬA TÍNH NĂNG (EXHAUSTIVE IMPACT AUDIT & ZERO OMISSION):**
+   - Khi thêm mới, mở rộng hoặc sửa đổi bất kỳ thực thể cốt lõi nào trong hệ thống (như thêm Agent CLI mới [ví dụ: `opencode`], mô hình mới, trạng thái task mới, kiểu nguồn dự án, hoặc chế độ xem mới), AI agent **BẮT BUỘC** phải rà soát toàn bộ các tầng trong monorepo và cập nhật đồng bộ, tuyệt đối không làm chắp vá cục bộ:
+     1. **Tầng Bộ điều hợp & CLI (`packages/adapters`, `packages/cli`):** Đăng ký Adapter trong `FACTORIES`, hàm `detect()`, parser stream/quota, danh sách nhãn nguồn `SOURCE_LABEL`, câu lệnh cài đặt tự động (`npm install -g`).
+     2. **Tầng Lõi Daemon & Cấu hình (`packages/core`):** `DEFAULT_CONFIG.priority`, danh sách hỗ trợ đầy đủ `knownProviders` trong `daemon.ts` (không để phụ thuộc vào cấu hình đã lưu cũ), tự động nâng cấp file cấu hình cũ (`loadConfig` auto-migration), ánh xạ gói npm `PROVIDER_NPM_PACKAGES`, danh mục bỏ qua `HOME_DOT_DIRS`, phân rã nhiệm vụ Trưởng phòng `buildDefaultSubtasks`.
+     3. **Tầng Giao diện Web 2D (`packages/web`):**
+        - Bảng Kanban & Thẻ task: CSS class cho badge agent (`.card-agent-badge.<provider>`), hàm phân loại `AGENT_CLASS`.
+        - Thanh Quota & Popover: Metadata cài đặt (`getProviderGuide`), số lượng hiển thị, chấm trạng thái màu sắc.
+        - Đồ thị quan hệ 2D: Tên và màu sắc thương hiệu trong `graphModel.ts`, biểu tượng canvas trong `ProviderIcon.tsx`.
+        - Phân công việc & Sub-agent: `ManagerPanel`, `SharedMemoryPanel`, `NewTaskForm`, `AgentPriorityMultiSelect`.
+        - Bộ phân tích văn bản: Bộ nhận diện lệnh terminal `COMMAND_PREFIXES` trong `MarkdownContent.tsx`.
+     4. **Tầng Văn phòng 3D (`packages/web/src/office`):** Bàn làm việc, vị trí nệm nghỉ, cốc nước/vật phẩm, bảng màu chủ đề `PROVIDER_THEMES`, và phụ kiện đặc trưng (`Accessory`) trên nhân vật rắn 3D trong `SnakeMesh.tsx`.
+     5. **Tài liệu & Kiểm thử:** Cập nhật `README.md`, `CLAUDE.md`, bộ test case tương ứng để bảo đảm không phát sinh hồi quy (regression).

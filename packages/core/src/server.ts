@@ -12,6 +12,7 @@ const execFileAsync = promisify(execFile);
 const PROVIDER_NPM_PACKAGES: Record<string, string> = {
   codex: '@openai/codex',
   claude: '@anthropic-ai/claude-code',
+  opencode: '@opencode/cli',
 };
 import { Hono } from 'hono';
 import type { Context } from 'hono';

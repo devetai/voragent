@@ -141,7 +141,7 @@ export interface MemoryItem {
   category: MemoryCategory;
   title: string;
   content: string;
-  author: string; // 'user' | 'manager' | 'claude' | 'codex' | 'antigravity'
+  author: string; // 'user' | 'manager' | 'claude' | 'codex' | 'antigravity' | 'opencode'
   pinned: boolean;
   updatedAt: number;
 }
@@ -193,9 +193,16 @@ export const PROVIDER_MODELS: Record<string, ModelOption[]> = {
   ],
   opencode: [
     { id: 'auto', name: 'Mặc định CLI (Auto)', description: 'Sử dụng mô hình mặc định đã thiết lập trong OpenCode', default: true },
-    { id: 'groq/llama-3.3-70b-versatile', name: 'Groq Llama 3.3 70B', description: 'Mô hình mã nguồn mở tốc độ cực cao trên Groq' },
-    { id: 'google/gemini-2.5-flash', name: 'Google Gemini 2.5 Flash', description: 'Mô hình Gemini thế hệ mới đa nhiệm' },
-    { id: 'openrouter/anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet (OpenRouter)', description: 'Sonnet 3.5 thông qua cổng OpenRouter' },
+    { id: 'opencode/big-pickle', name: 'Big Pickle OpenCode', description: 'Mô hình mạnh mẽ nhất của OpenCode (Miễn phí)' },
+    { id: 'opencode/crouton-alpha-free', name: 'Crouton Alpha Free', description: 'Mô hình thử nghiệm Crouton Alpha (Miễn phí)' },
+    { id: 'opencode/pulse-alpha-free', name: 'Pulse Alpha Free', description: 'Mô hình phản hồi nhanh Pulse Alpha (Miễn phí)' },
+    { id: 'opencode/flint-40b-free', name: 'Flint 40B Free', description: 'Mô hình Flint 40B mã nguồn mở (Miễn phí)' },
+    { id: 'opencode/nemotron-3.5-super-vl-free', name: 'Nemotron 3.5 Super VL Free', description: 'NVIDIA Nemotron 3.5 Super Vision-Language (Miễn phí)' },
+    { id: 'opencode/beam-free', name: 'Beam Free', description: 'Mô hình Beam tốc độ cao (Miễn phí)' },
+    { id: 'opencode/mimo-v2.6-flash-free', name: 'MiMo-V2.6-Flash Free', description: 'MiMo V2.6 Flash đa năng (Miễn phí)' },
+    { id: 'opencode/deepseek-v4.1-flash-free', name: 'DeepSeek V4.1 Flash Free', description: 'DeepSeek V4.1 Flash suy luận siêu tốc (Miễn phí)' },
+    { id: 'opencode/glm-5.3-flash-free', name: 'GLM-5.3-Flash Free', description: 'GLM 5.3 Flash thế hệ mới (Miễn phí)' },
+    { id: 'opencode/nemotron-3.5-lightning-free', name: 'Nemotron 3.5 Lightning Free', description: 'NVIDIA Nemotron 3.5 Lightning cực nhanh (Miễn phí)' },
   ],
 };
 

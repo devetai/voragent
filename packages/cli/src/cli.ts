@@ -241,7 +241,7 @@ function table(rows: string[][]): string {
     .join('\n');
 }
 
-const SOURCE_LABEL: Record<string, string> = { claude: 'Claude', antigravity: 'Antigravity' };
+const SOURCE_LABEL: Record<string, string> = { claude: 'Claude', antigravity: 'Antigravity', codex: 'Codex', opencode: 'OpenCode' };
 
 function stamp(ts: number): string {
   const d = new Date(ts);

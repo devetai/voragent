@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Check,
   CheckCircle2,
   ChevronDown,
+  Clock,
   Copy,
   Cpu,
   Download,
@@ -200,6 +201,27 @@ export function QuotaBar({
   const [probingKey, setProbingKey] = useState<string | null>(null);
   const [probeFeedbacks, setProbeFeedbacks] = useState<Record<string, { ok: boolean; note: string }>>({});
   const ref = useRef<HTMLDivElement>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; right: number } | null>(null);
+
+  const updatePopoverPos = useCallback(() => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    setPopoverPos({
+      top: rect.bottom + 8,
+      right: Math.max(12, window.innerWidth - rect.right),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePopoverPos();
+    window.addEventListener('resize', updatePopoverPos);
+    window.addEventListener('scroll', updatePopoverPos, true);
+    return () => {
+      window.removeEventListener('resize', updatePopoverPos);
+      window.removeEventListener('scroll', updatePopoverPos, true);
+    };
+  }, [open, updatePopoverPos]);
 
   useEffect(() => {
     if (!open) return;
@@ -209,7 +231,8 @@ export function QuotaBar({
       if (
         target.closest('.custom-select-dropdown') ||
         target.closest('.custom-select-container') ||
-        target.closest('.confirm-modal-overlay')
+        target.closest('.confirm-modal-overlay') ||
+        target.closest('.quota-popover-menu')
       ) {
         return;
       }
@@ -388,14 +411,24 @@ export function QuotaBar({
             />
           ))}
         </div>
-        <span style={{ fontSize: '12px', fontWeight: 600 }}>
-          {installedCount}/{providers.length} CLI
+        <span className="quota-trigger-text" style={{ fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+          <span className="quota-counts tabular">{installedCount}/{providers.length}</span>
+          <span className="quota-label"> CLI</span>
         </span>
         <ChevronDown size={13} style={{ color: 'var(--text-secondary)' }} />
       </button>
 
-      {open && (
-        <div className="quota-popover-menu" role="dialog" aria-label="Chi tiết trạng thái và hạn mức Agent CLI">
+      {open && popoverPos && typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="quota-popover-menu is-portal"
+            style={{
+              position: 'fixed',
+              top: `${popoverPos.top}px`,
+              right: `${popoverPos.right}px`,
+              zIndex: 99999,
+            }}
+            role="dialog" aria-label="Chi tiết trạng thái và hạn mức Agent CLI">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-secondary)' }}>
               TRẠNG THÁI &amp; HẠN MỨC CÁC AGENT CLI
@@ -591,12 +624,12 @@ export function QuotaBar({
                                   </>
                                 ) : curQuotaInfo?.status === 'cooldown' && curQuotaInfo.cooldownUntil ? (
                                   <>
-                                    <span>⏳</span>
+                                    <Clock size={11} color="#D97706" />
                                     <span>Tạm nghỉ đến {hhmm(curQuotaInfo.cooldownUntil)}</span>
                                   </>
                                 ) : (
                                   <>
-                                    <span>🟢</span>
+                                    <span className="quota-pill-indicator green" style={{ width: '6px', height: '6px', display: 'inline-block' }} />
                                     <span>Hạn mức độc lập, sẵn sàng</span>
                                   </>
                                 )}
@@ -608,76 +641,33 @@ export function QuotaBar({
                               )}
                             </div>
 
-                            {/* Tùy chọn xử lý khi hết quota thu gọn ngay bên trong thẻ Antigravity */}
-                            <div
-                              style={{
-                                marginTop: '4px',
-                                paddingTop: '4px',
-                                borderTop: '1px dotted var(--border-subtle)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: '6px',
-                              }}
-                            >
-                              <span style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                            {/* Tùy chọn xử lý khi hết quota thu gọn dạng Capsule Switcher */}
+                            <div className="quota-fallback-row">
+                              <span className="quota-fallback-label">
                                 Khi hết quota:
                               </span>
-                              <div
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  background: 'var(--bg-canvas)',
-                                  padding: '2px',
-                                  borderRadius: '5px',
-                                  border: '1px solid var(--border-subtle)',
-                                  gap: '2px',
-                                }}
-                              >
+                              <div className="quota-fallback-switcher" role="radiogroup" aria-label="Xử lý khi hết quota">
                                 <button
                                   type="button"
+                                  className={`quota-fallback-btn ${fallbackPolicy === 'auto' ? 'active' : ''}`}
                                   onClick={() => void handleUpdateFallbackPolicy('auto')}
-                                  style={{
-                                    padding: '2px 7px',
-                                    fontSize: '10px',
-                                    fontWeight: fallbackPolicy === 'auto' ? 600 : 500,
-                                    borderRadius: '3px',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    background: fallbackPolicy === 'auto' ? 'var(--bg-surface)' : 'transparent',
-                                    color: fallbackPolicy === 'auto' ? 'var(--amber-dark, #B45309)' : 'var(--text-secondary)',
-                                    boxShadow: fallbackPolicy === 'auto' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '3px',
-                                    transition: 'all 0.15s ease',
-                                  }}
-                                  data-tooltip="Tự động nhảy sang model còn quota (vd: Flash) để tiếp tục chạy liên tục"
+                                  role="radio"
+                                  aria-checked={fallbackPolicy === 'auto'}
+                                  data-tooltip="Tự động chuyển sang model còn quota (ví dụ: Gemini 3.8 Flash) để tiếp tục công việc"
                                 >
-                                  <Zap size={10} color={fallbackPolicy === 'auto' ? 'var(--amber-base)' : 'currentColor'} />
+                                  <Zap size={11} className="fallback-icon-zap" />
                                   <span>Tự đổi model</span>
                                 </button>
                                 <button
                                   type="button"
+                                  className={`quota-fallback-btn ${fallbackPolicy === 'ask' ? 'active' : ''}`}
                                   onClick={() => void handleUpdateFallbackPolicy('ask')}
-                                  style={{
-                                    padding: '2px 7px',
-                                    fontSize: '10px',
-                                    fontWeight: fallbackPolicy === 'ask' ? 600 : 500,
-                                    borderRadius: '3px',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    background: fallbackPolicy === 'ask' ? 'var(--bg-surface)' : 'transparent',
-                                    color: fallbackPolicy === 'ask' ? 'var(--amber-dark, #B45309)' : 'var(--text-secondary)',
-                                    boxShadow: fallbackPolicy === 'ask' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '3px',
-                                    transition: 'all 0.15s ease',
-                                  }}
+                                  role="radio"
+                                  aria-checked={fallbackPolicy === 'ask'}
                                   data-tooltip="Tạm dừng task và hiển thị thông báo để bạn quyết định đổi model hay dừng hẳn"
                                 >
-                                  <span>🔔 Chờ duyệt</span>
+                                  <Clock size={11} className="fallback-icon-pause" />
+                                  <span>Chờ duyệt</span>
                                 </button>
                               </div>
                             </div>
@@ -706,7 +696,8 @@ export function QuotaBar({
               );
             })}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* MODAL CÀI ĐẶT TỰ ĐỘNG & HƯỚNG DẪN CHI TIẾT CHO AGENT CLI CHƯA CÀI */}

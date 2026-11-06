@@ -55,6 +55,9 @@ export function extractGraphData(
     } else if (nameLower.includes('antigravity') || nameLower.includes('agy')) {
       color = '#3B82F6';
       label = 'Antigravity';
+    } else if (nameLower.includes('opencode')) {
+      color = '#059669';
+      label = 'OpenCode';
     }
 
     // Tọa độ khởi tạo vòng cung phía trên
