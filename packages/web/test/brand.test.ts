@@ -14,11 +14,11 @@ describe('Brand & UI Components', () => {
       expect(PROVIDER_BRAND_META.opencode.label).toBe('OpenCode');
     });
 
-    it('renders opencode vector icon with emerald terminal badge', () => {
+    it('renders opencode vector icon with official logo', () => {
       const html = renderToString(React.createElement(ProviderIcon, { provider: 'opencode', size: 16 }));
-      expect(html).toContain('viewBox="0 0 24 24"');
-      expect(html).toContain('#059669');
-      expect(html).toContain('#ECFDF5');
+      expect(html).toContain('viewBox="0 0 240 300"');
+      expect(html).toContain('#211E1E');
+      expect(html).toContain('#CFCECD');
     });
   });
 
