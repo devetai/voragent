@@ -336,7 +336,7 @@ export function ManagerPanel({
             type="button"
             className="icon-btn-sm"
             onClick={onClose}
-            title="Đóng cửa sổ (Esc)"
+
             aria-label="Đóng cửa sổ"
           >
             <X size={14} />
@@ -407,7 +407,7 @@ export function ManagerPanel({
                           value={currentGoal}
                           onChange={(e) => setDraftGoals((prev) => ({ ...prev, [plan.id]: e.target.value }))}
                           placeholder="Mục tiêu kế hoạch..."
-                          title="Bấm để chỉnh sửa mục tiêu chung của kế hoạch"
+
                           style={{
                             flex: 1,
                             fontWeight: 700,
@@ -427,7 +427,7 @@ export function ManagerPanel({
                           style={{ fontSize: '12px', height: '32px', padding: '0 10px' }}
                           disabled={deletingPlanId === plan.id || dispatchingId === plan.id}
                           onClick={() => setPlanToDelete(plan)}
-                          title="Hủy và xóa vĩnh viễn kế hoạch nháp này"
+
                         >
                           <Trash2 size={13} />
                           <span>{deletingPlanId === plan.id ? 'Đang hủy…' : 'Hủy kế hoạch'}</span>
@@ -474,7 +474,7 @@ export function ManagerPanel({
                                 type="button"
                                 className="icon-btn-sm danger"
                                 onClick={() => handleDeleteSubtask(plan, idx)}
-                                title="Xóa nhiệm vụ này khỏi kế hoạch"
+                                data-tooltip="Xóa nhiệm vụ này khỏi kế hoạch"
                                 aria-label="Xóa nhiệm vụ"
                               >
                                 <Trash2 size={13} />
@@ -531,7 +531,7 @@ export function ManagerPanel({
                           type="button"
                           className="icon-btn-sm"
                           onClick={() => { void handleToggleDiff(task.id); }}
-                          title={taskDiff !== undefined ? 'Ẩn thay đổi mã nguồn (Diff)' : 'Xem thay đổi mã nguồn (Diff)'}
+                          data-tooltip={taskDiff !== undefined ? 'Ẩn thay đổi mã nguồn (Diff)' : 'Xem thay đổi mã nguồn (Diff)'}
                           aria-label="Xem hoặc ẩn Diff"
                         >
                           <FileCode2 size={14} />
@@ -540,7 +540,7 @@ export function ManagerPanel({
                           type="button"
                           className="icon-btn-sm"
                           onClick={() => onSelectTask?.(task.id)}
-                          title="Mở chi tiết Task & Nhật ký"
+                          data-tooltip="Mở chi tiết Task & Nhật ký"
                           aria-label="Mở chi tiết Task"
                         >
                           <ExternalLink size={14} />
@@ -615,7 +615,7 @@ export function ManagerPanel({
                           fontWeight: 600,
                         }}
                         onClick={() => { void handleApproveAndClose(task, lastAgentMessage); }}
-                        title="Nghiệm thu kết quả và lưu quyết định vào Shared Memory"
+
                       >
                         ✓ Nghiệm thu
                       </button>
@@ -657,7 +657,7 @@ export function ManagerPanel({
                           className="icon-btn-sm"
                           disabled={isBusy}
                           onClick={() => { void handleRetryTask(task.id, false); }}
-                          title="Thử lại trên nền tảng hiện tại"
+                          data-tooltip="Thử lại trên nền tảng hiện tại"
                           aria-label="Thử lại"
                         >
                           <RotateCcw size={13} />
@@ -668,7 +668,7 @@ export function ManagerPanel({
                             className="icon-btn-sm"
                             disabled={isBusy}
                             onClick={() => { void handleRetryTask(task.id, true); }}
-                            title="Đổi nhân viên khả dụng khác tiếp quản"
+                            data-tooltip="Đổi nhân viên khả dụng khác tiếp quản"
                             aria-label="Đổi nhân viên khác"
                           >
                             <Shuffle size={13} />
@@ -678,7 +678,7 @@ export function ManagerPanel({
                           type="button"
                           className="icon-btn-sm"
                           onClick={() => { void handleApproveAndClose(task, ''); }}
-                          title="Đóng công việc lỗi này"
+
                           aria-label="Đóng công việc"
                         >
                           <X size={13} />
@@ -788,7 +788,7 @@ export function ManagerPanel({
                         className="icon-btn-sm danger"
                         disabled={deletingPlanId === plan.id}
                         onClick={() => setPlanToDelete(plan)}
-                        title="Xóa kế hoạch này"
+                        data-tooltip="Xóa kế hoạch này"
                         aria-label="Xóa kế hoạch"
                       >
                         <Trash2 size={13} />
@@ -825,7 +825,7 @@ export function ManagerPanel({
                                 type="button"
                                 style={{ fontSize: '11px', height: '24px', minHeight: '24px', padding: '0 8px' }}
                                 onClick={() => onSelectTask?.(linkedTask.id)}
-                                title="Bấm để mở chi tiết Task"
+
                               >
                                 #{linkedTask.seq} {TASK_STATUS_LABEL[linkedTask.status]}
                               </button>

@@ -94,7 +94,7 @@ export function NodeDetailDrawer({
           type="button"
           className="icon-btn-sm"
           onClick={onClose}
-          title="Đóng (Esc)"
+
           aria-label="Đóng"
         >
           ✕

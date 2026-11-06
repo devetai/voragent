@@ -771,7 +771,7 @@ export function TaskView({
               type="button"
               className="icon-btn-sm"
               onClick={onBack}
-              data-tooltip="Quay lại danh sách (Esc)"
+
               aria-label="Quay lại danh sách"
             >
               <ArrowLeft size={14} />

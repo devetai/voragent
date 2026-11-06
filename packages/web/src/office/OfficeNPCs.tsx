@@ -113,7 +113,7 @@ export function OfficeCat() {
 
       {/* Trái tim nổi khi được vuốt ve */}
       {hearts.map((h) => (
-        <Html key={h.id} position={[h.offset, 0.8, 0]} center pointerEvents="none">
+        <Html key={h.id} zIndexRange={[5, 0]} position={[h.offset, 0.8, 0]} center pointerEvents="none">
           <div style={{ fontSize: '20px', animation: 'floatUp 1.8s ease-out forwards', userSelect: 'none' }}>
             ❤️
           </div>
@@ -122,7 +122,7 @@ export function OfficeCat() {
 
       {/* Bong bóng thoại khi vuốt ve */}
       {petMessage && (
-        <Html position={[0, 0.85, 0]} center pointerEvents="none">
+        <Html zIndexRange={[5, 0]} position={[0, 0.85, 0]} center pointerEvents="none">
           <div
             style={{
               backgroundColor: 'rgba(255, 255, 255, 0.96)',
@@ -145,7 +145,7 @@ export function OfficeCat() {
 
       {/* Hint khi hover */}
       {isHovered && !petMessage && (
-        <Html position={[0, 0.65, 0]} center pointerEvents="none">
+        <Html zIndexRange={[5, 0]} position={[0, 0.65, 0]} center pointerEvents="none">
           <div
             style={{
               backgroundColor: 'rgba(30, 41, 59, 0.85)',
@@ -285,7 +285,7 @@ export function RoombaBot() {
 
       {/* Bong bóng thoại Roomba */}
       {roombaMessage && (
-        <Html position={[0, 0.6, 0]} center pointerEvents="none">
+        <Html zIndexRange={[5, 0]} position={[0, 0.6, 0]} center pointerEvents="none">
           <div
             style={{
               backgroundColor: 'rgba(255, 255, 255, 0.96)',
@@ -308,7 +308,7 @@ export function RoombaBot() {
 
       {/* Hint khi hover */}
       {isHovered && !roombaMessage && (
-        <Html position={[0, 0.45, 0]} center pointerEvents="none">
+        <Html zIndexRange={[5, 0]} position={[0, 0.45, 0]} center pointerEvents="none">
           <div
             style={{
               backgroundColor: 'rgba(30, 41, 59, 0.85)',
@@ -392,7 +392,7 @@ export function InteractiveCoffeeMachine({ position }: { position: [number, numb
 
       {/* Hơi khói bốc lên khi pha */}
       {steam && (
-        <Html position={[0, 0.85, 0.15]} center pointerEvents="none">
+        <Html zIndexRange={[5, 0]} position={[0, 0.85, 0.15]} center pointerEvents="none">
           <div
             style={{
               backgroundColor: 'rgba(255, 255, 255, 0.96)',
@@ -415,7 +415,7 @@ export function InteractiveCoffeeMachine({ position }: { position: [number, numb
 
       {/* Hint khi hover */}
       {isHovered && !isBrewing && (
-        <Html position={[0, 0.75, 0]} center pointerEvents="none">
+        <Html zIndexRange={[5, 0]} position={[0, 0.75, 0]} center pointerEvents="none">
           <div
             style={{
               backgroundColor: 'rgba(30, 41, 59, 0.85)',
@@ -501,7 +501,7 @@ export function InteractivePlant({ position }: { position: [number, number, numb
 
       {/* Bong bóng khi tưới cây */}
       {isWatered && (
-        <Html position={[0, 2.4, 0]} center pointerEvents="none">
+        <Html zIndexRange={[5, 0]} position={[0, 2.4, 0]} center pointerEvents="none">
           <div
             style={{
               backgroundColor: 'rgba(255, 255, 255, 0.96)',
@@ -524,7 +524,7 @@ export function InteractivePlant({ position }: { position: [number, number, numb
 
       {/* Hint khi hover */}
       {isHovered && !isWatered && (
-        <Html position={[0, 1.8, 0]} center pointerEvents="none">
+        <Html zIndexRange={[5, 0]} position={[0, 1.8, 0]} center pointerEvents="none">
           <div
             style={{
               backgroundColor: 'rgba(30, 41, 59, 0.85)',

@@ -134,9 +134,10 @@ export function FolderPickerModal({ initialPath, onSelect, onClose }: FolderPick
             type="button"
             className="icon-btn"
             onClick={onClose}
-            data-tooltip="Đóng (Esc)"
-            data-tooltip-placement="bottom"
             aria-label="Đóng"
+
+
+
             style={{ width: '28px', height: '28px', padding: 0 }}
           >
             <X size={16} />

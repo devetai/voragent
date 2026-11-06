@@ -169,7 +169,7 @@ export function SharedMemoryPanel({
               type="button"
               className="icon-btn-sm"
               onClick={onClose}
-              title="Đóng cửa sổ (Esc)"
+
               aria-label="Đóng cửa sổ"
             >
               <X size={14} />
@@ -297,7 +297,7 @@ export function SharedMemoryPanel({
                     type="button"
                     className={`icon-btn-sm ${m.pinned ? 'active' : ''}`}
                     onClick={() => { void handleTogglePin(m); }}
-                    title={m.pinned ? 'Đang ghim trên Bảng Trắng 3D — Bấm để bỏ ghim' : 'Ghim mục nhớ này lên Bảng Trắng 3D'}
+                    data-tooltip={m.pinned ? 'Đang ghim trên Bảng Trắng 3D — Bấm để bỏ ghim' : 'Ghim mục nhớ này lên Bảng Trắng 3D'}
                     aria-label={m.pinned ? 'Bỏ ghim' : 'Ghim lên bảng 3D'}
                   >
                     <Pin size={13} />
@@ -306,7 +306,7 @@ export function SharedMemoryPanel({
                     type="button"
                     className="icon-btn-sm danger"
                     onClick={() => setMemoryToDelete(m)}
-                    title="Xóa mục nhớ này"
+                    data-tooltip="Xóa mục nhớ này"
                     aria-label="Xóa mục nhớ"
                   >
                     <Trash2 size={13} />

@@ -221,7 +221,7 @@ export function CustomSelect<T extends string = string>({
                 type="button"
                 className="custom-select-clear-btn"
                 onClick={() => setQuery('')}
-                data-tooltip="Xóa tìm kiếm"
+                aria-label="Xóa tìm kiếm"
               >
                 <X size={12} />
               </button>

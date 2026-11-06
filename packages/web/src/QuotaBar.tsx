@@ -150,6 +150,7 @@ function CommandCopyRow({ label, command }: { label: string; command: string }) 
           className="icon-btn-sm"
           onClick={handleCopy}
           data-tooltip={copied ? 'Đã sao chép lệnh!' : 'Sao chép lệnh'}
+          aria-label="Sao chép lệnh"
           style={{
             background: 'rgba(255,255,255,0.1)',
             borderColor: 'rgba(255,255,255,0.18)',
@@ -740,7 +741,7 @@ export function QuotaBar({
                     className="icon-btn-sm"
                     disabled={installing}
                     onClick={() => setGuideProviderId(null)}
-                    data-tooltip="Đóng cửa sổ (Esc)"
+
                     aria-label="Đóng"
                   >
                     <X size={15} />

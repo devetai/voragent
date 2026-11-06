@@ -220,7 +220,8 @@ export function AgentPriorityMultiSelect({
                     className="agent-priority-move-btn"
                     disabled={priorityIndex === 0}
                     onClick={(e) => handleMove(priorityIndex, 'up', e)}
-                    title="Tăng mức ưu tiên (chạy trước)"
+                    data-tooltip="Tăng mức ưu tiên (chạy trước)"
+                    aria-label="Tăng mức ưu tiên"
                   >
                     <ArrowUp size={13} />
                   </button>
@@ -229,7 +230,8 @@ export function AgentPriorityMultiSelect({
                     className="agent-priority-move-btn"
                     disabled={priorityIndex === currentPriority.length - 1}
                     onClick={(e) => handleMove(priorityIndex, 'down', e)}
-                    title="Giảm mức ưu tiên (chạy sau)"
+                    data-tooltip="Giảm mức ưu tiên (chạy sau)"
+                    aria-label="Giảm mức ưu tiên"
                   >
                     <ArrowDown size={13} />
                   </button>

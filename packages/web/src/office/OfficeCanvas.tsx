@@ -585,7 +585,7 @@ export function OfficeCanvas({
                 setSelectedAgentId(ag.id === selectedAgentId ? null : ag.id);
                 setQuickNotice(null);
               }}
-              title={`${ag.name} (${ag.role}) — Bấm để lia camera & giao việc`}
+              data-tooltip={`${ag.name} (${ag.role}) — Bấm để lia camera & giao việc`}
               style={{
                 fontSize: '12px',
                 height: '28px',
@@ -636,7 +636,7 @@ export function OfficeCanvas({
                 type="button"
                 className="icon-btn-sm"
                 onClick={() => setSelectedAgentId(null)}
-                data-tooltip="Đóng (Esc)"
+
                 aria-label="Đóng"
               >
                 ✕
@@ -730,7 +730,7 @@ export function OfficeCanvas({
                           type="button"
                           className="office-mini-btn"
                           disabled={quickBusy}
-                          title={`Bàn giao task #${selectedAgent.currentTask!.seq} sang ${targetAg.name}`}
+
                           onClick={() => { void handleHandoffTo(selectedAgent.currentTask!.id, targetAg.provider); }}
                         >
                           <ProviderIcon provider={targetAg.provider} size={11} /> → {targetAg.name}

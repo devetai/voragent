@@ -257,7 +257,7 @@ export function FileTree({ projectPath, activeFilePath, onSelectFile }: FileTree
               </button>
             </div>
           ) : (
-            <span className="ide-tree-label" title={node.path}>
+            <span className="ide-tree-label" data-tooltip={node.path}>
               {node.name}
             </span>
           )}

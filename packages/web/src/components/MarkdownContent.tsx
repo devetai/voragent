@@ -53,7 +53,7 @@ function CommandInlineChip({ code }: { code: string }) {
     <span
       className="md-command-chip"
       onClick={handleCopy}
-      title={copied ? 'Đã sao chép lệnh!' : 'Bấm để sao chép lệnh'}
+      data-tooltip={copied ? 'Đã sao chép lệnh!' : 'Sao chép lệnh'}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -95,7 +95,7 @@ function UrlInlineChip({ url, label }: { url: string; label?: string }) {
         target={isLocalFile ? undefined : '_blank'}
         rel={isLocalFile ? undefined : 'noreferrer noopener'}
         className="md-url-link"
-        title={url}
+        data-tooltip={url}
       >
         <ExternalLink size={11} />
         <span>{label ?? url}</span>
@@ -104,7 +104,8 @@ function UrlInlineChip({ url, label }: { url: string; label?: string }) {
         type="button"
         className="md-url-copy-btn"
         onClick={handleCopy}
-        title={copied ? 'Đã sao chép URL!' : 'Sao chép URL'}
+        data-tooltip={copied ? 'Đã sao chép URL!' : 'Sao chép URL'}
+        aria-label="Sao chép URL"
       >
         {copied ? <Check size={11} color="var(--green-base)" /> : <Copy size={11} />}
       </button>
@@ -129,7 +130,8 @@ function CodeBlock({ lang, code }: { lang: string; code: string }) {
           type="button"
           className="copy-btn"
           onClick={handleCopy}
-          title={copied ? 'Đã sao chép mã nguồn' : 'Sao chép mã nguồn'}
+          data-tooltip={copied ? 'Đã sao chép mã nguồn' : 'Sao chép mã nguồn'}
+          aria-label="Sao chép mã nguồn"
         >
           {copied ? <Check size={11} color="var(--green-base)" /> : <Copy size={11} />}
         </button>

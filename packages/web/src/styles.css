@@ -5477,13 +5477,18 @@ span.badge[data-tooltip]:not([role="button"]),
 [class*="-box"] > select,
 [class*="-box"] > input,
 .ide-nav-select select,
-.ide-select-wrapper select {
+.ide-select-wrapper select,
+.custom-select-search-input,
+.search-box input,
+.search-wrapper input {
   height: 100% !important;
   min-height: 0 !important;
   line-height: normal !important;
   box-shadow: none !important;
   outline: none !important;
   border: none !important;
+  background: transparent !important;
+  margin: 0 !important;
 }
 
 .ide-branch-indicator {

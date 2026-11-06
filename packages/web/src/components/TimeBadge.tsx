@@ -72,11 +72,11 @@ export function TimeBadge({
   return (
     <span
       className={`time-badge ${isRecent ? 'recent' : ''} ${className}`}
-      title={full}
+      data-tooltip={full}
     >
       {showIcon && <Clock size={11} className="time-badge-icon" />}
       <span className="time-badge-text">{relative}</span>
-      {isRecent && <span className="time-badge-dot" title="Hoạt động trong 15 phút qua" />}
+      {isRecent && <span className="time-badge-dot" data-tooltip="Hoạt động trong 15 phút qua" />}
     </span>
   );
 }

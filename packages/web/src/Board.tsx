@@ -123,7 +123,7 @@ export function Board({
                                   <span
                                     className="badge"
                                     style={{ fontSize: '10.5px', padding: '1px 6px', background: 'var(--bg-canvas)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
-                                    title={`Đang chờ #${parent.seq} (${parent.title}) hoàn thành`}
+                                    data-tooltip={`Đang chờ #${parent.seq} (${parent.title}) hoàn thành`}
                                   >
                                     <Clock size={10} /> Chờ #${parent.seq}
                                   </span>
@@ -133,12 +133,12 @@ export function Board({
                             return null;
                           })()}
                           {isUnisolated(t) && (
-                            <span className="badge warn" style={{ fontSize: '10.5px', padding: '1px 6px' }} title="Không cách ly Git Worktree">
+                            <span className="badge warn" style={{ fontSize: '10.5px', padding: '1px 6px' }} data-tooltip="Không cách ly Git Worktree">
                               <AlertTriangle size={10} />
                             </span>
                           )}
                           {t.currentProvider && (
-                            <span className={`card-agent-badge ${agentClass}`} title={`Đang thực thi bởi ${t.currentProvider}`}>
+                            <span className={`card-agent-badge ${agentClass}`}>
                               <ProviderIcon provider={t.currentProvider} size={11} /> {t.currentProvider}
                             </span>
                           )}
@@ -148,7 +148,7 @@ export function Board({
                       <div className="card-title">{t.title}</div>
 
                       <div className="card-footer">
-                        <div className="card-path" title={t.repoPath} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', minWidth: 0, flex: 1 }}>
+                        <div className="card-path" data-tooltip={t.repoPath} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', minWidth: 0, flex: 1 }}>
                           <Folder size={11} style={{ flexShrink: 0 }} />
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folder}</span>
                           {t.branch && (
@@ -161,7 +161,7 @@ export function Board({
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
                           {handoffs > 0 && (
-                            <span className="handoff-chip" title="Số lần tự động chuyển nền tảng do hết quota">
+                            <span className="handoff-chip" data-tooltip="Số lần tự động chuyển nền tảng do hết quota">
                               <ArrowLeftRight size={10} /> {handoffs}
                             </span>
                           )}

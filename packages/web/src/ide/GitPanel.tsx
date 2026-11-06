@@ -296,7 +296,7 @@ export function GitPanel({ cwd, onSelectDiff, onSwitchWorktree }: GitPanelProps)
         <span className={`ide-git-badge ${f.status}`}>
           {f.status === 'untracked' ? 'U' : (f.status[0] || 'M').toUpperCase()}
         </span>
-        <span className="ide-git-file-name" title={f.path}>
+        <span className="ide-git-file-name" data-tooltip={f.path}>
           {node.name}
         </span>
         <div className="ide-git-item-actions" onClick={(e) => e.stopPropagation()}>
@@ -344,7 +344,7 @@ export function GitPanel({ cwd, onSelectDiff, onSwitchWorktree }: GitPanelProps)
       <span className={`ide-git-badge ${f.status}`}>
         {f.status === 'untracked' ? 'U' : (f.status[0] || 'M').toUpperCase()}
       </span>
-      <span className="ide-git-file-name" title={f.path}>
+      <span className="ide-git-file-name" data-tooltip={f.path}>
         {f.path}
       </span>
       <div className="ide-git-item-actions" onClick={(e) => e.stopPropagation()}>
