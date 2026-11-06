@@ -128,6 +128,9 @@ function normalizeClaudeModel(model?: string | null): string | null {
   if (m === 'sonnet-5.5' || m === 'sonnet-5-5') return 'claude-sonnet-5-5';
   if (m === 'opus-5.5' || m === 'opus-5-5') return 'claude-opus-5-5';
   if (m === 'haiku-5.5' || m === 'haiku-4.5' || m === 'haiku-4-5') return 'claude-haiku-4-5';
+  if (m.startsWith('gemini-') || m.startsWith('gpt-') || m.startsWith('groq/') || m.startsWith('openrouter/') || m === 'auto') {
+    return null;
+  }
   return m;
 }
 

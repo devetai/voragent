@@ -104,6 +104,15 @@ function createCodexParser(): StreamParser {
   };
 }
 
+function normalizeCodexModel(model?: string | null): string | null {
+  if (!model) return null;
+  const m = model.trim();
+  if (m.startsWith('gemini-') || m.startsWith('claude-') || m.startsWith('groq/') || m.startsWith('openrouter/') || m === 'auto') {
+    return null;
+  }
+  return m;
+}
+
 export function createCodexAdapter(): Adapter {
   return {
     id: 'codex',
@@ -114,7 +123,7 @@ export function createCodexAdapter(): Adapter {
         args: [
           ...(input.sessionId ? ['exec', 'resume', input.sessionId] : ['exec']),
           '--json',
-          ...(input.model ? ['-m', input.model] : []),
+          ...(normalizeCodexModel(input.model) ? ['-m', normalizeCodexModel(input.model)!] : []),
           '-c', 'sandbox_mode="workspace-write"',
           ...(input.network ? ['-c', 'sandbox_workspace_write.network_access=true'] : []),
           '-',

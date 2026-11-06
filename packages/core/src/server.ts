@@ -28,7 +28,7 @@ import { migrateDataDir } from './migration.js';
 import { resolveDataDir } from './location.js';
 import type { EventBus } from './bus.js';
 import { DEFAULT_CONFIG, saveConfig } from './config.js';
-import type { Orchestrator } from './orchestrator.js';
+import { resolveProviderModel, type Orchestrator } from './orchestrator.js';
 import type { ProjectCatalog } from './projects.js';
 import type { Store } from './store.js';
 import { initGitRepository, workspaceSummary } from './workspace.js';
@@ -329,7 +329,8 @@ export function createServer(d: {
     const b = await readJson(c);
     const patch: Record<string, unknown> = {};
     if (b.model !== undefined) {
-      patch.model = typeof b.model === 'string' && b.model.trim() ? b.model.trim() : null;
+      const rawModel = typeof b.model === 'string' && b.model.trim() ? b.model.trim() : null;
+      patch.model = task.currentProvider ? resolveProviderModel(task.currentProvider, rawModel, d.config) : rawModel;
     }
     if (typeof b.title === 'string' && b.title.trim()) {
       patch.title = b.title.trim();

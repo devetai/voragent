@@ -10,7 +10,7 @@ import type { Adapter, TurnResult } from '@voragent/adapters';
 import type { Config, ProviderId, Task } from '@voragent/shared';
 import { EventBus } from '../src/bus.js';
 import { DEFAULT_CONFIG } from '../src/config.js';
-import { createOrchestrator } from '../src/orchestrator.js';
+import { createOrchestrator, resolveProviderModel } from '../src/orchestrator.js';
 import type { Orchestrator } from '../src/orchestrator.js';
 import { openStore } from '../src/store.js';
 import type { Store } from '../src/store.js';
@@ -543,4 +543,21 @@ describe('orchestrator', () => {
     const t1Final = await run(o, id1, 'awaiting_user');
     expect(t1Final.status).toBe('awaiting_user');
   }, 60_000);
+  it('resolveProviderModel tự động chuyển sang model tương ứng khi gán model chéo nhà cung cấp', () => {
+    const config = { ...DEFAULT_CONFIG, dataDir: '/tmp', models: { claude: 'claude-sonnet-5-5', codex: 'gpt-5.6-luna' } };
+    expect(resolveProviderModel('claude', 'claude-opus-5-5', config)).toBe('claude-opus-5-5');
+    expect(resolveProviderModel('claude', 'gemini-4-argon', config)).toBe('claude-sonnet-5-5');
+    expect(resolveProviderModel('codex', 'claude-sonnet-5-5', config)).toBe('gpt-5.6-luna');
+  });
+
+  it('assignTask tự động đổi task.model tương ứng với agent mới khi gán provider', async () => {
+    const o = make();
+    const t = await o.submitTask({ repoPath: repo, message: 'test task', model: 'gemini-4-argon' });
+    expect(store.getTask(t.id)!.model).toBe('gemini-4-argon');
+
+    // Chuyển sang fake-a: gemini-4-argon không thuộc fake-a -> model thành null / default
+    o.assignTask(t.id, 'fake-a');
+    expect(store.getTask(t.id)!.currentProvider).toBe('fake-a');
+    expect(store.getTask(t.id)!.model).toBeFalsy();
+  });
 });

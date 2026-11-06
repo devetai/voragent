@@ -134,6 +134,29 @@ export function buildDefaultSubtasks(goal: string, installedProviders: ProviderI
   return subtasks;
 }
 
+
+/**
+ * Xác định model hợp lệ cho từng provider:
+ * - Nếu model được chỉ định thuộc về chính provider này thì giữ nguyên.
+ * - Nếu model thuộc provider khác (ví dụ gemini trên claude), tự động chuyển sang model đã cấu hình hoặc mặc định của provider đó.
+ */
+export function resolveProviderModel(
+  provider: ProviderId,
+  model: string | null | undefined,
+  config?: Config,
+): string | null {
+  const allModels = PROVIDER_MODELS[provider] ?? [];
+  if (model && allModels.some((m) => m.id === model)) {
+    return model;
+  }
+  const configured = config?.models?.[provider];
+  if (configured && (allModels.length === 0 || allModels.some((m) => m.id === configured))) {
+    return configured;
+  }
+  const def = allModels.find((m) => m.default) ?? allModels[0];
+  return def ? def.id : null;
+}
+
 const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 export function createOrchestrator(d: {
@@ -462,7 +485,7 @@ export function createOrchestrator(d: {
         sessionId: run.sessionId,
         cwd: ws.path,
         network: config.network,
-        model: task.model ?? config.models?.[provider] ?? null,
+        model: resolveProviderModel(provider, task.model, config),
       },
       {
         timeoutMs: config.turnTimeoutMs,
@@ -828,7 +851,9 @@ export function createOrchestrator(d: {
       const installedPool = getInstalledPriority();
       const nextPrio = current ? installedPool.filter((p) => p !== current) : installedPool;
       const effectivePrio = nextPrio.length > 0 ? [...nextPrio, ...(current ? [current] : [])] : installedPool;
-      setStatus(taskId, 'queued', { currentProvider: null, priority: effectivePrio });
+      const nextProv = effectivePrio[0] ?? null;
+      const nextModel = nextProv ? resolveProviderModel(nextProv, null, config) : null;
+      setStatus(taskId, 'queued', { currentProvider: null, priority: effectivePrio, model: nextModel });
     } else {
       // Force retry: xóa cooldown của nền tảng mục tiêu (hoặc tất cả nền tảng đã cài đặt trong priority) để có thể thử chạy ngay
       const candidates = task.currentProvider
@@ -863,11 +888,12 @@ export function createOrchestrator(d: {
     const installedPool = getInstalledPriority();
     const rest = installedPool.filter((p) => p !== provider);
     const nextPriority = [provider, ...rest];
+    const effectiveModel = resolveProviderModel(provider, task.model, config);
 
     // Nếu đang chạy trên agent khác thì hủy lượt hiện tại để bàn giao sang agent mới
     const active = inflight.get(taskId);
     if (active && active.provider !== provider) {
-      store.updateTask(taskId, { priority: nextPriority, currentProvider: provider });
+      store.updateTask(taskId, { priority: nextPriority, currentProvider: provider, model: effectiveModel });
       active.abort.abort();
       return store.getTask(taskId)!;
     }
@@ -876,6 +902,7 @@ export function createOrchestrator(d: {
     const updated = store.updateTask(taskId, {
       priority: nextPriority,
       currentProvider: provider,
+      model: effectiveModel,
     });
     if (prevProvider && prevProvider !== provider) {
       emit(taskId, null, 'HANDOFF', { from: prevProvider, to: provider, manual: true });
@@ -889,7 +916,7 @@ export function createOrchestrator(d: {
       if (target) {
         store.updateTurn(target.id, { status: 'queued', attempts: 0 });
       }
-      return setStatus(taskId, 'queued', { priority: nextPriority, currentProvider: provider });
+      return setStatus(taskId, 'queued', { priority: nextPriority, currentProvider: provider, model: effectiveModel });
     }
     return updated;
   }
