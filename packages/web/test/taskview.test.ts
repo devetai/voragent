@@ -12,6 +12,9 @@ describe('TaskView Component Rendering & Semantic UX', () => {
     repoPath: 'd:\\Projects\\voragent',
     workspacePath: 'd:\\Projects\\voragent\\.worktrees\\task-12',
     branch: 'voragent/task-12',
+    baseCommit: 'c0ffee',
+    mode: 'head-dirty-commit',
+    priority: ['antigravity'],
     status: 'awaiting_user',
     currentProvider: 'antigravity',
     model: 'gemini-2.5-pro',
@@ -22,9 +25,12 @@ describe('TaskView Component Rendering & Semantic UX', () => {
 
   const mockEvents: VEvent[] = [
     {
-      type: 'AGENT_OUTPUT',
+      id: 1,
       taskId: 'test-task-1',
-      timestamp: Date.now() - 30000,
+      runId: 'run-1',
+      ts: Date.now() - 30000,
+      source: 'managed',
+      type: 'TEXT_MESSAGE_CONTENT',
       data: { text: 'Chào bạn, tôi đã chuẩn bị xong kế hoạch triển khai.' },
     },
   ];

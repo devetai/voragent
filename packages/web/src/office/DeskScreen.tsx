@@ -64,6 +64,9 @@ export function PrimaryDeskMonitor({
     const agentColor = agent?.baseColor || '#8B5CF6';
     const taskSeq = agent?.currentTask?.seq;
     const taskTitle = agent?.currentTask?.title || '';
+    const signal = agent?.signal;
+    const signalLabel = signal !== undefined && signal.kind !== 'idle' ? signal.label : '';
+    const signalDetail = signal?.detail ?? '';
 
     // Nền IDE đậm chất Modern Dark
     ctx.fillStyle = '#0F141C';
@@ -101,7 +104,12 @@ export function PrimaryDeskMonitor({
     ctx.fillText('⚡', 80, 23);
 
     ctx.fillStyle = '#E2E8F0';
-    const tabName = taskSeq ? `task-${taskSeq}.ts` : 'workspace.ts';
+    const tabName =
+      signal?.kind === 'file'
+        ? signal.label
+        : taskSeq
+          ? `task-${taskSeq}.ts`
+          : 'workspace.ts';
     ctx.fillText(tabName, 98, 23);
 
     // Status Badge bên phải thanh tiêu đề
@@ -161,8 +169,11 @@ export function PrimaryDeskMonitor({
 
       // Dòng 2: comment task
       ctx.fillStyle = '#64748B';
-      const safeTitle = taskTitle ? taskTitle.slice(0, 34) : 'Executing assigned plan';
-      ctx.fillText(`// Task #${taskSeq ?? '1'}: ${safeTitle}`, 52, startY + lineHeight * 2);
+      const liveLine =
+        signalLabel !== ''
+          ? `${signalLabel}${signalDetail !== '' ? `: ${signalDetail}` : ''}`
+          : taskTitle || 'Executing assigned plan';
+      ctx.fillText(`// ${liveLine.slice(0, 52)}`, 52, startY + lineHeight * 2);
 
       // Dòng 3: async function
       ctx.fillStyle = '#60A5FA'; // blue
@@ -188,7 +199,10 @@ export function PrimaryDeskMonitor({
 
       // Dòng 5: streaming / typing line with blinking cursor
       ctx.fillStyle = '#E2E8F0';
-      const typingText = '  await wt.applyPatches({ verify: true });';
+      const typingText =
+        signalDetail !== ''
+          ? `  ${signalDetail}`
+          : '  await wt.applyPatches({ verify: true });';
       const charCount = (tick % 24) + 10;
       ctx.fillText(typingText.slice(0, charCount), 52, startY + lineHeight * 5);
 
@@ -301,17 +315,29 @@ export function PrimaryDeskMonitor({
     ctx.font = '10.5px "JetBrains Mono", Consolas, monospace';
     if (isWorking) {
       ctx.fillStyle = '#38BDF8';
-      ctx.fillText('$ voragent worker run --watch', 16, 248);
+      ctx.fillText(`$ ${signalLabel || 'voragent worker run --watch'}`, 16, 248);
       ctx.fillStyle = '#34D399';
-      ctx.fillText('✓ test suites passing · build finished in 1.4s', 16, 268);
+      ctx.fillText(
+        signalDetail !== '' ? `› ${signalDetail.slice(0, 72)}` : '✓ test suites passing · build finished in 1.4s',
+        16,
+        268,
+      );
     } else if (isWaiting) {
       ctx.fillStyle = '#F59E0B';
-      ctx.fillText('$ voragent status: awaiting_approval', 16, 248);
+      ctx.fillText(`$ voragent status: ${signalLabel || 'awaiting_approval'}`, 16, 248);
       ctx.fillStyle = '#94A3B8';
-      ctx.fillText('Worker thread suspended · waiting signal...', 16, 268);
+      ctx.fillText(
+        signalDetail !== '' ? `› ${signalDetail.slice(0, 72)}` : 'Worker thread suspended · waiting signal...',
+        16,
+        268,
+      );
     } else if (isError) {
       ctx.fillStyle = '#EF4444';
-      ctx.fillText('$ voragent exit code 1 · Check logs', 16, 258);
+      ctx.fillText(
+        signalDetail !== '' ? `$ ${signalDetail.slice(0, 72)}` : '$ voragent exit code 1 · Check logs',
+        16,
+        258,
+      );
     } else {
       ctx.fillStyle = '#64748B';
       ctx.fillText('$ voragent daemon connected · ping 1ms', 16, 248);
@@ -442,10 +468,11 @@ export function SecondaryDeskMonitor({
     ctx.font = '10px "JetBrains Mono", Consolas, monospace';
     ctx.fillText(agent?.provider?.toUpperCase() || 'NODE', 110, 19);
 
-    // CPU Bar
-    const cpuUsage = isWorking ? Math.min(96, Math.floor(65 + Math.sin(tick * 0.4) * 25)) : 14;
+    // CPU Bar -> Thanh hạn mức thật của CLI
+    const quota = typeof agent?.quotaPercent === 'number' ? Math.round(agent.quotaPercent * 100) : null;
+    const quotaUsage = quota ?? 0;
     ctx.fillStyle = '#E2E8F0';
-    ctx.fillText(`CPU USAGE: ${cpuUsage}%`, 12, 52);
+    ctx.fillText(quota === null ? 'QUOTA: CHƯA RÕ' : `QUOTA ĐÃ DÙNG: ${quota}%`, 12, 52);
 
     ctx.fillStyle = '#1E293B';
     ctx.beginPath();
@@ -453,26 +480,30 @@ export function SecondaryDeskMonitor({
     ctx.fill();
 
     const cpuGradient = ctx.createLinearGradient(12, 0, 372, 0);
-    cpuGradient.addColorStop(0, '#38BDF8');
-    cpuGradient.addColorStop(1, cpuUsage > 85 ? '#EF4444' : '#10B981');
+    cpuGradient.addColorStop(0, quota !== null && quota >= 85 ? '#F59E0B' : '#38BDF8');
+    cpuGradient.addColorStop(1, quota !== null && quota >= 100 ? '#EF4444' : '#10B981');
     ctx.fillStyle = cpuGradient;
     ctx.beginPath();
-    ctx.roundRect(12, 60, (360 * cpuUsage) / 100, 14, 4);
+    ctx.roundRect(12, 60, Math.max(2, (360 * quotaUsage) / 100), 14, 4);
     ctx.fill();
 
-    // Memory Bar
-    const memUsage = isWorking ? 74 : 38;
+    // Memory Bar -> Nhịp tác vụ thật theo trạng thái agent
+    const loadPercent = isWorking ? 100 : agent?.state === 'waiting' ? 55 : 12;
     ctx.fillStyle = '#E2E8F0';
-    ctx.fillText(`MEMORY: ${memUsage}% (1.8 / 2.4 GB)`, 12, 96);
+    ctx.fillText(
+      `TÁC VỤ: ${isWorking ? 'ĐANG CHẠY' : agent?.state === 'waiting' ? 'CHỜ DUYỆT' : 'SẴN SÀNG'}`,
+      12,
+      96,
+    );
 
     ctx.fillStyle = '#1E293B';
     ctx.beginPath();
     ctx.roundRect(12, 104, 360, 14, 4);
     ctx.fill();
 
-    ctx.fillStyle = '#8B5CF6';
+    ctx.fillStyle = agentColor;
     ctx.beginPath();
-    ctx.roundRect(12, 104, (360 * memUsage) / 100, 14, 4);
+    ctx.roundRect(12, 104, (360 * loadPercent) / 100, 14, 4);
     ctx.fill();
 
     // Live Activity Sparkline Graph

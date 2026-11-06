@@ -17,11 +17,13 @@ import {
   RoombaBot,
 } from './OfficeNPCs';
 import { LOUNGE_COORDINATES } from './SnakeAnimation';
+import { SIGNAL_TONE, type ActivityItem } from './liveSignal';
 import type { OfficeAgentData } from './types';
 
 interface OfficeRoomProps {
   queuedTasks: Task[];
   memories?: MemoryItem[];
+  activity?: ActivityItem[];
   activeAgentDesks: {
     deskIndex: number;
     screenGlowColor: string;
@@ -45,9 +47,16 @@ export const DESK_COORDINATES = [
 
 export const MANAGER_DESK_COORDINATE = { x: 0, z: -5.2 };
 
+/** Giờ:phút ngắn gọn cho bảng tin TV. */
+function clockOf(ts: number): string {
+  const d = new Date(ts);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
 export function OfficeRoom({
   queuedTasks,
   memories = [],
+  activity = [],
   activeAgentDesks,
   workerAgents = [],
   managerAgent,
@@ -302,6 +311,8 @@ export function OfficeRoom({
             pointerEvents: 'auto',
             borderRadius: '4px',
             overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #334155', paddingBottom: '6px', marginBottom: '8px' }}>
@@ -311,13 +322,13 @@ export function OfficeRoom({
             <span style={{ fontSize: '12.5px', color: '#94A3B8' }}>{clockText}</span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minHeight: 0, overflow: 'hidden' }}>
             {queuedTasks.length === 0 ? (
-              <div style={{ color: '#94A3B8', fontSize: '12.5px', fontStyle: 'italic', marginTop: '24px', textAlign: 'center' }}>
+              <div style={{ color: '#94A3B8', fontSize: '12.5px', fontStyle: 'italic', marginTop: '14px', textAlign: 'center' }}>
                 Hàng đợi trống · Bấm vào Trưởng phòng hoặc Nhân viên để giao việc
               </div>
             ) : (
-              queuedTasks.slice(0, 4).map((t, i) => (
+              queuedTasks.slice(0, 3).map((t, i) => (
                 <div
                   key={t.id}
                   onClick={() => onSelectTask?.(t.id)}
@@ -342,6 +353,22 @@ export function OfficeRoom({
               ))
             )}
           </div>
+
+          {/* Bảng tin hoạt động thật: chỉ hiện sự kiện có ý nghĩa, bỏ qua từng token chữ */}
+          {activity.length > 0 && (
+            <div className="office-tv-ticker">
+              {activity.slice(0, 3).map((item) => (
+                <div key={item.id} className="office-tv-ticker-row">
+                  <span
+                    className="office-tv-ticker-dot"
+                    style={{ backgroundColor: SIGNAL_TONE[item.kind] }}
+                  />
+                  <span className="office-tv-ticker-time">{clockOf(item.ts)}</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </Html>
       </group>
 

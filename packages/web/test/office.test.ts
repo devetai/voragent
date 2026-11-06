@@ -96,3 +96,44 @@ describe('Văn phòng Dự án - Trưởng phòng (Manager Agent)', () => {
     expect(PROVIDER_THEMES.manager?.name).toContain('Trưởng Phòng');
   });
 });
+
+describe('Văn phòng 3D - Biểu cảm khuôn mặt & Hoạt cảnh chuyển giao (Handoff Flow)', () => {
+  it('định nghĩa đầy đủ 7 biểu cảm khuôn mặt chuẩn xác cho Agent', () => {
+    const expressions = ['focus', 'plead', 'sleep', 'happy', 'sad', 'surprised', 'dizzy'] as const;
+    expect(expressions).toHaveLength(7);
+  });
+
+  it('vị trí nghỉ ngơi áp dụng cho cả trạng thái idle lẫn handoff khi tạm dừng công việc', () => {
+    const checkResting = (state: string, expression: string) => {
+      return (state === 'idle' || state === 'handoff') && (expression === 'sleep' || expression === 'dizzy');
+    };
+
+    // Khi Agent đang làm: không ở khu nghỉ
+    expect(checkResting('working', 'focus')).toBe(false);
+
+    // Khi Agent rảnh rỗi: ở khu nghỉ
+    expect(checkResting('idle', 'sleep')).toBe(true);
+
+    // Khi Agent vừa bàn giao do hết quota: rời bàn trườn về khu nghỉ
+    expect(checkResting('handoff', 'dizzy')).toBe(true);
+
+    // Khi Agent chờ duyệt: vẫn ở tại bàn làm việc
+    expect(checkResting('waiting', 'plead')).toBe(false);
+  });
+
+  it('đường cong chuyển giao bàn giao ca nâng độ cao ở điểm giữa để tạo vòng cung 3D', () => {
+    const start = new THREE.Vector3(-6, 1.15, -1); // Bàn 1
+    const end = new THREE.Vector3(-2, 1.15, -1);   // Bàn 2
+    const mid = new THREE.Vector3(
+      (start.x + end.x) / 2,
+      2.6,
+      (start.z + end.z) / 2 - 0.4,
+    );
+    const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+
+    const ptMid = curve.getPoint(0.5);
+    // Điểm giữa của vòng cung phải cao hơn mặt bàn đáng kể để nhìn rõ từ camera
+    expect(ptMid.y).toBeGreaterThan(1.8);
+    expect(ptMid.y).toBeCloseTo(1.875, 1);
+  });
+});

@@ -1,4 +1,5 @@
 import type { Task } from '@voragent/shared';
+import type { AgentSignal } from './liveSignal';
 
 export type AgentExpression =
   | 'focus'     // Tập trung làm việc
@@ -26,6 +27,14 @@ export interface OfficeAgentData {
   currentTask?: Task;
   actionTag: string;
   isOnline: boolean;
+  /** Tín hiệu sống suy ra từ dòng sự kiện, dùng cho chip 3D và thẻ hover. */
+  signal: AgentSignal;
+  /** Mô hình đang dùng (nếu có) để hiển thị trong thẻ hover. */
+  modelText?: string;
+  /** Tình trạng hạn mức ngắn gọn, ví dụ "Quota 42%" hoặc "Nghỉ đến 14:30". */
+  quotaText?: string;
+  /** Phần trăm hạn mức đã dùng (0..1) để vẽ thanh thật trên màn hình phụ. */
+  quotaPercent?: number;
 }
 
 export interface ProviderThemeConfig {

@@ -1,9 +1,13 @@
-import { useMemo, useRef, useState } from 'react';
+import { memo, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { ProviderIcon } from '../components/ProviderIcon';
 import type { AgentAccessory, OfficeAgentData } from './types';
+import { SIGNAL_TONE } from './liveSignal';
+
+/** Bảng màu tín hiệu dùng chung cho chip 3D và bảng tin TV. */
+
 
 interface SnakeMeshProps {
   agent: OfficeAgentData;
@@ -44,12 +48,13 @@ function updateCoiledSpine(pts: THREE.Vector3[], headPos: THREE.Vector3) {
   });
 }
 
-export function SnakeMesh({ agent, targetPosition, isSelected = false, onClick }: SnakeMeshProps) {
+function SnakeMeshImpl({ agent, targetPosition, isSelected = false, onClick }: SnakeMeshProps) {
   const groupRef = useRef<THREE.Group>(null);
   const headRef = useRef<THREE.Group>(null);
   const bodyMeshRef = useRef<THREE.Mesh>(null);
   const tailRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
+  const [cardHovered, setCardHovered] = useState(false);
 
   // Vị trí hiện tại của toàn bộ con rắn
   const currentRootPos = useRef<THREE.Vector3>(new THREE.Vector3(...targetPosition));
@@ -63,6 +68,8 @@ export function SnakeMesh({ agent, targetPosition, isSelected = false, onClick }
   const rightLidRef = useRef<THREE.Mesh>(null);
   const leftBrowRef = useRef<THREE.Mesh>(null);
   const rightBrowRef = useRef<THREE.Mesh>(null);
+  const leftSparkleRef = useRef<THREE.Mesh>(null);
+  const rightSparkleRef = useRef<THREE.Mesh>(null);
 
   // Mắt vui / ngủ / choáng
   const leftHappyRef = useRef<THREE.Mesh>(null);
@@ -245,13 +252,28 @@ export function SnakeMesh({ agent, targetPosition, isSelected = false, onClick }
     }
     if (leftPupilRef.current) {
       leftPupilRef.current.position.set(px, py, 0.08);
-      const pupilScale = isPleading ? 1.25 : isSurprised ? 0.6 : 1.0;
+      const pupilScale = isPleading ? 1.25 : isWorking ? 1.15 : isSurprised ? 0.6 : 1.0;
       leftPupilRef.current.scale.set(pupilScale, pupilScale, pupilScale * 0.4);
     }
     if (rightPupilRef.current) {
       rightPupilRef.current.position.set(px, py, 0.08);
-      const pupilScale = isPleading ? 1.25 : isSurprised ? 0.6 : 1.0;
+      const pupilScale = isPleading ? 1.25 : isWorking ? 1.15 : isSurprised ? 0.6 : 1.0;
       rightPupilRef.current.scale.set(pupilScale, pupilScale, pupilScale * 0.4);
+    }
+
+    if (leftSparkleRef.current) {
+      leftSparkleRef.current.visible = isPleading;
+      if (isPleading) {
+        const shine = 0.8 + Math.sin(t * 7) * 0.25;
+        leftSparkleRef.current.scale.set(shine, shine, shine);
+      }
+    }
+    if (rightSparkleRef.current) {
+      rightSparkleRef.current.visible = isPleading;
+      if (isPleading) {
+        const shine = 0.8 + Math.cos(t * 7) * 0.25;
+        rightSparkleRef.current.scale.set(shine, shine, shine);
+      }
     }
 
     const browAngle = isWorking ? -0.3 : isPleading ? 0.4 : isSad ? 0.5 : 0;
@@ -318,8 +340,9 @@ export function SnakeMesh({ agent, targetPosition, isSelected = false, onClick }
 
   // Chỉ hiện nhãn nổi khi Agent đang làm việc, chờ duyệt, là Trưởng phòng, hoặc đang được hover/chọn
   // (Tránh để nhãn của các Agent đang nghỉ ở góc phòng trôi lơ lửng che giao diện)
+  const open = isSelected || hovered || cardHovered;
   const showFloatingBadge =
-    isSelected || hovered || agent.isManager || (agent.isOnline && agent.state !== 'idle');
+    open || agent.isManager || (agent.isOnline && agent.state !== 'idle');
 
   return (
     <group
@@ -381,6 +404,10 @@ export function SnakeMesh({ agent, targetPosition, isSelected = false, onClick }
             <sphereGeometry args={[0.065, 12, 12]} />
             <meshStandardMaterial color={DARK} roughness={0.1} />
           </mesh>
+          <mesh ref={leftSparkleRef} visible={false} position={[0.025, 0.035, 0.12]}>
+            <sphereGeometry args={[0.024, 8, 8]} />
+            <meshBasicMaterial color="#FFFFFF" />
+          </mesh>
           <mesh ref={leftLidRef} rotation={[-Math.PI / 2, 0, 0]}>
             <sphereGeometry args={[0.12, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
             <meshStandardMaterial color={agent.baseColor} roughness={0.4} />
@@ -420,6 +447,10 @@ export function SnakeMesh({ agent, targetPosition, isSelected = false, onClick }
           <mesh ref={rightPupilRef} position={[0, 0, 0.09]}>
             <sphereGeometry args={[0.065, 12, 12]} />
             <meshStandardMaterial color={DARK} roughness={0.1} />
+          </mesh>
+          <mesh ref={rightSparkleRef} visible={false} position={[0.025, 0.035, 0.12]}>
+            <sphereGeometry args={[0.024, 8, 8]} />
+            <meshBasicMaterial color="#FFFFFF" />
           </mesh>
           <mesh ref={rightLidRef} rotation={[-Math.PI / 2, 0, 0]}>
             <sphereGeometry args={[0.12, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
@@ -523,7 +554,7 @@ export function SnakeMesh({ agent, targetPosition, isSelected = false, onClick }
         {/* Phụ kiện đặc trưng cho từng Agent */}
         <Accessory kind={agent.accessory} />
 
-        {/* Nhãn thông tin 1 dòng gọn gàng trên đầu Agent (Giới hạn zIndexRange={[5, 0]}) */}
+        {/* Chip tín hiệu sống trên đầu Agent (Giới hạn zIndexRange={[5, 0]}) */}
         {showFloatingBadge && (
           <Html
             position={[0, 0.78, 0]}
@@ -538,40 +569,62 @@ export function SnakeMesh({ agent, targetPosition, isSelected = false, onClick }
             }}
           >
             <div
+              className={`office-agent-card${open ? ' is-open' : ''}`}
               onClick={(e) => {
                 e.stopPropagation();
                 onClick?.();
               }}
+              onPointerEnter={() => setCardHovered(true)}
+              onPointerLeave={() => setCardHovered(false)}
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '3px 9px',
-                borderRadius: '999px',
                 backgroundColor: isSelected ? '#FFFBEB' : 'rgba(255, 255, 255, 0.95)',
-                color: '#1F1B18',
-                fontSize: '11.5px',
-                fontWeight: 600,
+                borderColor: agent.baseColor,
                 boxShadow: isSelected
                   ? `0 0 0 2px ${agent.baseColor}, 0 4px 12px rgba(0, 0, 0, 0.18)`
-                  : '0 2px 8px rgba(0, 0, 0, 0.14)',
-                border: `1.5px solid ${agent.baseColor}`,
+                  : undefined,
               }}
             >
-              <ProviderIcon provider={agent.provider} size={12} />
-              <span>{agent.name}</span>
-              {agent.currentTask && (
-                <span
-                  style={{
-                    fontSize: '10.5px',
-                    padding: '1px 5px',
-                    borderRadius: '999px',
-                    backgroundColor: agent.state === 'waiting' ? '#FEF3C7' : '#EFF6FF',
-                    color: agent.state === 'waiting' ? '#92400E' : '#1D4ED8',
-                  }}
+              <div className="office-agent-card-id">
+                <ProviderIcon provider={agent.provider} size={12} />
+                <span>{agent.name}</span>
+                {agent.currentTask && (
+                  <span
+                    className="office-agent-card-seq"
+                    style={{
+                      backgroundColor: agent.state === 'waiting' ? '#FEF3C7' : '#EFF6FF',
+                      color: agent.state === 'waiting' ? '#92400E' : '#1D4ED8',
+                    }}
+                  >
+                    #{agent.currentTask.seq}
+                  </span>
+                )}
+              </div>
+
+              {/* Dòng 2: tín hiệu sống, tự tàn dần để không rác thị giác */}
+              {agent.signal.kind !== 'idle' && (
+                <div
+                  key={agent.signal.key}
+                  className="office-agent-signal"
+                  style={{ color: SIGNAL_TONE[agent.signal.kind] }}
                 >
-                  #{agent.currentTask.seq}
-                </span>
+                  <span className="office-agent-signal-dot" />
+                  <span className="office-agent-signal-label">{agent.signal.label}</span>
+                  <span className="office-agent-signal-bar" />
+                </div>
+              )}
+
+              {/* Dòng 3: chi tiết chỉ mở khi rê chuột hoặc chọn (progressive disclosure) */}
+              {open && (agent.signal.detail !== '' || agent.modelText || agent.quotaText) && (
+                <div className="office-agent-card-detail">
+                  {agent.signal.detail !== '' && (
+                    <span>{agent.signal.detail}</span>
+                  )}
+                  {(agent.modelText || agent.quotaText) && (
+                    <span className="office-agent-card-meta">
+                      {[agent.modelText, agent.quotaText].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           </Html>
@@ -696,3 +749,17 @@ function Accessory({ kind }: { kind: AgentAccessory }) {
 
   return null;
 }
+
+/**
+ * Chặn re-render khi cha vẽ lại vì token văn bản: agent giữ nguyên tham chiếu nhờ
+ * `useStableAgents`, còn toạ độ đích so sánh theo từng trục. `onClick` được bỏ qua có chủ đích
+ * vì nó chỉ đóng gói `agent.id` ổn định và dùng `setState` dạng hàm nên không bị cũ.
+ */
+export const SnakeMesh = memo(SnakeMeshImpl, (prev, next) => {
+  if (prev.agent !== next.agent) return false;
+  if (prev.isSelected !== next.isSelected) return false;
+  const a = prev.targetPosition;
+  const b = next.targetPosition;
+  return a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+});
+

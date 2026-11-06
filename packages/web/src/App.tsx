@@ -572,6 +572,7 @@ export function App() {
           projectName={viewedName || projects?.[0]?.name || ''}
           tasks={officeTasks}
           providers={providers}
+          eventsByTask={state.events}
           memories={officeMemories}
           plans={officePlans}
           onSelectTask={(id) => setOverlay({ kind: 'task', taskId: id })}

@@ -1,22 +1,172 @@
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { Html, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import type { ManagerPlan, MemoryItem, ProviderState, Task } from '@voragent/shared';
+import type { ManagerPlan, MemoryItem, ProviderState, Task, VEvent } from '@voragent/shared';
 import { TASK_STATUS_LABEL } from '@voragent/shared';
 import { api, errText } from '../api';
 import { ProviderIcon } from '../components/ProviderIcon';
 import { isProviderAvailable } from '../state';
 import { DESK_COORDINATES, MANAGER_DESK_COORDINATE, OfficeRoom } from './OfficeRoom';
+import {
+  IDLE_SIGNAL,
+  deriveSignal,
+  detectClosure,
+  detectHandoff,
+  recentActivity,
+  type ActivityItem,
+  type ClosureInfo,
+  type HandoffInfo,
+} from './liveSignal';
 import { LOUNGE_COORDINATES } from './SnakeAnimation';
 import { SnakeMesh } from './SnakeMesh';
 import { DEFAULT_THEME, type OfficeAgentData, PROVIDER_THEMES } from './types';
+
+const EMPTY_ACTIVITY: ActivityItem[] = [];
+
+/** Tìm sự kiện bàn giao gần đây nhất giữa hai Agent để tạo hoạt cảnh chuyển giao. */
+function findRecentHandoff(
+  tasks: Task[],
+  eventsByTask: Map<string, VEvent[]> | undefined,
+  now: number,
+  windowMs = 25_000,
+): { info: HandoffInfo; task: Task } | null {
+  if (!eventsByTask) return null;
+  let bestInfo: HandoffInfo | null = null;
+  let bestTask: Task | null = null;
+
+  for (const task of tasks) {
+    const events = eventsByTask.get(task.id);
+    const info = detectHandoff(events, { windowMs, now });
+    if (info && (bestInfo === null || info.ts > bestInfo.ts)) {
+      bestInfo = info;
+      bestTask = task;
+    }
+  }
+
+  return bestInfo && bestTask ? { info: bestInfo, task: bestTask } : null;
+}
+
+/** Tìm sự kiện hoàn tất task gần đây nhất để hiển thị hiệu ứng ăn mừng. */
+function findRecentClosure(
+  tasks: Task[],
+  eventsByTask: Map<string, VEvent[]> | undefined,
+  now: number,
+  windowMs = 15_000,
+): { info: ClosureInfo; task: Task } | null {
+  if (!eventsByTask) return null;
+  let bestInfo: ClosureInfo | null = null;
+  let bestTask: Task | null = null;
+
+  for (const task of tasks) {
+    const events = eventsByTask.get(task.id);
+    const info = detectClosure(events, { windowMs, now });
+    if (info && (bestInfo === null || info.ts > bestInfo.ts)) {
+      bestInfo = info;
+      bestTask = task;
+    }
+  }
+
+  return bestInfo && bestTask ? { info: bestInfo, task: bestTask } : null;
+}
+
+/** Nhãn hạn mức ngắn gọn của một CLI, dùng cho thẻ hover và HUD. */function quotaTextOf(p: ProviderState | undefined, now: number): string | undefined {
+  if (!p) return undefined;
+  if ((p.cooldownUntil ?? 0) > now) {
+    const d = new Date(p.cooldownUntil as number);
+    const at = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    return `Nghỉ đến ${at}`;
+  }
+  if (typeof p.usedPercent === 'number') {
+    const percent = Math.round(Math.max(0, Math.min(1, p.usedPercent)) * 100);
+    return percent > 0 ? `Quota ${percent}%` : undefined;
+  }
+  return undefined;
+}
+
+/** So sánh hai agent theo đúng các trường hiển thị; tín hiệu so theo khoá đã throttle. */
+function sameAgent(a: OfficeAgentData, b: OfficeAgentData): boolean {
+  return (
+    a.id === b.id &&
+    a.name === b.name &&
+    a.provider === b.provider &&
+    a.role === b.role &&
+    a.isManager === b.isManager &&
+    a.baseColor === b.baseColor &&
+    a.bandColor === b.bandColor &&
+    a.accessory === b.accessory &&
+    a.deskIndex === b.deskIndex &&
+    a.state === b.state &&
+    a.expression === b.expression &&
+    a.actionTag === b.actionTag &&
+    a.isOnline === b.isOnline &&
+    a.currentTask?.id === b.currentTask?.id &&
+    a.currentTask?.seq === b.currentTask?.seq &&
+    a.currentTask?.status === b.currentTask?.status &&
+    a.signal.key === b.signal.key &&
+    a.modelText === b.modelText &&
+    a.quotaText === b.quotaText &&
+    a.quotaPercent === b.quotaPercent
+  );
+}
+
+/**
+ * Giữ nguyên tham chiếu của agent không đổi để `React.memo` trong `SnakeMesh` chặn được
+ * hàng trăm lần render mỗi giây do token văn bản đổ về.
+ */
+function useStableAgents(next: OfficeAgentData[]): OfficeAgentData[] {
+  const cache = useRef<OfficeAgentData[]>([]);
+  const prev = cache.current;
+  const merged: OfficeAgentData[] = [];
+  let changed = prev.length !== next.length;
+
+  for (let i = 0; i < next.length; i++) {
+    const fresh = next[i] as OfficeAgentData;
+    const old = prev[i];
+    if (old !== undefined && sameAgent(old, fresh)) {
+      merged.push(old);
+    } else {
+      merged.push(fresh);
+      changed = true;
+    }
+  }
+
+  if (!changed) return prev;
+  cache.current = merged;
+  return merged;
+}
+
+/** Như `useStableAgents` cho một agent duy nhất (Trưởng phòng). */
+function useStableAgent(next: OfficeAgentData): OfficeAgentData {
+  const cache = useRef<OfficeAgentData>(next);
+  if (!sameAgent(cache.current, next)) cache.current = next;
+  return cache.current;
+}
+
+/** Tín hiệu sống của Trưởng phòng: phản chiếu sự kiện mới nhất trong các task đang hoạt động. */
+function managerSignalOf(eventsByTask: Map<string, VEvent[]> | undefined, activeTaskIds: Set<string>) {
+  if (!eventsByTask) return IDLE_SIGNAL;
+  let winnerId: string | null = null;
+  let winnerTs = -1;
+  for (const taskId of activeTaskIds) {
+    const events = eventsByTask.get(taskId);
+    const last = events?.[events.length - 1];
+    if (last !== undefined && last.ts > winnerTs) {
+      winnerTs = last.ts;
+      winnerId = taskId;
+    }
+  }
+  if (winnerId === null) return IDLE_SIGNAL;
+  const signal = deriveSignal(eventsByTask.get(winnerId));
+  return signal.kind === 'done' ? IDLE_SIGNAL : signal;
+}
 
 export function OfficeCanvas({
   repoPath,
   projectName,
   tasks,
   providers,
+  eventsByTask,
   memories = [],
   plans = [],
   onSelectTask,
@@ -28,6 +178,8 @@ export function OfficeCanvas({
   projectName?: string;
   tasks: Task[];
   providers: ProviderState[];
+  /** Dòng sự kiện theo task, dùng để suy ra tín hiệu sống cho từng nhân vật. */
+  eventsByTask?: Map<string, VEvent[]>;
   memories?: MemoryItem[];
   plans?: ManagerPlan[];
   onSelectTask?: (taskId: string) => void;
@@ -54,7 +206,21 @@ export function OfficeCanvas({
     return tasks.filter((t) => t.status === 'queued');
   }, [tasks]);
 
-  const workerAgents = useMemo<OfficeAgentData[]>(() => {
+  /** Bảng tin TV: gom vài sự kiện mới nhất của mọi task, bỏ qua token chữ để khỏi ngập. */
+  const activity = useMemo<ActivityItem[]>(() => {
+    if (!eventsByTask || eventsByTask.size === 0) return EMPTY_ACTIVITY;
+    const items: ActivityItem[] = [];
+    for (const events of eventsByTask.values()) {
+      if (events.length === 0) continue;
+      const tail = events.length > 8 ? events.slice(-8) : events;
+      items.push(...recentActivity(tail, 3));
+    }
+    if (items.length === 0) return EMPTY_ACTIVITY;
+    items.sort((a, b) => b.ts - a.ts);
+    return items.slice(0, 6);
+  }, [eventsByTask]);
+
+  const computedWorkers = useMemo<OfficeAgentData[]>(() => {
     const knownProviders = ['claude', 'codex', 'antigravity', 'opencode'];
 
     return knownProviders.map((key, deskIdx) => {
@@ -78,6 +244,7 @@ export function OfficeCanvas({
           currentTask: undefined,
           actionTag: '🔌 Chưa cài CLI · Đang nghỉ',
           isOnline: false,
+          signal: IDLE_SIGNAL,
         };
       }
 
@@ -97,17 +264,61 @@ export function OfficeCanvas({
         (t) => (t.currentProvider || '').toLowerCase().includes(key) && t.status === 'failed'
       );
 
+      const now = Date.now();
+      const recentHandoff = findRecentHandoff(tasks, eventsByTask, now, 25_000);
+      const isHandoffFrom =
+        recentHandoff !== null &&
+        (recentHandoff.info.from.toLowerCase().includes(key) ||
+          (key === 'claude' && recentHandoff.info.from.toLowerCase().includes('claude')) ||
+          (key === 'codex' && recentHandoff.info.from.toLowerCase().includes('codex')) ||
+          (key === 'antigravity' && (recentHandoff.info.from.toLowerCase().includes('antigravity') || recentHandoff.info.from.toLowerCase().includes('agy'))));
+      const isHandoffTo =
+        recentHandoff !== null &&
+        (recentHandoff.info.to.toLowerCase().includes(key) ||
+          (key === 'claude' && recentHandoff.info.to.toLowerCase().includes('claude')) ||
+          (key === 'codex' && recentHandoff.info.to.toLowerCase().includes('codex')) ||
+          (key === 'antigravity' && (recentHandoff.info.to.toLowerCase().includes('antigravity') || recentHandoff.info.to.toLowerCase().includes('agy'))));
+
+      const recentClosure = findRecentClosure(tasks, eventsByTask, now, 15_000);
+      const isRecentlyClosed =
+        recentClosure !== null &&
+        (recentClosure.task.currentProvider || '').toLowerCase().includes(key);
+
       let state: OfficeAgentData['state'] = 'idle';
       let expression: OfficeAgentData['expression'] = 'sleep';
       let actionTag = '💤 Sẵn sàng · Bấm để giao việc';
-      const targetTask = activeTask || awaitingUserTask || waitingTask || queuedForAgent || failedTask;
+      const targetTask = activeTask || awaitingUserTask || waitingTask || queuedForAgent || failedTask || (isHandoffFrom ? recentHandoff?.task : undefined) || (isRecentlyClosed ? recentClosure?.task : undefined);
+      const signal = targetTask ? deriveSignal(eventsByTask?.get(targetTask.id)) : IDLE_SIGNAL;
+      const quotaText = quotaTextOf(provState, now);
 
-      const isCooldown = (provState?.cooldownUntil ?? 0) > Date.now();
+      const isCooldown = (provState?.cooldownUntil ?? 0) > now;
 
       if (activeTask) {
         state = 'working';
         expression = 'focus';
         actionTag = `⚡ Đang làm #${activeTask.seq}`;
+        if (signal.kind === 'error') {
+          expression = 'sad';
+        } else if (signal.kind === 'done') {
+          expression = 'happy';
+        } else if (signal.kind === 'quota') {
+          expression = 'dizzy';
+        } else if (signal.kind === 'handoff') {
+          state = 'handoff';
+          expression = 'dizzy';
+        }
+      } else if (isHandoffFrom) {
+        state = 'handoff';
+        expression = 'dizzy';
+        actionTag = `📦 Bàn giao → ${recentHandoff.info.to} (#${recentHandoff.task.seq})`;
+      } else if (isHandoffTo && targetTask) {
+        state = 'working';
+        expression = 'focus';
+        actionTag = `⚡ Nhận bàn giao #${targetTask.seq} từ ${recentHandoff.info.from}`;
+      } else if (isRecentlyClosed && !awaitingUserTask) {
+        state = 'working';
+        expression = 'happy';
+        actionTag = `🎉 Nghiệm thu xong #${recentClosure.task.seq}!`;
       } else if (awaitingUserTask) {
         state = 'waiting';
         expression = 'plead';
@@ -145,11 +356,19 @@ export function OfficeCanvas({
         currentTask: targetTask,
         actionTag,
         isOnline: true,
+        signal,
+        ...(targetTask?.model ? { modelText: targetTask.model } : {}),
+        ...(quotaText !== undefined ? { quotaText } : {}),
+        ...(typeof provState?.usedPercent === 'number'
+          ? { quotaPercent: Math.max(0, Math.min(1, provState.usedPercent)) }
+          : {}),
       };
     });
-  }, [providers, tasks]);
+  }, [providers, tasks, eventsByTask]);
 
-  const managerAgent = useMemo<OfficeAgentData>(() => {
+  const workerAgents = useStableAgents(computedWorkers);
+
+  const computedManager = useMemo<OfficeAgentData>(() => {
     const theme = PROVIDER_THEMES.manager ?? DEFAULT_THEME;
     const draftPlans = plans.filter((p) => p.status === 'draft');
     const awaitingTasks = tasks.filter((t) => t.status === 'awaiting_user');
@@ -157,6 +376,11 @@ export function OfficeCanvas({
     const runningCount = tasks.filter((t) => t.status === 'running').length;
     const queuedCount = tasks.filter((t) => t.status === 'queued').length;
     const inboxCount = draftPlans.length + awaitingTasks.length + failedTasks.length;
+    const activeTaskIds = new Set(
+      tasks
+        .filter((t) => t.status === 'running' || t.status === 'awaiting_user' || t.status === 'waiting_quota')
+        .map((t) => t.id),
+    );
 
     let state: OfficeAgentData['state'] = 'working';
     let expression: OfficeAgentData['expression'] = 'focus';
@@ -190,8 +414,11 @@ export function OfficeCanvas({
       expression,
       actionTag,
       isOnline: true,
+      signal: managerSignalOf(eventsByTask, activeTaskIds),
     };
-  }, [plans, tasks, memories.length]);
+  }, [plans, tasks, memories.length, eventsByTask]);
+
+  const managerAgent = useStableAgent(computedManager);
 
   // Chỉ cho phép tương tác và hiển thị các Agent đã cài CLI (online) hoặc Trưởng phòng
   const onlineWorkers = useMemo(() => workerAgents.filter((a) => a.isOnline), [workerAgents]);
@@ -230,7 +457,9 @@ export function OfficeCanvas({
     if (selectedAgent.isManager) {
       return [MANAGER_DESK_COORDINATE.x, 1.3, MANAGER_DESK_COORDINATE.z - 0.8];
     }
-    const isResting = selectedAgent.state === 'idle' && (selectedAgent.expression === 'sleep' || selectedAgent.expression === 'dizzy');
+    const isResting =
+      (selectedAgent.state === 'idle' || selectedAgent.state === 'handoff') &&
+      (selectedAgent.expression === 'sleep' || selectedAgent.expression === 'dizzy');
     if (isResting) {
       const lounge = LOUNGE_COORDINATES[selectedAgent.deskIndex];
       return lounge ? [lounge.x, 1.0, lounge.z] : null;
@@ -238,6 +467,48 @@ export function OfficeCanvas({
     const desk = DESK_COORDINATES[selectedAgent.deskIndex];
     return desk ? [desk.x, 1.2, desk.z] : null;
   }, [selectedAgent]);
+
+  const recentHandoff = useMemo(
+    () => findRecentHandoff(tasks, eventsByTask, Date.now(), 25_000),
+    [tasks, eventsByTask],
+  );
+
+  const recentClosure = useMemo(
+    () => findRecentClosure(tasks, eventsByTask, Date.now(), 15_000),
+    [tasks, eventsByTask],
+  );
+
+  const handoffFromAgent = useMemo(() => {
+    if (!recentHandoff) return null;
+    return (
+      workerAgents.find((a) =>
+        (a.provider || '').toLowerCase().includes(recentHandoff.info.from.toLowerCase()),
+      ) ?? null
+    );
+  }, [recentHandoff, workerAgents]);
+
+  const handoffToAgent = useMemo(() => {
+    if (!recentHandoff) return null;
+    return (
+      workerAgents.find((a) =>
+        (a.provider || '').toLowerCase().includes(recentHandoff.info.to.toLowerCase()),
+      ) ?? null
+    );
+  }, [recentHandoff, workerAgents]);
+
+  const handoffFromCoord = handoffFromAgent ? DESK_COORDINATES[handoffFromAgent.deskIndex] : null;
+  const handoffToCoord = handoffToAgent ? DESK_COORDINATES[handoffToAgent.deskIndex] : null;
+
+  const closureAgent = useMemo(() => {
+    if (!recentClosure) return null;
+    return (
+      workerAgents.find((a) =>
+        (a.provider || '').toLowerCase().includes((recentClosure.task.currentProvider || '').toLowerCase()),
+      ) ?? null
+    );
+  }, [recentClosure, workerAgents]);
+
+  const closureDeskCoord = closureAgent ? DESK_COORDINATES[closureAgent.deskIndex] : null;
 
   const handleQuickAssignToAgent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -505,6 +776,7 @@ export function OfficeCanvas({
           <OfficeRoom
             queuedTasks={queuedTasks}
             memories={memories}
+            activity={activity}
             activeAgentDesks={activeAgentDesks}
             workerAgents={workerAgents}
             managerAgent={managerAgent}
@@ -527,7 +799,7 @@ export function OfficeCanvas({
             isSelected={selectedAgentId === managerAgent.id}
             targetPosition={[MANAGER_DESK_COORDINATE.x, 0.09, MANAGER_DESK_COORDINATE.z - 1.55]}
             onClick={() => {
-              setSelectedAgentId(selectedAgentId === managerAgent.id ? null : managerAgent.id);
+              setSelectedAgentId((cur) => (cur === managerAgent.id ? null : managerAgent.id));
               setQuickNotice(null);
             }}
           />
@@ -536,7 +808,9 @@ export function OfficeCanvas({
             const deskCoord = DESK_COORDINATES[agent.deskIndex] ?? { x: 0, z: -1 };
             const loungeCoord = LOUNGE_COORDINATES[agent.deskIndex] ?? { x: 8.5, z: 5.5 };
 
-            const isResting = agent.state === 'idle' && (agent.expression === 'sleep' || agent.expression === 'dizzy');
+            const isResting =
+              (agent.state === 'idle' || agent.state === 'handoff') &&
+              (agent.expression === 'sleep' || agent.expression === 'dizzy');
             const targetPos: [number, number, number] = isResting
               ? [loungeCoord.x, 0.15, loungeCoord.z]
               : [deskCoord.x, 0.08, deskCoord.z - 1.6];
@@ -548,12 +822,29 @@ export function OfficeCanvas({
                 isSelected={selectedAgentId === agent.id}
                 targetPosition={targetPos}
                 onClick={() => {
-                  setSelectedAgentId(agent.id === selectedAgentId ? null : agent.id);
+                  setSelectedAgentId((cur) => (cur === agent.id ? null : agent.id));
                   setQuickNotice(null);
                 }}
               />
             );
           })}
+
+          {recentHandoff && handoffFromCoord && handoffToCoord && (
+            <HandoffRibbon
+              fromCoord={handoffFromCoord}
+              toCoord={handoffToCoord}
+              fromName={handoffFromAgent?.name ?? recentHandoff.info.from}
+              toName={handoffToAgent?.name ?? recentHandoff.info.to}
+              taskSeq={recentHandoff.task.seq}
+            />
+          )}
+
+          {recentClosure && closureDeskCoord && (
+            <CelebrationBurst
+              coord={closureDeskCoord}
+              taskSeq={recentClosure.task.seq}
+            />
+          )}
 
           <CameraController target={cameraTarget} />
         </Suspense>
@@ -583,4 +874,132 @@ function CameraController({ target }: { target: [number, number, number] | null 
     }
   });
   return null;
+}
+
+interface HandoffRibbonProps {
+  fromCoord: { x: number; z: number };
+  toCoord: { x: number; z: number };
+  fromName: string;
+  toName: string;
+  taskSeq?: number;
+}
+
+/** Đường cong chuyển giao 3D nối giữa hai bàn làm việc khi có sự kiện bàn giao ca. */
+function HandoffRibbon({ fromCoord, toCoord, fromName, toName, taskSeq }: HandoffRibbonProps) {
+  const curve = useMemo(() => {
+    const start = new THREE.Vector3(fromCoord.x, 1.15, fromCoord.z);
+    const end = new THREE.Vector3(toCoord.x, 1.15, toCoord.z);
+    const mid = new THREE.Vector3(
+      (fromCoord.x + toCoord.x) / 2,
+      2.6,
+      (fromCoord.z + toCoord.z) / 2 - 0.4,
+    );
+    return new THREE.QuadraticBezierCurve3(start, mid, end);
+  }, [fromCoord.x, fromCoord.z, toCoord.x, toCoord.z]);
+
+  const pulseMeshRef = useRef<THREE.Mesh>(null);
+  const midPoint = useMemo(() => curve.getPoint(0.5), [curve]);
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (pulseMeshRef.current) {
+      const u = (t * 0.6) % 1;
+      const pt = curve.getPoint(u);
+      pulseMeshRef.current.position.copy(pt);
+      const scale = 0.8 + Math.sin(u * Math.PI) * 0.4;
+      pulseMeshRef.current.scale.set(scale, scale, scale);
+    }
+  });
+
+  return (
+    <group>
+      {/* Đường cong 3D chuyển giao phát sáng nhẹ */}
+      <mesh>
+        <tubeGeometry args={[curve, 32, 0.035, 8, false]} />
+        <meshStandardMaterial
+          color="#A855F7"
+          emissive="#7E22CE"
+          emissiveIntensity={0.6}
+          roughness={0.3}
+          transparent
+          opacity={0.75}
+        />
+      </mesh>
+      {/* Hạt năng lượng chuyển giao di chuyển từ bàn A sang bàn B */}
+      <mesh ref={pulseMeshRef}>
+        <sphereGeometry args={[0.08, 12, 12]} />
+        <meshStandardMaterial color="#FBBF24" emissive="#F59E0B" emissiveIntensity={0.9} />
+      </mesh>
+      {/* Thẻ chip thông tin bàn giao nổi tại đỉnh đường cong */}
+      <Html
+        center
+        position={[midPoint.x, midPoint.y + 0.35, midPoint.z]}
+        distanceFactor={12}
+        zIndexRange={[5, 0]}
+        style={{ pointerEvents: 'none' }}
+      >
+        <div className="office-handoff-chip">
+          <span>⇄ Bàn giao {taskSeq !== undefined ? `#${taskSeq}: ` : ''}</span>
+          <strong>{fromName}</strong>
+          <span>→</span>
+          <strong>{toName}</strong>
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+interface CelebrationBurstProps {
+  coord: { x: number; z: number };
+  taskSeq: number;
+}
+
+/** Hiệu ứng chúc mừng confetti nhẹ nhàng trên bàn khi task vừa hoàn tất nghiệm thu. */
+function CelebrationBurst({ coord, taskSeq }: CelebrationBurstProps) {
+  const particlesRef = useRef<THREE.Group>(null);
+  const colors = ['#F59E0B', '#10B981', '#3B82F6', '#EC4899', '#8B5CF6'];
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (particlesRef.current) {
+      particlesRef.current.children.forEach((child, i) => {
+        const speed = 0.5 + (i % 3) * 0.2;
+        const progress = (t * speed + i * 0.15) % 1;
+        const radius = 0.3 + progress * 0.6;
+        const angle = (i / 10) * Math.PI * 2 + t * 0.5;
+        child.position.set(
+          Math.cos(angle) * radius,
+          1.4 + progress * 1.5,
+          Math.sin(angle) * radius,
+        );
+        child.rotation.x = t * (i % 2 === 0 ? 3 : -3);
+        child.rotation.y = t * 2;
+        child.scale.setScalar(Math.sin(progress * Math.PI) * 0.8 + 0.2);
+      });
+    }
+  });
+
+  return (
+    <group position={[coord.x, 0, coord.z]}>
+      <group ref={particlesRef}>
+        {Array.from({ length: 10 }).map((_, i) => (
+          <mesh key={`confetti-${i}`}>
+            <planeGeometry args={[0.07, 0.05]} />
+            <meshBasicMaterial color={colors[i % colors.length]} side={THREE.DoubleSide} />
+          </mesh>
+        ))}
+      </group>
+      <Html
+        center
+        position={[0, 2.5, 0]}
+        distanceFactor={11}
+        zIndexRange={[5, 0]}
+        style={{ pointerEvents: 'none' }}
+      >
+        <div className="office-closure-chip">
+          <span>🎉 Hoàn tất #{taskSeq}!</span>
+        </div>
+      </Html>
+    </group>
+  );
 }

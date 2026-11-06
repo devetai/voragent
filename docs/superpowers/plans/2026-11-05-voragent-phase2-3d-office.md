@@ -72,7 +72,7 @@ Xây dựng không gian **Văn phòng 3D tương tác** và tạo hình **Agent 
 
 - [x] Dựng các chi tiết mắt: tròng trắng, con ngươi (đồng tử), mí mắt trên và mí mắt dưới.
 - [x] Cơ chế chớp mắt tự nhiên (Blinking Loop): Tự động chớp mắt ngẫu nhiên sau mỗi 3–6 giây.
-- [ ] Biểu cảm theo trạng thái:
+- [x] Biểu cảm theo trạng thái:
   - **Tập trung:** Đồng tử mở to nhìn chăm chú vào màn hình.
   - **Năn nỉ / Chờ duyệt:** Vươn cao cổ, đồng tử long lanh, thêm hạt mồ hôi lăn bên má (`#60A5FA`).
   - **Ngủ (Rảnh):** Mí mắt nhắm cong hình chữ `^ ^` hoặc nhắm nghiền, có hiệu ứng chữ `Z z z` bay lên.
