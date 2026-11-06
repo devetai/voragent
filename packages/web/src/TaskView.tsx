@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
+  Code2,
   AlertTriangle,
   ArrowDown,
   ArrowLeft,
@@ -783,7 +784,6 @@ export function TaskView({
                   if (onSelectProject && task.repoPath) onSelectProject(task.repoPath);
                   else onBack();
                 }}
-                data-tooltip={`Dự án: ${projectName || task.repoPath} — Bấm để mở Bảng Kanban của dự án này`}
               >
                 <Building2 size={13} style={{ color: 'var(--primary, #2563EB)' }} />
                 <span>{projectName || (task.repoPath ? task.repoPath.replace(/[\/\\]+$/, '').split(/[\/\\]/).pop() : 'Dự án')}</span>
@@ -821,8 +821,7 @@ export function TaskView({
                 className="success"
                 disabled={busy}
                 onClick={() => act(() => api.close(task.id))}
-                style={{ height: '30px', minHeight: '30px', padding: '0 0.8rem', fontSize: '0.78rem', fontWeight: 600 }}
-                data-tooltip="Nghiệm thu và đóng hoàn tất công việc này"
+style={{ height: '30px', minHeight: '30px', padding: '0 0.8rem', fontSize: '0.78rem', fontWeight: 600 }}
               >
                 <CheckCircle2 size={13} /> <span>Hoàn tất</span>
               </button>
@@ -834,10 +833,18 @@ export function TaskView({
               target="_blank"
               rel="noreferrer noopener"
               className="btn-live-preview"
-              data-tooltip="Mở Live Preview giao diện web (HTML) trực tiếp từ daemon voragent"
             >
               <Globe size={13} />
               <span>Live Preview</span>
+            </a>
+
+            {/* Nút mở Worktree trong VorStudio Browser IDE */}
+            <a
+              href={`/ide?project=${encodeURIComponent(task.repoPath)}${task.workspacePath ? `&worktree=${encodeURIComponent(task.workspacePath)}` : ''}&taskSeq=${task.seq}${typeof window !== 'undefined' && window.location.search.includes('key=') ? `&key=${new URLSearchParams(window.location.search).get('key')}` : ''}`}
+              className="btn-ide-open"
+            >
+              <Code2 size={13} />
+              <span>Mở IDE</span>
             </a>
 
             <TaskStatusBadge status={task.status} />
@@ -858,7 +865,6 @@ export function TaskView({
                 type="button"
                 className="icon-btn-sm"
                 onClick={onMaximize}
-                data-tooltip="Mở chi tiết Task toàn màn hình"
                 aria-label="Mở toàn màn hình"
               >
                 <Maximize2 size={13} />
@@ -869,7 +875,6 @@ export function TaskView({
                 type="button"
                 className="icon-btn-sm"
                 onClick={onBack}
-                data-tooltip="Đóng cửa sổ (Esc)"
                 aria-label="Đóng cửa sổ"
               >
                 <X size={14} />

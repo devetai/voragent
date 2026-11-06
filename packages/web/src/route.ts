@@ -18,14 +18,16 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-export type AppView = 'projects' | 'board' | 'office' | 'manager' | 'memory' | 'graph' | 'settings' | 'new' | 'task';
-export type TabId = 'projects' | 'board' | 'office' | 'manager' | 'memory' | 'graph' | 'settings';
+export type AppView = 'projects' | 'board' | 'office' | 'manager' | 'memory' | 'graph' | 'settings' | 'new' | 'task' | 'ide';
+export type TabId = 'projects' | 'board' | 'office' | 'manager' | 'memory' | 'graph' | 'settings' | 'ide';
 
 export interface AppRoute {
   view: AppView;
   activeTab: TabId;
   taskId: string | null;
+  taskSeq: number | null;
   projectPath: string | null;
+  worktreePath: string | null;
   pathname: string;
   search: string;
   key: string | null;
@@ -48,6 +50,18 @@ export function parseLocation(loc: { pathname: string; search: string; hash?: st
   const rawProject = searchParams.get('project');
   if (rawProject !== null) {
     projectPath = decodeUriSafely(rawProject);
+  }
+
+  let worktreePath: string | null = null;
+  const rawWorktree = searchParams.get('worktree');
+  if (rawWorktree !== null) {
+    worktreePath = decodeUriSafely(rawWorktree);
+  }
+
+  let taskSeq: number | null = null;
+  const rawTaskSeq = searchParams.get('taskSeq');
+  if (rawTaskSeq !== null && !isNaN(Number(rawTaskSeq))) {
+    taskSeq = Number(rawTaskSeq);
   }
 
   const hash = loc.hash || '';
@@ -84,6 +98,8 @@ export function parseLocation(loc: { pathname: string; search: string; hash?: st
     view = 'graph';
   } else if (pathname === '/settings' || hash === '#/settings') {
     view = 'settings';
+  } else if (pathname === '/ide' || hash === '#/ide') {
+    view = 'ide';
   } else if (pathname === '/board' || hash === '#/board' || projectPath !== null) {
     view = 'board';
   } else {
@@ -97,6 +113,7 @@ export function parseLocation(loc: { pathname: string; search: string; hash?: st
   else if (view === 'memory') activeTab = 'memory';
   else if (view === 'graph') activeTab = 'graph';
   else if (view === 'settings') activeTab = 'settings';
+  else if (view === 'ide') activeTab = 'ide';
   else if (view === 'board' || projectPath !== null) activeTab = 'board';
   else activeTab = 'projects';
 
@@ -104,7 +121,9 @@ export function parseLocation(loc: { pathname: string; search: string; hash?: st
     view,
     activeTab,
     taskId,
+    taskSeq,
     projectPath,
+    worktreePath,
     pathname,
     search: loc.search || '',
     key,
@@ -115,7 +134,7 @@ export function parseLocation(loc: { pathname: string; search: string; hash?: st
  * Xây dựng URL chuẩn từ target (chuỗi hoặc object), tự động bảo lưu query key nếu có.
  */
 export function buildUrl(
-  target: string | { view: AppView; taskId?: string | null; projectPath?: string | null },
+  target: string | { view: AppView; taskId?: string | null; taskSeq?: number | null; projectPath?: string | null; worktreePath?: string | null },
   currentSearch: string = (typeof window !== 'undefined' ? window.location.search : '')
 ): string {
   const currentParams = new URLSearchParams(currentSearch);
@@ -146,6 +165,12 @@ export function buildUrl(
   if (target.projectPath) {
     params.set('project', target.projectPath);
   }
+  if (target.worktreePath) {
+    params.set('worktree', target.worktreePath);
+  }
+  if (target.taskSeq !== undefined && target.taskSeq !== null) {
+    params.set('taskSeq', String(target.taskSeq));
+  }
   if (currentKey) {
     params.set('key', currentKey);
   }
@@ -172,6 +197,9 @@ export function buildUrl(
       break;
     case 'settings':
       basePath = '/settings';
+      break;
+    case 'ide':
+      basePath = '/ide';
       break;
     case 'new':
       basePath = '/new';

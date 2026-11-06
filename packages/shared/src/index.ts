@@ -309,3 +309,57 @@ export interface MigrateResult {
   oldPath: string;
   newPath: string;
 }
+
+
+export interface FileNode {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  size?: number;
+  modifiedTime?: number;
+  hasChildren?: boolean;
+  children?: FileNode[];
+}
+
+export interface FileContent {
+  path: string;
+  content: string;
+  isBinary: boolean;
+  size: number;
+}
+
+export type GitStatusType = 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked';
+
+export interface GitFileStatus {
+  path: string;
+  oldPath?: string;
+  status: GitStatusType;
+  staged: boolean;
+}
+
+export interface GitWorktreeInfo {
+  path: string;
+  head: string;
+  branch: string | null;
+  isMain: boolean;
+  isLocked?: boolean;
+  taskSeq?: number;
+}
+
+export interface GitStatusResult {
+  isGit: boolean;
+  branch: string | null;
+  clean: boolean;
+  files: GitFileStatus[];
+  ahead: number;
+  behind: number;
+  worktrees: GitWorktreeInfo[];
+  currentWorktreePath?: string;
+}
+
+export interface GitBranchInfo {
+  name: string;
+  isCurrent: boolean;
+  commitHash: string;
+  commitMessage?: string;
+}

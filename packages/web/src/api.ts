@@ -1,6 +1,11 @@
 import type {
   BrowseFolderResult,
   Config,
+  FileContent,
+  FileNode,
+  GitBranchInfo,
+  GitStatusResult,
+  GitWorktreeInfo,
   ManagerMode,
   ManagerPlan,
   ManagerSubtask,
@@ -156,6 +161,51 @@ export const api = {
     call<void>('DELETE', `/api/manager/plans/${encodeURIComponent(id)}`),
   updateManagerPlan: (id: string, patch: Partial<ManagerPlan>) =>
     call<ManagerPlan>('PATCH', `/api/manager/plans/${encodeURIComponent(id)}`, patch),
+  // IDE Browser & Git
+  ideTree: (project: string, dir = '') =>
+    call<{ root: string; subDir: string; nodes: FileNode[] }>(
+      'GET',
+      `/api/ide/tree?project=${encodeURIComponent(project)}&dir=${encodeURIComponent(dir)}`,
+    ),
+  ideReadFile: (project: string, path: string) =>
+    call<FileContent>(
+      'GET',
+      `/api/ide/file?project=${encodeURIComponent(project)}&path=${encodeURIComponent(path)}`,
+    ),
+  ideWriteFile: (project: string, path: string, content: string) =>
+    call<{ ok: boolean; path: string; size: number }>('PUT', '/api/ide/file', { project, path, content }),
+  ideCreateItem: (project: string, path: string, type: 'file' | 'directory') =>
+    call<{ ok: boolean; path: string }>('POST', '/api/ide/item', { project, path, type }),
+  ideRenameItem: (project: string, oldPath: string, newPath: string) =>
+    call<{ ok: boolean; oldPath: string; newPath: string }>('PATCH', '/api/ide/item', {
+      project,
+      oldPath,
+      newPath,
+    }),
+  ideDeleteItem: (project: string, path: string) =>
+    call<{ ok: boolean; path: string }>('DELETE', '/api/ide/item', { project, path }),
+  ideGitStatus: (cwd: string) =>
+    call<GitStatusResult>('GET', `/api/ide/git/status?cwd=${encodeURIComponent(cwd)}`),
+  ideGitDiff: (cwd: string, path?: string, staged?: boolean) => {
+    let url = `/api/ide/git/diff?cwd=${encodeURIComponent(cwd)}`;
+    if (path) url += `&path=${encodeURIComponent(path)}`;
+    if (staged) url += '&staged=1';
+    return call<{ diff: string }>('GET', url);
+  },
+  ideGitStage: (cwd: string, paths: string[]) =>
+    call<{ ok: boolean }>('POST', '/api/ide/git/stage', { cwd, paths }),
+  ideGitUnstage: (cwd: string, paths: string[]) =>
+    call<{ ok: boolean }>('POST', '/api/ide/git/unstage', { cwd, paths }),
+  ideGitDiscard: (cwd: string, paths: string[]) =>
+    call<{ ok: boolean }>('POST', '/api/ide/git/discard', { cwd, paths }),
+  ideGitCommit: (cwd: string, message: string) =>
+    call<{ commitHash: string }>('POST', '/api/ide/git/commit', { cwd, message }),
+  ideGitBranches: (cwd: string) =>
+    call<GitBranchInfo[]>('GET', `/api/ide/git/branches?cwd=${encodeURIComponent(cwd)}`),
+  ideGitCheckout: (cwd: string, branch: string, createNew?: boolean) =>
+    call<{ ok: boolean }>('POST', '/api/ide/git/checkout', { cwd, branch, createNew }),
+  ideGitRemoveWorktree: (cwd: string, path: string, force = false) =>
+    call<{ ok: boolean }>('DELETE', '/api/ide/git/worktree', { cwd, path, force }),
 };
 
 export const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));

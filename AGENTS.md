@@ -94,20 +94,27 @@ Mọi AI Agent (Antigravity, Claude Code, Codex, opencode...) khi làm việc tr
    - Mọi thao tác yêu cầu xác nhận (Hủy/xóa kế hoạch Trưởng phòng, xóa task, xóa bộ nhớ chung, thoát trạng thái quan trọng) **BẮT BUỘC** phải sử dụng UI component chuyên dụng (`<ConfirmModal />` hoặc In-place Confirm Card).
    - Component modal xác nhận phải được render qua React Portal (`createPortal(..., document.body)`), có lớp nền mờ (`backdrop-filter: blur(...)`), tự động bẫy phím `Escape` để hủy và focus nút an toàn để chống bấm nhầm.
 
-16. **SỬ DỤNG TOOLTIP CÓ MỤC ĐÍCH & TRIỆT TIÊU RÁC THỊ GIÁC (INTENTIONAL TOOLTIPS & ZERO TOOLTIP CLUTTER):**
-   - **Chỉ sử dụng Tooltip khi thật sự cần thiết và mang lại giá trị gia tăng thông tin:**
-     - **Nút chỉ có Icon (Icon-only buttons):** BẮT BUỘC có Custom UI Tooltip giải thích chức năng (ví dụ: Làm mới, Đóng ✕, Quay lại ←, Sao chép, Xóa 🗑, Cài đặt, View Switcher Grid/Table, Zoom in/out).
-     - **Văn bản bị cắt ngắn (Truncated text):** Tên đường dẫn dài, tiêu đề bị `text-overflow: ellipsis`.
-     - **Chỉ báo trạng thái trừu tượng (Abstract status indicators):** Chấm trạng thái (offline pulse dot), thanh quota hoặc badge số liệu kỹ thuật cần diễn giải chi tiết.
-     - **Phím tắt ẩn (Keyboard shortcuts):** Cung cấp phím tắt kích hoạt nhanh khi nhãn nút không hiển thị phím tắt.
+16. **SỬ DỤNG TOOLTIP CÓ CHỌN LỌC & TRIỆT TIÊU RÁC THỊ GIÁC (INTENTIONAL TOOLTIPS & ZERO TOOLTIP OVERUSE):**
+   - **Nguyên tắc vàng:** **CHỈ GẮN TOOLTIP CHO NHỮNG PHẦN TỬ MÀ KHI NHÌN VÀO NGƯỜI DÙNG CHƯA THỂ HIỂU RÕ Ý NGHĨA HOẶC CÓ PHÍM TẮT ẨN QUAN TRỌNG.** Tuyệt đối không lạm dụng tooltip lên mọi nút bấm làm phát sinh hàng loạt bóng mờ nhảy múa liên tục khi rê chuột dọc giao diện, gây rối mắt và ức chế trải nghiệm.
+   - **CHỈ ĐƯỢC PHÉP gắn Tooltip trong 3 trường hợp thực sự cần thiết:**
+     1. **Biểu tượng trừu tượng hoặc có phím tắt ẩn quan trọng:** Các nút công cụ không có chữ mà icon chưa đủ trực quan hoặc có phím tắt hữu ích không hiển thị trên giao diện (ví dụ: `Ẩn/Hiện thanh bên (Ctrl+B)`, `Bật/Tắt Terminal (Ctrl+`)`, `Toàn màn hình (F11)`).
+     2. **Văn bản bị cắt ngắn (Truncated text):** Tên đường dẫn dài, tiêu đề bị `text-overflow: ellipsis` cần rê chuột để xem toàn bộ nội dung.
+     3. **Chỉ báo trạng thái trừu tượng:** Chấm offline, commit ahead/behind (ví dụ: `↑2` kèm tooltip `2 commit chưa push`), thanh dung lượng/quota phức tạp.
    - **TUYỆT ĐỐI CẤM gắn Tooltip cho:**
-     - Các phần tử **ĐÃ CÓ NHÃN CHỮ RÕ RÀNG (Self-explanatory text labels):**
-       - Tab điều hướng Header khi đang hiện chữ (`Dự án`, `Văn phòng 3D`, `Bảng Kanban`, `Đồ thị`).
-       - Nút hành động chính khi đang có chữ (ví dụ: nút `Task mới` khi nhãn chữ đang hiện).
-       - Checkbox và Radio khi nhãn mô tả đã ghi rõ ràng (ví dụ: `Chỉ dự án đang hoạt động`).
-       - Các nút bấm hành động có chữ trực quan (Lưu, Hủy, Đăng nhập, v.v.).
-     - Logo thương hiệu chính (`voragent`).
-     - Tooltip **lặp lại y hệt hoặc diễn giải thừa thãi** nội dung nhãn chữ đang nhìn thấy (ví dụ: badge ghi `1 task` thì CẤM gắn tooltip `Dự án có 1 task`, badge ghi `main` thì CẤM gắn tooltip `Nhánh Git hiện tại: main`).
+     1. **Các biểu tượng phổ quát ai nhìn vào cũng tự hiểu ý nghĩa (Universal Self-Explanatory Icons):**
+        - Nút đóng `✕` trên tab trình duyệt/editor/terminal, modal close `✕`.
+        - Nút thêm mới `+` trên dải tab.
+        - Các nút xác nhận `✓` và hủy `✕` cạnh ô nhập liệu inline.
+        - Nút quay lại `←` (đặc biệt khi ngữ cảnh đã rõ ràng hoặc đã có nhãn chữ).
+        - Nút xóa từ khóa `✕` trong ô tìm kiếm.
+     2. **Các biểu tượng thao tác vi mô hàng loạt trên danh sách/cây thư mục/danh sách file (Hover Micro-Actions in Lists/Trees):**
+        - Tuyệt đối KHÔNG gắn tooltip cho các nút thao tác nhanh xuất hiện khi hover trên từng dòng của Tree/List (ví dụ: nút tạo file, tạo folder, đổi tên, xóa trong file tree; nút stage `+`, bỏ stage `-`, discard `✕` trong Git diff list). Rê chuột dọc danh sách không bao giờ được phép kích hoạt một rừng bóng tooltip che khuất nội dung. Sử dụng thuộc tính trợ năng `aria-label` thay thế.
+     3. **Các phần tử ĐÃ CÓ NHÃN CHỮ RÕ RÀNG (Self-explanatory text labels):**
+        - Tab điều hướng Header khi đang hiện chữ (`Dự án`, `Văn phòng 3D`, `Bảng Kanban`, `Đồ thị`).
+        - Nút hành động chính khi đang có chữ (ví dụ: nút `Task mới`, `Kanban`, `Commit`, `Lưu`, `Hủy`, `Đăng nhập`).
+        - Checkbox, Radio, Dropdown chọn dự án/worktree đã có chữ và mũi tên dropdown.
+     4. **Logo thương hiệu chính (`voragent`).**
+     5. **Tooltip lặp lại y hệt hoặc diễn giải thừa thãi nhãn chữ đang nhìn thấy.**
 
 17. **RÀ SOÁT TÁC ĐỘNG TOÀN DIỆN & KHÔNG BỎ SÓT KHI THÊM/SỬA TÍNH NĂNG (EXHAUSTIVE IMPACT AUDIT & ZERO OMISSION):**
    - Khi thêm mới, mở rộng hoặc sửa đổi bất kỳ thực thể cốt lõi nào trong hệ thống (như thêm Agent CLI mới [ví dụ: `opencode`], mô hình mới, trạng thái task mới, kiểu nguồn dự án, hoặc chế độ xem mới), AI agent **BẮT BUỘC** phải rà soát toàn bộ các tầng trong monorepo và cập nhật đồng bộ, tuyệt đối không làm chắp vá cục bộ:
@@ -121,3 +128,11 @@ Mọi AI Agent (Antigravity, Claude Code, Codex, opencode...) khi làm việc tr
         - Bộ phân tích văn bản: Bộ nhận diện lệnh terminal `COMMAND_PREFIXES` trong `MarkdownContent.tsx`.
      4. **Tầng Văn phòng 3D (`packages/web/src/office`):** Bàn làm việc, vị trí nệm nghỉ, cốc nước/vật phẩm, bảng màu chủ đề `PROVIDER_THEMES`, và phụ kiện đặc trưng (`Accessory`) trên nhân vật rắn 3D trong `SnakeMesh.tsx`.
      5. **Tài liệu & Kiểm thử:** Cập nhật `README.md`, `CLAUDE.md`, bộ test case tương ứng để bảo đảm không phát sinh hồi quy (regression).
+
+
+18. **TRIỆT TIÊU BÓNG & FOCUS-RING LỆCH KHỎI PHẦN TỬ WRAPPER (ZERO MISALIGNED SHADOWS & FOCUS-RINGS):**
+   - **Nguyên nhân cốt lõi:** Trong `styles.css`, các thẻ form nguyên bản (`input`, `select`, `button`) đã được định nghĩa chiều cao chuẩn toàn cục (`height: 38px; line-height: 36px;`) và vòng sáng tiêu điểm (`box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.18)` trên `:focus`). Khi bọc chúng vào các container tùy biến hẹp hơn (như `.wrapper`, `.nav-select`, `.search-box`, thanh breadcrumb 28–32px), phần tử con bên trong bị tràn hoặc lệch tâm, khiến bóng `box-shadow` khi focus xuất hiện lơ lửng, trồi lên/xuống lệch hẳn so với khung viền của container cha gây mất thẩm mỹ nghiêm trọng.
+   - **Quy tắc bắt buộc phải tuân thủ:**
+     1. **Triệt tiêu toàn bộ Focus-Ring & Chiều cao thừa của phần tử con:** Mọi `<input>`, `<select>`, `<button>` nằm trong container tùy biến **BẮT BUỘC** phải được reset tường minh: `box-shadow: none !important; outline: none !important; height: 100% !important; min-height: 0 !important; line-height: normal !important; border: none !important; background: transparent !important; margin: 0 !important;`.
+     2. **Hiệu ứng Focus-Ring chuyển lên Container cha qua `:focus-within`:** Vòng sáng focus (`box-shadow: 0 0 0 2.5px rgba(217, 119, 87, 0.2)`) và đổi màu viền (`border-color`) **BẮT BUỘC** phải được gắn trên container cha (`.wrapper:focus-within`), tuyệt đối không để phần tử con tự sinh shadow riêng lẻ.
+     3. **Ưu tiên Custom Component thay vì Native Select:** Luôn ưu tiên dùng `<CustomSelect />` hoặc các popover menu tùy chỉnh thay vì thẻ `<select>` thô của HTML (vốn có mũi tên và hành vi render focus-ring không nhất quán giữa các trình duyệt hệ thống).

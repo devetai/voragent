@@ -32,6 +32,24 @@ import { resolveProviderModel, type Orchestrator } from './orchestrator.js';
 import type { ProjectCatalog } from './projects.js';
 import type { Store } from './store.js';
 import { initGitRepository, workspaceSummary } from './workspace.js';
+import {
+  browseTree,
+  checkoutBranch,
+  commitChanges,
+  createProjectItem,
+  createTerminalSession,
+  deleteProjectItem,
+  discardFiles,
+  getGitDiff,
+  getGitStatus,
+  listBranches,
+  readProjectFile,
+  removeWorktree,
+  renameProjectItem,
+  stageFiles,
+  unstageFiles,
+  writeProjectFile,
+} from './ide/index.js';
 
 export const KEY_COOKIE = 'voragent_key';
 export const KEY_HEADER = 'x-voragent-key';
@@ -919,6 +937,192 @@ export function createServer(d: {
     return c.body(null, 204);
   });
 
+  // ------------------------------------------------------------ ide
+  app.get('/api/ide/tree', async (c) => {
+    const project = c.req.query('project');
+    if (!project) return err(c, 400, 'Thiếu tham số project');
+    const dir = c.req.query('dir') || '';
+    try {
+      const data = await browseTree(project, dir);
+      return c.json(data);
+    } catch (e) {
+      return err(c, 500, e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  app.get('/api/ide/file', async (c) => {
+    const project = c.req.query('project');
+    const path = c.req.query('path');
+    if (!project || !path) return err(c, 400, 'Thiếu tham số project hoặc path');
+    try {
+      const data = await readProjectFile(project, path);
+      return c.json(data);
+    } catch (e) {
+      return err(c, 500, e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  app.put('/api/ide/file', async (c) => {
+    const b = await readJson(c);
+    const project = reqString(b, 'project');
+    const path = reqString(b, 'path');
+    const content = typeof b.content === 'string' ? b.content : '';
+    try {
+      const res = await writeProjectFile(project, path, content);
+      return c.json(res);
+    } catch (e) {
+      return err(c, 500, e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  app.post('/api/ide/item', async (c) => {
+    const b = await readJson(c);
+    const project = reqString(b, 'project');
+    const path = reqString(b, 'path');
+    const type = b.type === 'directory' ? 'directory' : 'file';
+    try {
+      const res = await createProjectItem(project, path, type);
+      return c.json(res, 201);
+    } catch (e) {
+      return err(c, 500, e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  app.patch('/api/ide/item', async (c) => {
+    const b = await readJson(c);
+    const project = reqString(b, 'project');
+    const oldPath = reqString(b, 'oldPath');
+    const newPath = reqString(b, 'newPath');
+    try {
+      const res = await renameProjectItem(project, oldPath, newPath);
+      return c.json(res);
+    } catch (e) {
+      return err(c, 500, e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  app.delete('/api/ide/item', async (c) => {
+    const b = await readJson(c);
+    const project = reqString(b, 'project');
+    const path = reqString(b, 'path');
+    try {
+      const res = await deleteProjectItem(project, path);
+      return c.json(res);
+    } catch (e) {
+      return err(c, 500, e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  // Git & Worktree
+  app.get('/api/ide/git/status', async (c) => {
+    const cwd = c.req.query('cwd');
+    if (!cwd) return err(c, 400, 'Thiếu tham số cwd');
+    try {
+      const status = await getGitStatus(cwd);
+      return c.json(status);
+    } catch (e) {
+      return err(c, 500, e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  app.get('/api/ide/git/diff', async (c) => {
+    const cwd = c.req.query('cwd');
+    if (!cwd) return err(c, 400, 'Thiếu tham số cwd');
+    const path = c.req.query('path') || undefined;
+    const staged = c.req.query('staged') === '1';
+    try {
+      const diff = await getGitDiff(cwd, path, staged);
+      return c.json(diff);
+    } catch (e) {
+      return err(c, 500, e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  app.post('/api/ide/git/stage', async (c) => {
+    const b = await readJson(c);
+    const cwd = reqString(b, 'cwd');
+    const paths = Array.isArray(b.paths) ? b.paths.map(String) : [];
+    try {
+      await stageFiles(cwd, paths);
+      return c.json({ ok: true });
+    } catch (e) {
+      return err(c, 500, e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  app.post('/api/ide/git/unstage', async (c) => {
+    const b = await readJson(c);
+    const cwd = reqString(b, 'cwd');
+    const paths = Array.isArray(b.paths) ? b.paths.map(String) : [];
+    try {
+      await unstageFiles(cwd, paths);
+      return c.json({ ok: true });
+    } catch (e) {
+      return err(c, 500, e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  app.post('/api/ide/git/discard', async (c) => {
+    const b = await readJson(c);
+    const cwd = reqString(b, 'cwd');
+    const paths = Array.isArray(b.paths) ? b.paths.map(String) : [];
+    try {
+      await discardFiles(cwd, paths);
+      return c.json({ ok: true });
+    } catch (e) {
+      return err(c, 500, e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  app.post('/api/ide/git/commit', async (c) => {
+    const b = await readJson(c);
+    const cwd = reqString(b, 'cwd');
+    const message = reqString(b, 'message');
+    try {
+      const res = await commitChanges(cwd, message);
+      return c.json(res);
+    } catch (e) {
+      return err(c, 500, e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  app.get('/api/ide/git/branches', async (c) => {
+    const cwd = c.req.query('cwd');
+    if (!cwd) return err(c, 400, 'Thiếu tham số cwd');
+    try {
+      const branches = await listBranches(cwd);
+      return c.json(branches);
+    } catch (e) {
+      return err(c, 500, e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  app.post('/api/ide/git/checkout', async (c) => {
+    const b = await readJson(c);
+    const cwd = reqString(b, 'cwd');
+    const branch = reqString(b, 'branch');
+    const createNew = b.createNew === true;
+    try {
+      const res = await checkoutBranch(cwd, branch, createNew);
+      return c.json(res);
+    } catch (e) {
+      return err(c, 500, e instanceof Error ? e.message : String(e));
+    }
+  });
+
+  app.delete('/api/ide/git/worktree', async (c) => {
+    const b = await readJson(c);
+    const cwd = reqString(b, 'cwd');
+    const worktreePath = reqString(b, 'path');
+    const force = b.force === true;
+    try {
+      const res = await removeWorktree(cwd, worktreePath, force);
+      return c.json(res);
+    } catch (e) {
+      return err(c, 500, e instanceof Error ? e.message : String(e));
+    }
+  });
+
   // ------------------------------------------------------------ web (tĩnh)
 
   app.get('*', async (c) => {
@@ -963,7 +1167,9 @@ export function attachWebSocket(
   d: { bus: EventBus; key: string },
 ): { close(): Promise<void> } {
   const wss = new WebSocketServer({ noServer: true });
+  const terminalWss = new WebSocketServer({ noServer: true });
   const sockets = new Set<WebSocket>();
+  const terminalSockets = new Set<WebSocket>();
 
   const reject = (socket: Duplex, code: number, text: string): void => {
     socket.write(`HTTP/1.1 ${code} ${text}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
@@ -977,7 +1183,9 @@ export function attachWebSocket(
     } catch {
       return reject(socket, 400, 'Bad Request');
     }
-    if (url.pathname !== '/api/events') return reject(socket, 404, 'Not Found');
+    if (url.pathname !== '/api/events' && url.pathname !== '/api/terminal/ws') {
+      return reject(socket, 404, 'Not Found');
+    }
     const host = req.headers.host;
     if (!isLocalHost(host)) return reject(socket, 403, 'Forbidden');
     const origin = req.headers.origin;
@@ -997,19 +1205,36 @@ export function attachWebSocket(
     });
     if (!keyMatches(given, d.key)) return reject(socket, 401, 'Unauthorized');
 
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      sockets.add(ws);
-      const unsubscribe = d.bus.subscribe((e) => {
-        if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(e));
+    if (url.pathname === '/api/events') {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        sockets.add(ws);
+        const unsubscribe = d.bus.subscribe((e) => {
+          if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(e));
+        });
+        const cleanup = (): void => {
+          unsubscribe();
+          sockets.delete(ws);
+        };
+        ws.on('close', cleanup);
+        ws.on('error', cleanup);
+        ws.send(JSON.stringify({ type: 'HELLO' }));
       });
-      const cleanup = (): void => {
-        unsubscribe();
-        sockets.delete(ws);
-      };
-      ws.on('close', cleanup);
-      ws.on('error', cleanup);
-      ws.send(JSON.stringify({ type: 'HELLO' }));
-    });
+    } else if (url.pathname === '/api/terminal/ws') {
+      terminalWss.handleUpgrade(req, socket, head, (ws) => {
+        terminalSockets.add(ws);
+        const cwd = url.searchParams.get('cwd') || process.cwd();
+        const cols = parseInt(url.searchParams.get('cols') || '80', 10);
+        const rows = parseInt(url.searchParams.get('rows') || '24', 10);
+        createTerminalSession({
+          id: Math.random().toString(36).slice(2),
+          cwd,
+          ws,
+          cols,
+          rows,
+        });
+        ws.on('close', () => terminalSockets.delete(ws));
+      });
+    }
   };
   server.on('upgrade', onUpgrade);
 
@@ -1017,7 +1242,10 @@ export function attachWebSocket(
     close: () => new Promise<void>((resolveClose) => {
       server.off('upgrade', onUpgrade);
       for (const ws of sockets) ws.terminate();
-      wss.close(() => resolveClose());
+      for (const ws of terminalSockets) ws.terminate();
+      wss.close(() => {
+        terminalWss.close(() => resolveClose());
+      });
     }),
   };
 }

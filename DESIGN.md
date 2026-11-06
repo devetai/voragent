@@ -375,16 +375,18 @@ Sử dụng bảng kiểm tra này trước khi merge bất kỳ thay đổi UI 
     3. Không thể tùy chỉnh kiểu dáng, màu sắc, phím tắt hoặc văn bản nút bấm theo ngữ cảnh.
   - **Quy chuẩn bắt buộc:** Mọi thao tác xác nhận phá hủy (Hủy/xóa kế hoạch Trưởng phòng, xóa task, xóa bộ nhớ chung, reset trạng thái) phải sử dụng component Modal chuyên dụng (`<ConfirmModal />` hoặc In-place Confirm Card). Modal phải được render qua React Portal (`createPortal(..., document.body)`), có lớp nền mờ (`backdrop-filter: blur(...)`), tự động bẫy phím `Escape` để hủy và tự động focus nút Hủy an toàn.
 
-- **Sử dụng Tooltip có Mục đích & Triệt tiêu Rác thị giác (Intentional Tooltips & Zero Tooltip Clutter - Rule 16):**
-  - **Triết lý:** Tooltip là công cụ trợ giúp bổ sung cho phần tử khiếm khuyết chữ (icon-only), văn bản bị cắt ngắn hoặc chỉ số kỹ thuật trừu tượng. Việc lạm dụng gắn tooltip lên mọi nút bấm, nhãn chữ, checkbox hay logo khiến tooltip bật liên tục khi di chuột, gây giật mắt và ức chế thị giác cho người dùng.
-  - **Chỉ gắn Tooltip cho:**
-    1. Các nút Icon-only (`.icon-btn`, `.icon-btn-sm`).
-    2. Văn bản đường dẫn dài bị co ngắn (`text-overflow: ellipsis`).
-    3. Chấm trạng thái hoặc chỉ báo màu sắc trừu tượng (như chấm mất kết nối, thanh Quota).
+- **Sử dụng Tooltip có Chọn lọc & Triệt tiêu Rác thị giác (Intentional Tooltips & Zero Tooltip Overuse - Rule 16):**
+  - **Triết lý:** **CHỈ GẮN TOOLTIP CHO NHỮNG PHẦN TỬ MÀ KHI NHÌN VÀO NGƯỜI DÙNG CHƯA THỂ HIỂU RÕ Ý NGHĨA HOẶC CÓ PHÍM TẮT ẨN QUAN TRỌNG.** Việc lạm dụng gắn tooltip lên mọi nút bấm, biểu tượng hiển nhiên hay các nút hover trên từng dòng danh sách/cây thư mục khiến tooltip nảy lên liên tục khi di chuột, gây che khuất nội dung, giật mắt và ức chế trải nghiệm người dùng.
+  - **Chỉ gắn Tooltip trong 3 trường hợp thực sự cần thiết:**
+    1. Các nút Icon trừu tượng hoặc có phím tắt ẩn quan trọng không hiện trên UI (ví dụ: `Ẩn/Hiện thanh bên (Ctrl+B)`, `Bật/Tắt Terminal (Ctrl+`)`, `Toàn màn hình (F11)`).
+    2. Văn bản đường dẫn dài bị co ngắn (`text-overflow: ellipsis`) cần rê chuột để đọc toàn văn.
+    3. Chỉ báo trạng thái trừu tượng (như chấm mất kết nối, badge `↑2` kèm `2 commit chưa push`).
   - **Nghiêm cấm gắn Tooltip cho:**
-    1. Các nút, tab, liên kết đã có nhãn chữ rõ ràng (Tab Header, nút Task mới khi có nhãn chữ, Checkbox, nút thao tác chính).
-    2. Logo thương hiệu chính.
-    3. Bất kỳ tooltip nào chỉ lặp lại nguyên văn nhãn chữ đang hiển thị.
+    1. **Các biểu tượng phổ quát ai nhìn vào cũng tự hiểu ý nghĩa (Universal Icons):** Nút đóng `✕` trên tab/modal, nút thêm tab `+`, nút xác nhận `✓`/hủy `✕` cạnh ô input, nút quay lại `←`, nút xóa từ khóa `✕` trong ô tìm kiếm.
+    2. **Các nút thao tác vi mô hàng loạt trên danh sách/cây (Hover Micro-Actions in Lists/Trees):** Nút tạo file con, tạo thư mục con, đổi tên, xóa trong cây thư mục; nút stage `+`, bỏ stage `-`, discard `✕` trong danh sách thay đổi Git. Rê chuột dọc danh sách tuyệt đối không được làm kích hoạt một rừng tooltip. Sử dụng thuộc tính trợ năng `aria-label` thay thế.
+    3. **Các phần tử đã có nhãn chữ rõ ràng:** Tab header, nút hành động có chữ (Kanban, Task mới, Commit, Lưu, Hủy), checkbox, radio, dropdown đã có chữ và icon ngữ cảnh.
+    4. **Logo thương hiệu chính.**
+    5. **Bất kỳ tooltip nào chỉ lặp lại nguyên văn hoặc diễn giải thừa thãi nhãn chữ đang hiển thị.**
 
 - **Rà soát Tác động Toàn diện & Không bỏ sót khi Thêm/Sửa Tính năng (Exhaustive Impact Audit - Rule 17):**
   - **Triết lý:** Một Agent CLI mới hoặc tính năng mới là một công dân hạng nhất (first-class citizen) trong hệ thống. Việc bổ sung phải diễn ra đồng bộ từ thiết lập cấu hình, định tuyến adapter, phân công nhiệm vụ, biểu tượng vector, màu sắc thương hiệu, giao diện 2D đến không gian 3D.
@@ -399,3 +401,11 @@ Sử dụng bảng kiểm tra này trước khi merge bất kỳ thay đổi UI 
   - **Trải nghiệm thân thiện:**
     1. Hoạt họa SVG chú rắn Voragent dễ thương chớp mắt, vẫy đuôi cùng tia lửa điện từ trường giữa 2 đầu dây cắm, biến sự cố kỹ thuật thành trải nghiệm thú vị, nhẹ nhàng.
     2. Cung cấp giải pháp xử lý tức thì: Nút "Thử kết nối lại ngay", "Tải lại trang", và ô dán URL/khóa key mới để kết nối lại 1-click mà không bắt người dùng phải gõ thủ công.
+
+
+- **Triệt tiêu bóng & focus-ring lệch khỏi phần tử wrapper (Zero Misaligned Shadows & Focus-Rings) (Rule 18):**
+  - **Nguyên nhân cốt lõi:** Trong `styles.css`, các thẻ form nguyên bản (`input`, `select`, `button`) đã được định nghĩa chiều cao chuẩn toàn cục (`height: 38px; line-height: 36px;`) và vòng sáng tiêu điểm (`box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.18)` trên `:focus`). Khi bọc chúng vào các container tùy biến hẹp hơn (như `.wrapper`, `.nav-select`, `.search-box`, thanh breadcrumb 28–32px), phần tử con bên trong bị tràn hoặc lệch tâm, khiến bóng `box-shadow` khi focus xuất hiện lơ lửng, trồi lên/xuống lệch hẳn so với khung viền của container cha gây mất thẩm mỹ nghiêm trọng.
+  - **Quy tắc bắt buộc:**
+    1. **Triệt tiêu toàn bộ Focus-Ring & Chiều cao thừa của phần tử con:** Mọi `<input>`, `<select>`, `<button>` nằm trong container tùy biến **BẮT BUỘC** phải được reset tường minh: `box-shadow: none !important; outline: none !important; height: 100% !important; min-height: 0 !important; line-height: normal !important; border: none !important; background: transparent !important; margin: 0 !important;`.
+    2. **Hiệu ứng Focus-Ring chuyển lên Container cha qua `:focus-within`:** Vòng sáng focus (`box-shadow: 0 0 0 2.5px rgba(217, 119, 87, 0.2)`) và đổi màu viền (`border-color`) **BẮT BUỘC** phải được gắn trên container cha (`.wrapper:focus-within`), tuyệt đối không để phần tử con tự sinh shadow riêng lẻ.
+    3. **Ưu tiên Custom Component thay vì Native Select:** Luôn ưu tiên dùng `<CustomSelect />` hoặc các popover menu tùy chỉnh thay vì thẻ `<select>` thô của HTML (vốn có mũi tên và hành vi render focus-ring không nhất quán giữa các trình duyệt hệ thống).

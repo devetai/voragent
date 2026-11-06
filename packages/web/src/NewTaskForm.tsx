@@ -188,8 +188,6 @@ export function NewTaskForm({
           type="button"
           className="icon-btn-sm"
           onClick={onCancel}
-          data-tooltip="Đóng (Esc)"
-          data-tooltip-placement="bottom"
           aria-label="Đóng"
         >
           <X size={16} />

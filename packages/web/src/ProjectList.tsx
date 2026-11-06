@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   Brain,
   Building2,
+  Code2,
   Crown,
   FileEdit,
   FolderGit2,
@@ -51,6 +52,7 @@ export function ProjectList({
   onOpen,
   onOpenOffice3D,
   onOpenManager,
+  onOpenIde,
   onRefresh,
 }: {
   projects: Project[] | null;
@@ -64,6 +66,7 @@ export function ProjectList({
   onOpen: (p: Project) => void;
   onOpenOffice3D?: (p: Project) => void;
   onOpenManager?: (p: Project) => void;
+  onOpenIde?: (p: Project) => void;
   onRefresh: () => void;
 }) {
   const [filter, setFilter] = useState('');
@@ -133,7 +136,7 @@ export function ProjectList({
               type="button"
               className="projects-search-clear"
               onClick={() => setFilter('')}
-              data-tooltip="Xóa từ khóa tìm kiếm"
+              aria-label="Xóa từ khóa tìm kiếm"
             >
               <X size={13} />
             </button>
@@ -212,7 +215,7 @@ export function ProjectList({
       {gitNotice !== null && (
         <div className="notice" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{gitNotice}</span>
-          <button type="button" className="icon-btn-sm" onClick={() => setGitNotice(null)} data-tooltip="Đóng thông báo">
+          <button type="button" className="icon-btn-sm" onClick={() => setGitNotice(null)} aria-label="Đóng thông báo">
             ✕
           </button>
         </div>
@@ -418,6 +421,17 @@ export function ProjectList({
                           aria-label="Bàn Trưởng phòng"
                         >
                           <Crown size={13} />
+                        </button>
+                      )}
+                      {onOpenIde && (
+                        <button
+                          type="button"
+                          className="icon-btn-sm"
+                          onClick={() => onOpenIde(p)}
+                          data-tooltip="Mở Browser IDE (VorStudio)"
+                          aria-label="Browser IDE"
+                        >
+                          <Code2 size={13} />
                         </button>
                       )}
                       <button
@@ -640,6 +654,17 @@ export function ProjectList({
                               aria-label="Bàn Trưởng phòng"
                             >
                               <Crown size={13} />
+                            </button>
+                          )}
+                          {onOpenIde && (
+                            <button
+                              type="button"
+                              className="icon-btn-sm"
+                              onClick={() => onOpenIde(p)}
+                              data-tooltip="Mở Browser IDE (VorStudio)"
+                              aria-label="Browser IDE"
+                            >
+                              <Code2 size={13} />
                             </button>
                           )}
                           <button

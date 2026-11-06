@@ -60,8 +60,14 @@ export function CustomSelect<T extends string = string>({
   const visibleBaseOptions = hideDisabled ? options.filter((o) => !o.disabled) : options;
   const isSearchable = searchable ?? visibleBaseOptions.length >= 5;
 
+  const isMatch = (a: string, b: string) =>
+    a === b ||
+    (typeof a === 'string' &&
+      typeof b === 'string' &&
+      a.replace(/\\/g, '/').toLowerCase() === b.replace(/\\/g, '/').toLowerCase());
+
   const selectedOption =
-    visibleBaseOptions.find((o) => o.value === value && !o.disabled) ??
+    visibleBaseOptions.find((o) => isMatch(o.value, value) && !o.disabled) ??
     visibleBaseOptions.find((o) => !o.disabled);
 
   const filteredOptions = isSearchable && query.trim() !== ''
@@ -233,7 +239,7 @@ export function CustomSelect<T extends string = string>({
             </div>
           ) : (
             filteredOptions.map((opt) => {
-              const isSelected = !opt.disabled && selectedOption?.value === opt.value;
+              const isSelected = !opt.disabled && selectedOption && isMatch(selectedOption.value, opt.value);
               return (
                 <div
                   key={opt.value}

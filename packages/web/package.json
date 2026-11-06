@@ -9,9 +9,17 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
+    "@codemirror/lang-css": "^6.3.1",
+    "@codemirror/lang-html": "^6.4.12",
+    "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/lang-markdown": "^6.5.2",
     "@react-three/drei": "^9.121.5",
     "@react-three/fiber": "^8.17.10",
+    "@uiw/react-codemirror": "^4.25.12",
     "@voragent/shared": "workspace:*",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "lucide-react": "^1.68.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",

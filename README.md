@@ -12,6 +12,7 @@ Trung tâm điều phối AI agent cục bộ, hỗ trợ làm việc song song 
 - **Cơ chế Dọn dẹp rác & Quản lý dung lượng (Cleanup Engine):** Giải phóng an toàn các worktree của task đã hoàn tất, dọn worktree mồ côi, thu gọn log và tối ưu SQLite database chỉ với 1 cú click (Quick Cleanup), bảo toàn 100% lịch sử chat, diff và checkpoints.
 - **Khám phá dự án tự động (Project Discovery):** Tự động phát hiện các dự án bạn đã từng mở trong Claude Code và Google Antigravity. Cho phép tạo task nhanh chóng theo tên dự án thay vì phải copy đường dẫn dài dòng.
 - **Giao diện Web Warm Cozy Tech:** Thiết kế theo quy chuẩn Warm Cozy Tech, bao gồm Danh sách dự án, Bảng Kanban 2D, Không gian Văn phòng 3D (3D Office), Đồ thị quan hệ (Task Dependency Graph) và Trang Cài đặt hệ thống (`/settings`).
+- **VorStudio Lightweight Browser IDE nhúng trực tiếp (`/ide`):** Xem cấu trúc thư mục dạng cây (File Explorer lazy loading), xem và chỉnh sửa tệp tin đa tab với CodeMirror 6, quản lý Git trực quan (Source Control: xem changed files, diff unified, stage/unstage, commit, switch branch) và Web Terminal tương tác thời gian thực (`@xterm/xterm` kết nối WebSocket hai chiều) ngay trong trình duyệt. Cho phép chuyển đổi tức thì giữa nhánh chính và Git Worktrees của các Sub-agent để kiểm tra mã nguồn.
 - **Định tuyến URL Semantic & Zero Double Scrollbars:** Không sử dụng hash URL, bảo lưu trạng thái và token xác thực khi reload; triệt tiêu thanh cuộn lồng nhau (duy nhất 1 thanh cuộn hoạt động trên toàn trang).
 
 ---

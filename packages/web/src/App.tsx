@@ -4,6 +4,7 @@ import {
   Brain,
   Building2,
   ChevronRight,
+  Code2,
   Crown,
   Folder,
   FolderGit2,
@@ -22,6 +23,7 @@ import { ConnectionOverlay } from './components/ConnectionOverlay';
 import { INITIAL_CONNECTION, nextConnectionState } from './connection';
 import type { ConnectionEvent, ConnectionState } from './connection';
 import { GraphCanvas } from './graph/GraphCanvas';
+import { IdeView } from './ide/IdeView';
 import { ManagerPanel } from './ManagerPanel';
 import { NewTaskForm } from './NewTaskForm';
 import { OfficeCanvas } from './office/OfficeCanvas';
@@ -364,7 +366,7 @@ export function App() {
   };
 
   return (
-    <div className={`app ${activeTab === 'office' ? 'is-office-view' : activeTab === 'graph' ? 'is-graph-view' : ''}`}>
+    <div className={`app ${activeTab === 'office' ? 'is-office-view' : activeTab === 'graph' ? 'is-graph-view' : activeTab === 'ide' ? 'is-ide-view' : ''}`}>
 
       {/* Single-Row Sticky Command Bar — Gọn đúng 1 hàng ngang duy nhất */}
       <div className="sticky-top-header">
@@ -466,7 +468,7 @@ export function App() {
               type="button"
               className="header-manager-btn"
               onClick={() => setOverlay(overlay?.kind === 'manager' ? null : { kind: 'manager' })}
-              data-tooltip="Mở Bàn Trưởng phòng — Duyệt câu hỏi, nghiệm thu & giao mục tiêu"
+              aria-label="Bàn Trưởng phòng"
               style={{
                 background: managerInboxCount > 0 ? '#FEF3C7' : 'var(--bg-surface)',
                 color: managerInboxCount > 0 ? '#92400E' : 'var(--text-primary)',
@@ -481,6 +483,28 @@ export function App() {
                   {managerInboxCount}
                 </span>
               )}
+            </button>
+
+            {/* Nút mở nhanh VorStudio Browser IDE */}
+            <button
+              type="button"
+              className={`icon-btn ${activeTab === 'ide' ? 'active' : ''}`}
+              onClick={() => nav({ view: 'ide', projectPath: viewedPath })}
+              data-tooltip="Mở VorStudio Browser IDE (Tập tin, Git & Terminal)"
+              aria-label="Browser IDE"
+              style={{
+                width: '32px',
+                height: '32px',
+                padding: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: activeTab === 'ide' ? 'var(--amber-bg)' : undefined,
+                color: activeTab === 'ide' ? 'var(--amber-text)' : undefined,
+                borderColor: activeTab === 'ide' ? 'var(--amber-border)' : undefined,
+              }}
+            >
+              <Code2 size={16} />
             </button>
 
             {/* Nút Cài đặt hệ thống & Quản lý lưu trữ */}
@@ -606,6 +630,14 @@ export function App() {
           events={state.events}
           onSelectTask={(id) => setOverlay({ kind: 'task', taskId: id })}
         />
+      ) : activeTab === 'ide' ? (
+        <IdeView
+          initialProjectPath={route.projectPath || viewedPath}
+          initialWorktreePath={route.worktreePath}
+          initialTaskSeq={route.taskSeq}
+          projects={projects || []}
+          onNavigate={(view, pPath) => nav({ view, projectPath: pPath })}
+        />
       ) : activeTab === 'projects' && viewedPath === null ? (
         <ProjectList
           projects={projects}
@@ -622,6 +654,7 @@ export function App() {
             nav({ view: 'office', projectPath: p.path });
             setOverlay({ kind: 'manager' });
           }}
+          onOpenIde={(p) => nav({ view: 'ide', projectPath: p.path })}
           onRefresh={() => { void loadProjects(true); }}
         />
       ) : (
