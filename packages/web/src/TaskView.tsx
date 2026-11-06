@@ -1,18 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
-  Cpu,
-  Globe,
   AlertTriangle,
+  ArrowDown,
   ArrowLeft,
+  Building2,
   Check,
   CheckCircle2,
+  ChevronRight,
   Clock,
   Copy,
+  Cpu,
   FileCode2,
   Folder,
   GitBranch,
   GitCommit,
+  Globe,
   Maximize2,
   MessagesSquare,
   RotateCcw,
@@ -81,18 +84,22 @@ export function TaskView({
   task,
   events,
   providers = [],
+  projectName,
   onLoaded,
   onBack,
   onDeleted,
+  onSelectProject,
   inModal = false,
   onMaximize,
 }: {
   task: Task;
   events: VEvent[];
   providers?: ProviderState[];
+  projectName?: string;
   onLoaded: (taskId: string, events: VEvent[]) => void;
   onBack: () => void;
   onDeleted?: (taskId: string) => void;
+  onSelectProject?: (projectPath: string) => void;
   inModal?: boolean;
   onMaximize?: () => void;
 }) {
@@ -104,6 +111,40 @@ export function TaskView({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [pendingText, setPendingText] = useState<string | null>(null);
+  const [userScrolledUp, setUserScrolledUp] = useState(false);
+  const transcriptRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = useCallback((smooth = false) => {
+    if (transcriptRef.current) {
+      transcriptRef.current.scrollTo({
+        top: transcriptRef.current.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto',
+      });
+    }
+  }, []);
+
+  const handleTranscriptScroll = () => {
+    if (!transcriptRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = transcriptRef.current;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 80;
+    setUserScrolledUp(!isNearBottom);
+  };
+
+  // Cuộn xuống cuối ngay khi mở task mới hoặc vừa nạp xong
+  useEffect(() => {
+    setUserScrolledUp(false);
+    const timer = setTimeout(() => scrollToBottom(false), 60);
+    return () => clearTimeout(timer);
+  }, [task.id, scrollToBottom]);
+
+  // Cuộn xuống mượt mà khi có nội dung mới (nếu người dùng không chủ động cuộn ngược lên trên)
+  useEffect(() => {
+    if (!userScrolledUp) {
+      scrollToBottom(true);
+    }
+  }, [events.length, isSending, task.status, userScrolledUp, scrollToBottom]);
 
   // Tải lịch sử đầy đủ khi mở.
   useEffect(() => {
@@ -185,11 +226,41 @@ export function TaskView({
       ? [{ kind: 'user' as const, text: initialPrompt, ts: task.createdAt }]
       : [];
 
+  // Xóa tin nhắn optimistic khi tin nhắn thật đã nạp vào events/turns
+  useEffect(() => {
+    if (pendingText) {
+      const exists = displayItems.some((it) => it.kind === 'user' && it.text.trim() === pendingText.trim());
+      if (exists) {
+        setPendingText(null);
+      }
+    }
+  }, [displayItems, pendingText]);
+
   const handleSend = (): void => {
-    if (canSend && text.trim() !== '' && !busy) {
-      act(() => api.send(task.id, text.trim()), () => setText(''));
+    if (canSend && text.trim() !== '' && !busy && !isSending) {
+      const msgToSend = text.trim();
+      setText('');
+      setPendingText(msgToSend);
+      setIsSending(true);
+      setUserScrolledUp(false);
+      scrollToBottom(true);
+
+      api.send(task.id, msgToSend).then(
+        () => {
+          setIsSending(false);
+          scrollToBottom(true);
+        },
+        (e: unknown) => {
+          setIsSending(false);
+          setPendingText(null);
+          setText(msgToSend);
+          setError(errText(e));
+        }
+      );
     }
   };
+
+  const isAgentThinking = isSending || task.status === 'running';
 
   const displayPath = task.workspacePath ?? task.repoPath;
   const changedFileLines = diff?.status ? diff.status.split('\n').filter((l) => l.trim().length > 0) : [];
@@ -399,7 +470,11 @@ export function TaskView({
           </div>
         )}
 
-        <div className="transcript">
+        <div
+          className="transcript"
+          ref={transcriptRef}
+          onScroll={handleTranscriptScroll}
+        >
           {displayItems.map((it, i) => {
             if (it.kind === 'handoff') {
               return (
@@ -444,26 +519,87 @@ export function TaskView({
               </div>
             );
           })}
-          {displayItems.length === 0 && (
+
+          {/* Tin nhắn tạm thời (optimistic) của người dùng ngay khi vừa bấm Gửi */}
+          {pendingText && (
+            <div className="msg user is-sending">
+              <MarkdownContent content={pendingText} />
+              <div className="msg-sending-indicator">
+                <Clock size={11} className="spin" />
+                <span>Đang gửi chỉ đạo tới agent…</span>
+              </div>
+            </div>
+          )}
+
+          {/* Bubble hiển thị Agent đang phản hồi / suy nghĩ */}
+          {isAgentThinking && (
+            <div className="agent-thinking-bubble">
+              <div className="agent-thinking-avatar">
+                <ProviderIcon provider={task.currentProvider ?? 'antigravity'} size={15} />
+              </div>
+              <div className="agent-thinking-body">
+                <div className="agent-thinking-meta">
+                  <span className="agent-thinking-name">
+                    {task.currentProvider
+                      ? task.currentProvider.charAt(0).toUpperCase() + task.currentProvider.slice(1)
+                      : 'Agent'}
+                  </span>
+                  <span className="agent-thinking-state">
+                    {isSending
+                      ? 'Đã tiếp nhận chỉ đạo, đang chuẩn bị thực thi…'
+                      : task.status === 'running'
+                      ? 'Đang suy nghĩ & thực thi công việc…'
+                      : 'Đang phản hồi…'}
+                  </span>
+                </div>
+                <div className="agent-typing-dots">
+                  <span className="dot dot-1" />
+                  <span className="dot dot-2" />
+                  <span className="dot dot-3" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {displayItems.length === 0 && !pendingText && !isAgentThinking && (
             <div className="muted" style={{ padding: '2rem 1rem', textAlign: 'center' }}>
               Chưa có nội dung trao đổi.
             </div>
           )}
         </div>
+
+        {/* Nút nổi cuộn xuống tin nhắn mới nhất khi người dùng cuộn lên trên */}
+        {userScrolledUp && (
+          <button
+            type="button"
+            className="transcript-scroll-bottom-btn"
+            onClick={() => {
+              setUserScrolledUp(false);
+              scrollToBottom(true);
+            }}
+            data-tooltip="Cuộn xuống tin nhắn mới nhất"
+            aria-label="Cuộn xuống tin nhắn mới nhất"
+          >
+            <ArrowDown size={14} />
+            <span>Xuống tin mới nhất</span>
+          </button>
+        )}
       </div>
 
       {/* Sticky Bottom Action Dock */}
-      <div className={`chat-action-bar ${!canSend ? 'is-readonly' : ''}`}>
+      <div className={`chat-action-bar ${!canSend || isSending ? 'is-readonly' : ''}`}>
         <div className="chat-input-row">
           <textarea
             value={text}
-            rows={canSend ? 2 : 1}
+            rows={canSend && !isSending ? 2 : 1}
             placeholder={
-              canSend
+              isSending
+                ? 'Đang gửi yêu cầu tới agent…'
+                : canSend
                 ? 'Nhập hướng dẫn hoặc phản hồi bổ sung (Ctrl + Enter để gửi)…'
-                : 'Task đang thực thi hoặc đã kết thúc.'
+                : 'Agent đang thực thi hoặc công việc đã kết thúc.'
             }
-            disabled={!canSend}
+            disabled={!canSend || isSending}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -474,10 +610,10 @@ export function TaskView({
           />
           <button
             type="button"
-            className="primary chat-btn-send"
-            disabled={busy || !canSend || text.trim() === ''}
+            className="chat-btn-send"
+            disabled={busy || isSending || !canSend || text.trim() === ''}
             onClick={handleSend}
-            data-tooltip="Gửi phản hồi (Ctrl+Enter)"
+            data-tooltip="Gửi phản hồi cho agent (Ctrl+Enter)"
           >
             <Send size={14} /> <span>Gửi</span> <kbd>Ctrl+↵</kbd>
           </button>
@@ -605,18 +741,19 @@ export function TaskView({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <button
               type="button"
-              className="danger"
+              className="danger-solid"
               disabled={busy}
               onClick={handleDeleteTask}
-              style={{ height: '28px', minHeight: '28px', padding: '0 0.65rem', fontSize: '0.78rem' }}
+              style={{ height: '28px', minHeight: '28px', padding: '0 0.75rem', fontSize: '0.78rem' }}
             >
               Xác nhận xóa
             </button>
             <button
               type="button"
+              className="office-mini-btn"
               disabled={busy}
               onClick={() => setConfirmDelete(false)}
-              style={{ height: '28px', minHeight: '28px', padding: '0 0.65rem', fontSize: '0.78rem' }}
+              style={{ height: '28px', minHeight: '28px', padding: '0 0.75rem', fontSize: '0.78rem' }}
             >
               Hủy
             </button>
@@ -624,21 +761,42 @@ export function TaskView({
         </div>
       )}
 
-      {/* Header gọn gàng 1 khối duy nhất */}
+      {/* Header gọn gàng kèm breadcrumb ngữ cảnh dự án */}
       <div className="task-header" style={{ marginBottom: '0.65rem', paddingBottom: '0.65rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0, flex: 1 }}>
-            {!inModal ? (
+        {/* Breadcrumb dự án khi xem toàn trang */}
+        {!inModal && (
+          <div className="task-breadcrumb">
+            <button
+              type="button"
+              className="icon-btn-sm"
+              onClick={onBack}
+              data-tooltip="Quay lại danh sách (Esc)"
+              aria-label="Quay lại danh sách"
+            >
+              <ArrowLeft size={14} />
+            </button>
+            <div className="task-breadcrumb-trail">
               <button
                 type="button"
-                className="icon-btn"
-                onClick={onBack}
-                data-tooltip="Quay lại (Esc)"
-                aria-label="Quay lại"
+                className="task-breadcrumb-link"
+                onClick={() => {
+                  if (onSelectProject && task.repoPath) onSelectProject(task.repoPath);
+                  else onBack();
+                }}
+                data-tooltip={`Dự án: ${projectName || task.repoPath} — Bấm để mở Bảng Kanban của dự án này`}
               >
-                <ArrowLeft size={16} />
+                <Building2 size={13} style={{ color: 'var(--primary, #2563EB)' }} />
+                <span>{projectName || (task.repoPath ? task.repoPath.replace(/[\/\\]+$/, '').split(/[\/\\]/).pop() : 'Dự án')}</span>
               </button>
-            ) : (
+              <ChevronRight size={13} className="task-breadcrumb-sep" />
+              <span className="task-breadcrumb-current">Task #{task.seq}</span>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0, flex: 1 }}>
+            {inModal && (
               <span className="badge info" style={{ flexShrink: 0 }}>🔍 Task #{task.seq}</span>
             )}
             <h2
@@ -656,31 +814,20 @@ export function TaskView({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
+            {/* Nút Hoàn tất với màu xanh success đúng chuẩn ngữ nghĩa */}
             {task.status !== 'closed' && (
               <button
                 type="button"
-                className="primary"
+                className="success"
                 disabled={busy}
                 onClick={() => act(() => api.close(task.id))}
-                style={{ height: '30px', minHeight: '30px', padding: '0 0.7rem', fontSize: '0.78rem' }}
-                data-tooltip="Nghiệm thu và đóng công việc này"
+                style={{ height: '30px', minHeight: '30px', padding: '0 0.8rem', fontSize: '0.78rem', fontWeight: 600 }}
+                data-tooltip="Nghiệm thu và đóng hoàn tất công việc này"
               >
-                <CheckCircle2 size={13} /> Hoàn tất
+                <CheckCircle2 size={13} /> <span>Hoàn tất</span>
               </button>
             )}
 
-            <button
-              type="button"
-              className="icon-btn-sm danger"
-              disabled={busy}
-              onClick={() => setConfirmDelete(true)}
-              data-tooltip="Xóa vĩnh viễn task này"
-              aria-label="Xóa task"
-            >
-              <Trash2 size={13} />
-            </button>
-
-            
             {/* Nút Live Preview giao diện trực tiếp từ daemon voragent */}
             <a
               href={`/api/tasks/${task.id}/preview/index.html${typeof window !== 'undefined' ? window.location.search : ''}`}
@@ -694,6 +841,17 @@ export function TaskView({
             </a>
 
             <TaskStatusBadge status={task.status} />
+
+            <button
+              type="button"
+              className="icon-btn-sm danger"
+              disabled={busy}
+              onClick={() => setConfirmDelete(true)}
+              data-tooltip="Xóa vĩnh viễn task này"
+              aria-label="Xóa task"
+            >
+              <Trash2 size={13} />
+            </button>
 
             {inModal && onMaximize && (
               <button

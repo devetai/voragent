@@ -146,15 +146,17 @@ export function resolveProviderModel(
   config?: Config,
 ): string | null {
   const allModels = PROVIDER_MODELS[provider] ?? [];
-  if (model && allModels.some((m) => m.id === model)) {
-    return model;
+  if (model) {
+    if (allModels.length === 0 || allModels.some((m) => m.id === model)) {
+      return model;
+    }
   }
   const configured = config?.models?.[provider];
   if (configured && (allModels.length === 0 || allModels.some((m) => m.id === configured))) {
     return configured;
   }
   const def = allModels.find((m) => m.default) ?? allModels[0];
-  return def ? def.id : null;
+  return def ? def.id : (model ?? null);
 }
 
 const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
@@ -425,6 +427,7 @@ export function createOrchestrator(d: {
         taskSeq: task.seq,
         mode: task.mode,
         baseBranchOrCommit,
+        allowExisting: true,
       });
       task = store.updateTask(taskId, {
         workspacePath: ws.path, branch: ws.branch, baseCommit: ws.baseCommit,

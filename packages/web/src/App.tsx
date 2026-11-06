@@ -32,7 +32,7 @@ import { SettingsView } from './SettingsView';
 import { TaskView } from './TaskView';
 import { applyEvent, mergeEvents, projectKeyOf, resolveProjectRoute, tasksOfProject } from './state';
 import type { UiState } from './state';
-import { useAppRoute } from './route';
+import { buildUrl, useAppRoute } from './route';
 import type { AppView } from './route';
 
 type Action =
@@ -114,10 +114,24 @@ export function App() {
   const taskId = route.taskId;
   const open = taskId !== null ? state.tasks.get(taskId) : undefined;
 
-  const viewedPath = route.projectPath;
+  // Khi đang mở task, dự án ngữ cảnh ưu tiên theo URL hoặc repoPath của task
+  const effectiveProjectPath = route.projectPath ?? open?.repoPath ?? null;
+  const viewedPath = effectiveProjectPath;
   const viewedProject = viewedPath === null ? undefined
     : projects?.find((p) => projectKeyOf(p.path) === projectKeyOf(viewedPath));
   const viewedName = viewedProject?.name ?? (viewedPath === null ? '' : baseName(viewedPath));
+
+  // Tự động bảo toàn tham số project trong URL query khi đang xem task
+  useEffect(() => {
+    if (route.view === 'task' && open?.repoPath && !route.projectPath) {
+      const canonical = buildUrl({
+        view: 'task',
+        taskId: open.id,
+        projectPath: open.repoPath,
+      }, window.location.search);
+      window.history.replaceState(null, '', canonical);
+    }
+  }, [route.view, route.projectPath, open?.id, open?.repoPath]);
 
   const officeTasks = viewedPath === null ? tasks : tasksOfProject(tasks, { path: viewedPath });
   const officeMemories = viewedPath === null
@@ -350,7 +364,7 @@ export function App() {
   };
 
   return (
-    <div className={`app ${activeTab === 'office' ? 'is-office-view' : ''}`}>
+    <div className={`app ${activeTab === 'office' ? 'is-office-view' : activeTab === 'graph' ? 'is-graph-view' : ''}`}>
 
       {/* Single-Row Sticky Command Bar — Gọn đúng 1 hàng ngang duy nhất */}
       <div className="sticky-top-header">
@@ -536,9 +550,11 @@ export function App() {
             task={open}
             events={state.events.get(open.id) ?? []}
             providers={providers}
+            projectName={viewedName}
             onLoaded={onHistory}
             onBack={() => nav(listView)}
             onDeleted={() => { void reload(); nav(listView); }}
+            onSelectProject={(projectPath) => nav({ view: 'board', projectPath })}
           />
         ) : (
           <div className="card" style={{ padding: '2rem', textAlign: 'center', marginTop: '1rem' }}>
@@ -612,7 +628,10 @@ export function App() {
           tasks={officeTasks}
           events={state.events}
           loading={loading}
-          onOpen={(id) => nav(`/task/${encodeURIComponent(id)}`)}
+          onOpen={(id) => {
+            const t = state.tasks.get(id);
+            nav({ view: 'task', taskId: id, projectPath: t?.repoPath ?? viewedPath });
+          }}
           onCreateNew={() => nav(viewedPath !== null ? `/new?project=${encodeURIComponent(viewedPath)}` : '/new')}
         />
       )}
@@ -635,14 +654,19 @@ export function App() {
                 task={overlayTask}
                 events={state.events.get(overlayTask.id) ?? []}
                 providers={providers}
+                projectName={projects?.find((p) => projectKeyOf(p.path) === projectKeyOf(overlayTask.repoPath))?.name ?? baseName(overlayTask.repoPath)}
                 onLoaded={onHistory}
                 onBack={() => setOverlay(null)}
                 onDeleted={() => { setOverlay(null); void reload(); }}
+                onSelectProject={(projectPath) => {
+                  setOverlay(null);
+                  nav({ view: 'board', projectPath });
+                }}
                 inModal={true}
                 onMaximize={() => {
                   const id = overlayTask.id;
                   setOverlay(null);
-                  nav(`/task/${encodeURIComponent(id)}`);
+                  nav({ view: 'task', taskId: id, projectPath: overlayTask.repoPath ?? viewedPath });
                 }}
               />
             ) : overlay.kind === 'manager' ? (

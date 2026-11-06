@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import React from 'react';
+import { renderToString } from 'react-dom/server';
 import type { ProviderState, Task, VEvent } from '@voragent/shared';
 import { extractGraphData } from '../src/graph/graphModel';
 import { ForceSimulation } from '../src/graph/forceSimulation';
+import { GraphCanvas } from '../src/graph/GraphCanvas';
 import type { GraphEdge, GraphNode } from '../src/graph/types';
 
 describe('Giai đoạn 3 - Đồ thị Quan hệ Tri thức & Mô hình Lực', () => {
@@ -202,5 +205,18 @@ describe('Giai đoạn 3 - Đồ thị Quan hệ Tri thức & Mô hình Lực', 
     const connectedToB = edges.filter((e) => e.source === 'b' || e.target === 'b');
     expect(connectedToB.length).toBe(1);
     expect(connectedToB[0]?.source).toBe('a');
+  });
+
+  it('GraphCanvas được bọc trong graph-canvas-wrapper để khớp 100vh và chống thanh cuộn kép', () => {
+    const html = renderToString(
+      React.createElement(GraphCanvas, {
+        tasks: dummyTasks,
+        providers: dummyProviders,
+        events: new Map(),
+      })
+    );
+
+    expect(html).toContain('graph-canvas-wrapper');
+    expect(html).toContain('overflow:hidden');
   });
 });

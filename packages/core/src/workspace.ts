@@ -1,6 +1,7 @@
 import { copyFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, normalize, resolve } from 'node:path';
 import spawn from 'cross-spawn';
 import type { WorkspaceMode } from '@voragent/shared';
 
@@ -78,6 +79,7 @@ export async function createWorkspace(o: {
   taskSeq: number;
   mode: WorkspaceMode;
   baseBranchOrCommit?: string | null;
+  allowExisting?: boolean;
 }): Promise<Workspace> {
   const top = await runGit(o.repoPath, ['rev-parse', '--show-toplevel']);
   if (top.code !== 0) {
@@ -109,13 +111,72 @@ export async function createWorkspace(o: {
     baseCommit = head.stdout.toString('utf8').trim();
   }
 
-  const branch = `voragent/task-${o.taskSeq}`;
+  let branch = `voragent/task-${o.taskSeq}`;
   const projectSlug = basename(root).replace(/[^a-zA-Z0-9._-]/g, '_') || 'project';
-  const path = join(o.worktreesDir, projectSlug, `task-${o.taskSeq}`);
-  const existing = await runGit(root, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]);
-  if (existing.code === 0) {
-    throw new Error(`Nhánh ${branch} đã tồn tại; task này đã có worktree.`);
+  let path = join(o.worktreesDir, projectSlug, `task-${o.taskSeq}`);
+
+  if (o.allowExisting) {
+    // 1. Kiểm tra xem worktree cho task này đã được tạo từ trước tại path hay chưa
+    const worktreeListRes = await runGit(root, ['worktree', 'list', '--porcelain']);
+    if (worktreeListRes.code === 0) {
+      const wtBlocks = worktreeListRes.stdout.toString('utf8').split('\n\n');
+      for (const block of wtBlocks) {
+        const lines = block.split('\n');
+        const wtLine = lines.find((l) => l.startsWith('worktree '));
+        const branchLine = lines.find((l) => l.startsWith('branch '));
+        if (wtLine && branchLine) {
+          const wtPath = wtLine.slice('worktree '.length).trim();
+          const wtBranchRef = branchLine.slice('branch '.length).trim();
+          if (
+            normalize(wtPath).toLowerCase() === normalize(path).toLowerCase() &&
+            wtBranchRef === `refs/heads/${branch}`
+          ) {
+            // Worktree đã tồn tại sẵn và hợp lệ cho task này: tiếp quản và sử dụng ngay
+            const headRes = await runGit(path, ['rev-parse', 'HEAD']);
+            const currentCommit = headRes.code === 0 ? headRes.stdout.toString('utf8').trim() : baseCommit;
+            return { path, branch, baseCommit: currentCommit, isolated: true };
+          }
+        }
+      }
+    }
+
+    // 2. Nếu nhánh hoặc thư mục đã tồn tại từ trước (do task cũ, xung đột hoặc lỗi lượt trước):
+    let existing = await runGit(root, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]);
+    if (existing.code === 0 || existsSync(path)) {
+      // Kiểm tra xem nhánh này có đang được worktree nào khác sử dụng không
+      const isBranchInUse =
+        worktreeListRes.code === 0 &&
+        worktreeListRes.stdout.toString('utf8').includes(`refs/heads/${branch}`);
+
+      if (!isBranchInUse && existing.code === 0) {
+        // Nhánh cũ mồ côi (không có worktree nào dùng): dọn dẹp để tạo mới sạch sẽ
+        await runGit(root, ['branch', '-D', branch]).catch(() => undefined);
+        existing = await runGit(root, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]);
+      }
+
+      // Nếu nhánh vẫn tồn tại (do worktree khác đang dùng) hoặc thư mục path đã bị chiếm:
+      // Tự động chuyển sang nhánh và thư mục kế tiếp chưa bị trùng (như voragent/task-N_1, task-N_2...)
+      let attempt = 1;
+      while (existing.code === 0 || existsSync(path)) {
+        branch = `voragent/task-${o.taskSeq}_${attempt}`;
+        path = join(o.worktreesDir, projectSlug, `task-${o.taskSeq}_${attempt}`);
+        existing = await runGit(root, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]);
+        attempt++;
+        if (attempt > 100) break;
+      }
+    }
+  } else {
+    const existing = await runGit(root, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]);
+    if (existing.code === 0) {
+      throw new Error(`Nhánh ${branch} đã tồn tại; task này đã có worktree.`);
+    }
   }
+
+  // Dọn dẹp thư mục rác nếu còn sót lại không phải là git worktree
+  if (existsSync(path)) {
+    await rm(path, { recursive: true, force: true }).catch(() => undefined);
+  }
+
   await mkdir(join(o.worktreesDir, projectSlug), { recursive: true });
   await git(root, ['worktree', 'add', '-b', branch, path, baseCommit]);
 

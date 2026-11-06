@@ -423,7 +423,17 @@ export function GraphCanvas({
   const selectedNode = visibleData.nodes.find((n) => n.id === selectedNodeId) ?? null;
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: 'calc(100vh - 68px)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)', overflow: 'hidden' }}>
+    <div
+      className="graph-canvas-wrapper"
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        borderRadius: 'var(--radius-lg)',
+        border: '1px solid var(--border-subtle)',
+        overflow: 'hidden',
+      }}
+    >
       <GraphToolbar
         filter={filter}
         onFilterChange={setFilter}

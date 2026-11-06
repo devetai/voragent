@@ -11,6 +11,7 @@ import {
   GitCommit,
   GitFork,
   Play,
+  Plus,
   SlidersHorizontal,
   X,
 } from 'lucide-react';
@@ -171,8 +172,18 @@ export function NewTaskForm({
 
   return (
     <form className="panel form form-new-task" onSubmit={submit} style={{ maxWidth: '680px', margin: '0 auto' }}>
-      <div className="task-nav">
-        <h2>Tạo Task Mới</h2>
+      <div className="task-nav" style={{ paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-subtle)', marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: 'var(--radius-sm)', background: 'var(--bg-subtle)', color: 'var(--blue-base)' }}>
+            <Plus size={18} />
+          </div>
+          <div>
+            <h2 style={{ fontSize: '1.2rem', margin: 0, fontWeight: 700 }}>Tạo Task Mới</h2>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              Khởi tạo công việc độc lập trong git worktree cách ly
+            </div>
+          </div>
+        </div>
         <button
           type="button"
           className="icon-btn-sm"
@@ -363,11 +374,31 @@ export function NewTaskForm({
       )}
 
       <div className="row form-new-task-actions" style={{ marginTop: '1.25rem', justifyContent: 'flex-end', gap: '0.75rem' }}>
-        <button type="button" onClick={onCancel} disabled={busy}>
+        <button
+          type="button"
+          className="office-mini-btn"
+          onClick={onCancel}
+          disabled={busy}
+          style={{ height: '36px', padding: '0 1rem', fontSize: '0.85rem' }}
+        >
           Hủy bỏ <kbd>Esc</kbd>
         </button>
-        <button type="submit" className="primary" disabled={busy}>
-          <Play size={14} /> {busy ? 'Đang khởi tạo…' : 'Bắt đầu thực thi'}
+        <button
+          type="submit"
+          className="primary btn-create-task-submit"
+          disabled={busy || !repoPath.trim() || !message.trim()}
+          style={{
+            height: '36px',
+            padding: '0 1.25rem',
+            fontSize: '0.875rem',
+            fontWeight: 600,
+            background: 'var(--blue-base)',
+            borderColor: '#1D4ED8',
+            color: '#FFFFFF',
+            boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
+          }}
+        >
+          <Play size={15} /> <span>{busy ? 'Đang khởi tạo…' : 'Bắt đầu thực thi'}</span>
         </button>
       </div>
     </form>
