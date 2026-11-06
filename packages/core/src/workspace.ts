@@ -77,6 +77,7 @@ export async function createWorkspace(o: {
   worktreesDir: string;
   taskSeq: number;
   mode: WorkspaceMode;
+  baseBranchOrCommit?: string | null;
 }): Promise<Workspace> {
   const top = await runGit(o.repoPath, ['rev-parse', '--show-toplevel']);
   if (top.code !== 0) {
@@ -84,13 +85,29 @@ export async function createWorkspace(o: {
   }
   const root = top.stdout.toString('utf8').trim();
 
-  const head = await runGit(root, ['rev-parse', '--verify', 'HEAD']);
-  if (head.code !== 0) {
-    throw new Error(
-      `Kho git tại ${o.repoPath} chưa có commit nào, không thể tạo worktree. Hãy tạo ít nhất một commit rồi thử lại.`,
-    );
+  let baseCommit: string;
+  if (o.baseBranchOrCommit) {
+    const res = await runGit(root, ['rev-parse', '--verify', o.baseBranchOrCommit]);
+    if (res.code === 0) {
+      baseCommit = res.stdout.toString('utf8').trim();
+    } else {
+      const head = await runGit(root, ['rev-parse', '--verify', 'HEAD']);
+      if (head.code !== 0) {
+        throw new Error(
+          `Kho git tại ${o.repoPath} chưa có commit nào, không thể tạo worktree. Hãy tạo ít nhất một commit rồi thử lại.`,
+        );
+      }
+      baseCommit = head.stdout.toString('utf8').trim();
+    }
+  } else {
+    const head = await runGit(root, ['rev-parse', '--verify', 'HEAD']);
+    if (head.code !== 0) {
+      throw new Error(
+        `Kho git tại ${o.repoPath} chưa có commit nào, không thể tạo worktree. Hãy tạo ít nhất một commit rồi thử lại.`,
+      );
+    }
+    baseCommit = head.stdout.toString('utf8').trim();
   }
-  const baseCommit = head.stdout.toString('utf8').trim();
 
   const branch = `voragent/task-${o.taskSeq}`;
   const projectSlug = basename(root).replace(/[^a-zA-Z0-9._-]/g, '_') || 'project';
@@ -103,7 +120,7 @@ export async function createWorkspace(o: {
   await git(root, ['worktree', 'add', '-b', branch, path, baseCommit]);
 
   try {
-    if (o.mode !== 'head-commit') {
+    if (o.mode !== 'head-commit' && !o.baseBranchOrCommit) {
       // Tracked changes (staged + unstaged, deletions, binary) relative to HEAD.
       const diff = await runGit(root, ['diff', 'HEAD', '--binary', ...DIFF_FLAGS]);
       if (diff.code !== 0) throw new Error(`git diff thất bại: ${diff.stderr.trim()}`);

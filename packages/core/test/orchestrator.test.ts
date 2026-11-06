@@ -504,4 +504,43 @@ describe('orchestrator', () => {
     await p;
     expect(store.turnsOf(t.id)[0]!.status).toBe('done');
   }, 60_000);
+  it('dispatchManagerPlan tạo chuỗi subtask liên kết qua parentTaskId và tuân thủ pipeline tuần tự', async () => {
+    adapters.set('fake-a', fake('fake-a', 'fake-ok.jsonl'));
+    adapters.set('fake-b', fake('fake-b', 'fake-ok.jsonl'));
+    const o = make({ priority: ['fake-a', 'fake-b'] });
+
+    const plan = await o.createManagerPlan({
+      repoPath: repo,
+      goal: 'Thiết kế và kiểm thử tính năng',
+      subtasks: [
+        { title: '[Kiến trúc] Bước 1', message: 'Làm lõi', assignedProvider: 'fake-a', role: 'Kiến trúc' },
+        { title: '[Kiểm thử] Bước 2', message: 'Kiểm tra', assignedProvider: 'fake-b', role: 'Kiểm thử' },
+      ],
+    });
+
+    const dispatched = await o.dispatchManagerPlan(plan.id);
+    expect(dispatched.subtasks).toHaveLength(2);
+    const id0 = dispatched.subtasks[0]!.taskId!;
+    const id1 = dispatched.subtasks[1]!.taskId!;
+    expect(id0).toBeTruthy();
+    expect(id1).toBeTruthy();
+
+    const t0 = store.getTask(id0)!;
+    const t1 = store.getTask(id1)!;
+    expect(t0.parentTaskId).toBeFalsy();
+    expect(t1.parentTaskId).toBe(t0.id);
+
+    // Khi t0 chưa closed, t1 TUYỆT ĐỐI KHÔNG được chạy (vẫn ở queued)
+    await o.tick();
+    await o.idle();
+    expect(store.getTask(id1)!.status).toBe('queued');
+
+    // Nghiệm thu/đóng t0
+    o.closeTask(t0.id);
+    expect(store.getTask(id0)!.status).toBe('closed');
+
+    // Sau khi t0 closed, t1 được giải phóng và hoàn thành
+    const t1Final = await run(o, id1, 'awaiting_user');
+    expect(t1Final.status).toBe('awaiting_user');
+  }, 60_000);
 });

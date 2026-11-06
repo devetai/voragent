@@ -33,9 +33,8 @@ describe('Antigravity CLI (agy) Adapter', () => {
     });
     expect(inv2.args).toContain('--conversation');
     expect(inv2.args).toContain('conv-123');
-    expect(inv2.args).toContain('--model');
-    expect(inv2.args).toContain('gemini-4-argon');
-    expect(inv2.args).toContain('--dangerously-skip-permissions');
+    expect(inv2.args).not.toContain('--model'); // agy khong ho tro co --model
+        expect(inv2.args).toContain('--dangerously-skip-permissions');
     expect(inv2.args).toContain('-p');
     expect(inv2.args).toContain('Tiếp tục');
   });

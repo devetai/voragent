@@ -275,6 +275,15 @@ export function createOrchestrator(d: {
       const task = store.getTask(turn.taskId);
       if (!task || (task.status !== 'queued' && task.status !== 'waiting_quota')) return;
 
+      // Pipeline tuần tự: Task có parentTaskId chỉ được chạy khi task cha đã hoàn tất ('closed').
+      // Nếu task cha chưa xong hoặc gặp lỗi ('failed'), task con không được phép chạy trước.
+      if (task.parentTaskId) {
+        const parent = store.getTask(task.parentTaskId);
+        if (parent && parent.status !== 'closed') {
+          return;
+        }
+      }
+
       const running = new Map<ProviderId, number>();
       for (const f of inflight.values()) running.set(f.provider, (running.get(f.provider) ?? 0) + 1);
       const priority = task.priority ?? config.priority;
@@ -380,8 +389,19 @@ export function createOrchestrator(d: {
 
     // 3. workspace
     if (task.workspacePath === null) {
+      let baseBranchOrCommit: string | null = null;
+      if (task.parentTaskId) {
+        const parent = store.getTask(task.parentTaskId);
+        if (parent?.branch) {
+          baseBranchOrCommit = parent.branch;
+        }
+      }
       const ws = await createWorkspace({
-        repoPath: task.repoPath, worktreesDir, taskSeq: task.seq, mode: task.mode,
+        repoPath: task.repoPath,
+        worktreesDir,
+        taskSeq: task.seq,
+        mode: task.mode,
+        baseBranchOrCommit,
       });
       task = store.updateTask(taskId, {
         workspacePath: ws.path, branch: ws.branch, baseCommit: ws.baseCommit,
@@ -504,6 +524,13 @@ export function createOrchestrator(d: {
             data: { repoPath: task.repoPath },
           });
         } catch { /* ignore */ }
+      }
+
+      if (linkedPlan && linkedPlan.mode === 'auto' && task.status === 'awaiting_user') {
+        // Trong chế độ tự động hoàn toàn (auto), khi task vừa xong 1 lượt,
+        // Trưởng phòng tự động đóng task để kích hoạt giai đoạn tiếp theo.
+        closeTask(task.id);
+        return;
       }
 
       if (linkedPlan && linkedPlan.status === 'dispatched') {
@@ -739,6 +766,7 @@ export function createOrchestrator(d: {
     const updated = store.updateTask(taskId, { status: 'closed' });
     emit(taskId, null, 'STATE_CHANGED', { status: 'closed' });
     syncManagerOnTaskUpdate(updated);
+    void tick(); // Kích hoạt ngay lập tức cho các task phụ thuộc tiếp theo
   }
 
   function updateTask(taskId: string, patch: Partial<Task>): Task {
@@ -932,6 +960,7 @@ export function createOrchestrator(d: {
 
     const list = subtasksOverride ?? plan.subtasks;
     const dispatchedSubtasks: ManagerSubtask[] = [];
+    let prevTaskId: string | null = null;
 
     for (const sub of list) {
       const effectiveProvider = isInstalled(sub.assignedProvider) ? sub.assignedProvider : fallbackProvider;
@@ -943,8 +972,10 @@ export function createOrchestrator(d: {
         message: sub.message,
         priority,
         role: sub.role,
+        parentTaskId: prevTaskId,
       });
       dispatchedSubtasks.push({ ...sub, assignedProvider: effectiveProvider, taskId: created.id });
+      prevTaskId = created.id;
     }
 
     const updated = store.updateManagerPlan(plan.id, {

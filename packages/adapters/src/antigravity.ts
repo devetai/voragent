@@ -144,7 +144,8 @@ export function createAntigravityAdapter(): Adapter {
         args: [
           '--log-file',
           lastLogFile,
-          ...(input.model ? ['--model', input.model] : []),
+          // agy CLI hien khong ho tro co --model; mo hinh duoc cau hinh qua moi truong/IDE Antigravity.
+          // Khong truyen --model de tranh loi "flags provided but not defined: -model".
           ...(input.sessionId ? ['--conversation', input.sessionId] : []),
           '--dangerously-skip-permissions',
           '-p',

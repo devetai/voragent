@@ -115,6 +115,23 @@ export function Board({
                               <Clock size={10} /> Chờ quota
                             </span>
                           )}
+                          {(() => {
+                            if (t.status === 'queued' && t.parentTaskId) {
+                              const parent = tasks.find((x) => x.id === t.parentTaskId);
+                              if (parent && parent.status !== 'closed') {
+                                return (
+                                  <span
+                                    className="badge"
+                                    style={{ fontSize: '10.5px', padding: '1px 6px', background: 'var(--bg-canvas)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
+                                    title={`Đang chờ #${parent.seq} (${parent.title}) hoàn thành`}
+                                  >
+                                    <Clock size={10} /> Chờ #${parent.seq}
+                                  </span>
+                                );
+                              }
+                            }
+                            return null;
+                          })()}
                           {isUnisolated(t) && (
                             <span className="badge warn" style={{ fontSize: '10.5px', padding: '1px 6px' }} title="Không cách ly Git Worktree">
                               <AlertTriangle size={10} />
